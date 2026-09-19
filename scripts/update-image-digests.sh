@@ -13,22 +13,34 @@
 #   - deploy/docker/docker-compose.dev.yml
 #   - deploy/docker/docker-compose.yml
 #   - deploy/docker/docker-compose.production.yml
+#   - deploy/ansible/vars.yml / vars.example.yml
+#   - deploy/ansible/roles/kamailio/templates/compose/kamailio.j2
+#   - deploy/ansible/roles/llamenos-whisper/templates/compose/whisper.j2
 #   - signal-notifier/Dockerfile
 #   - deploy/docker/Dockerfile.nodejs (node:26-slim + bun zip)
+#
+# NOTE (2026-09-19, #722): the tags below are verified against the upstream
+# registry, not copied from compose files — "ollama/ollama:0.6",
+# "fedirz/faster-whisper-server:0.4.1" and "kamailio/kamailio:5.7" were never
+# published (confirmed via direct registry API queries, not just `docker
+# pull` failures). Whisper has no bare/untagged releases at all, only
+# -cpu/-cuda variants. Kamailio's runtime image lives at
+# ghcr.io/kamailio/kamailio, not Docker Hub. Before bumping any of these
+# three further, re-verify the target tag actually exists upstream first.
 set -euo pipefail
 
 images=(
   "postgres:17-alpine"
   "caddy:2.9-alpine"
   "rustfs/rustfs:latest"
-  "fedirz/faster-whisper-server:0.4.1"
+  "fedirz/faster-whisper-server:0.4.0-cpu"
   "andrius/asterisk:latest"
-  "kamailio/kamailio:5.7"
+  "ghcr.io/kamailio/kamailio:5.7.1-bookworm"
   "coturn/coturn:4"
   "glitchtip/glitchtip:v4.1"
   "redis:7-alpine"
   "bbernhard/signal-cli-rest-api:0.92"
-  "ollama/ollama:latest"
+  "ollama/ollama:0.6.0"
   "containrrr/watchtower:1.7.1"
   "tecnativa/docker-socket-proxy:latest"
   "oven/bun:1.3.5-slim"

@@ -181,9 +181,11 @@ services:
 
   # ── Optional: Whisper Transcription ───────────────────────
   whisper:
-    # TODO: pin digest — run scripts/update-image-digests.sh once tag is published to Docker Hub
-    # docker pull fedirz/faster-whisper-server:0.4.1 && docker inspect --format='{{index .RepoDigests 0}}' fedirz/faster-whisper-server:0.4.1
-    image: fedirz/faster-whisper-server:0.4.1
+    # NOTE: "0.4.1" was never a published tag (see #722) — no bare/untagged
+    # release exists for this image, only -cpu/-cuda variants. Pinned to
+    # 0.4.0-cpu (the earliest published 0.4.x patch, matching the cpu default
+    # in WHISPER__DEVICE below) per scripts/update-image-digests.sh
+    image: fedirz/faster-whisper-server:0.4.0-cpu@sha256:f77aaf85e2e811aae96a60b04c85ff7cb0e0f2be6729c6fd7600340842412539  # pinned 2026-09-19
     profiles: ["transcription"]
     restart: unless-stopped
     environment:
@@ -201,7 +203,11 @@ services:
   # ── Optional: Asterisk PBX ───────────────────────────────
   asterisk:
     image: andrius/asterisk@sha256:e30df5ec1b512827bf3cffc49b8000b07376a05c950736d028348eba80035015 # 20.x
-    profiles: ["asterisk"]
+    # Also enabled by "telephony": kamailio (telephony profile) has a hard
+    # `depends_on: asterisk: condition: service_healthy` below, so activating
+    # telephony without asterisk previously failed compose config resolution
+    # entirely (pre-existing bug, found while verifying #722's fix)
+    profiles: ["asterisk", "telephony"]
     restart: unless-stopped
     volumes:
       - ./asterisk-config:/etc/asterisk:ro
@@ -247,7 +253,12 @@ services:
 
   # ── Optional: Kamailio SIP Proxy (telephony profile) ──────
   kamailio:
-    image: kamailio/kamailio:5.7  # TODO: pin digest — run scripts/update-image-digests.sh
+    # NOTE: "kamailio/kamailio" does not exist on Docker Hub (only
+    # kamailio-ci/kamailio-store, neither suitable for production) and ":5.7"
+    # was never a published tag anywhere (see #722). The project's official
+    # runtime images live at ghcr.io/kamailio/kamailio; pinned to 5.7.1-bookworm,
+    # the earliest published patch in the 5.7.x line, per scripts/update-image-digests.sh
+    image: ghcr.io/kamailio/kamailio:5.7.1-bookworm@sha256:a5c0564fe4bf12315ec3aed97303bc63207c0cec0c5b1150ea6500f4747163e9  # pinned 2026-09-19
     profiles: ["telephony"]
     restart: unless-stopped
     ports:
