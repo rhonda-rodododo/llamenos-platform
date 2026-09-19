@@ -105,7 +105,7 @@
     "@aws-sdk/client-s3": "^3.1037.0",
     "@fivesheepco/cloudflare-apns2": "^13.0.0",
     "@hono/standard-validator": "^0.2.2",
-    "@huggingface/transformers": "^4.2.0",
+    "@huggingface/transformers": "^4.3.0",
     "@noble/ciphers": "^2.2.0",
     "@noble/curves": "^2.2.0",
     "@noble/hashes": "^2.2.0",
