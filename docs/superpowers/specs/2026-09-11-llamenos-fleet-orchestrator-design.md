@@ -213,7 +213,7 @@ of work*:
 |---|---|---|---|
 | **Planner** | Opus, high | Issues, dependency edges, lane assignment | Issues only, never code |
 | **Implementer** | Sonnet default; Opus when the issue carries `effort:high` | One issue → one worktree → one PR | Its lane's scope only |
-| **Reviewer** | *different engine from the author* — Claude author reviewed by GLM/Kimi via opencode, and vice versa | A verdict, and a reply to the author | Nothing — plan mode |
+| **Reviewer** | `claude` session, `sonnet` default (see the "#812 move to a self-hosted claude session" section below — historically GLM/Kimi via `opencode`, a genuinely different vendor from the `claude` author) | A verdict, and a reply to the author | Nothing — plan mode |
 | **Integrator** | Sonnet | Rebases, CI watch, post-merge revert-on-red | Merges only |
 | **Release engineer** | Opus, max | Pipeline runs, artifact verification | Never merges its own work |
 
@@ -273,35 +273,76 @@ Eight, each a file, each asserted by a test rather than promised by a comment.
    the scope breaker nothing to compare against. Asserted in a test that refuses
    to let such a lane be `live`.
 
-#### Switching the review engine provider
+#### Switching the review engine provider (historical) / the #812 move to a self-hosted claude session
 
-`fleet/review`'s non-author reviewer (rail 1, above) runs on `opencode`,
-driven entirely by two repo variables — `vars.FLEET_REVIEW_PROVIDER` (default
-`kimi-for-coding`) and `vars.FLEET_REVIEW_MODEL` (default
-`kimi-for-coding/k3-256k`) — plus the `FLEET_REVIEW_API_KEY` secret. Switching
-provider needs **no code change**:
+Through 2026-09-15, `fleet/review`'s non-author reviewer (rail 1, above) ran
+on `opencode`, driven entirely by two repo variables —
+`vars.FLEET_REVIEW_PROVIDER` (default `kimi-for-coding`) and
+`vars.FLEET_REVIEW_MODEL` (default `kimi-for-coding/k3-256k`) — plus the
+`FLEET_REVIEW_API_KEY` secret written into `~/.local/share/opencode/
+auth.json`. That design is what unblocked the fleet on 2026-09-15 itself: the
+Moonshot Kimi subscription backing the hardcoded `kimi-for-coding` provider
+had exhausted its weekly quota, so every `fleet/review` smoke test failed and
+the required check was red repo-wide, with no way to recover short of
+waiting out the week. Fail-closed on a real outage is correct; being
+un-switchable to a different provider was not.
 
-1. Set the two repo variables (repo Settings → Secrets and variables →
-   Actions → Variables) to the new provider id and its `provider/model`
-   string, e.g. `zai-coding-plan` / `zai-coding-plan/glm-5.3`.
-2. Replace `FLEET_REVIEW_API_KEY` with a key valid for that provider.
-3. Force a re-review of any open PR outside the normal label flow (manual
-   debugging only): `gh workflow run fleet-review.yml --ref <branch>
-   -f pr_number=<n>`. The normal path is applying the `review` label to the
-   PR — see below. The "Authenticate the review engine" step keys
-   `~/.local/share/opencode/auth.json` off `FLEET_REVIEW_PROVIDER` itself
-   (never a literal), the "Smoke-test the review engine" step passes
-   `FLEET_REVIEW_MODEL` to `--model`, and the real "Review" step
-   (`review-ci` → `review.ts`'s `VERIFIER_ENGINE`) reads the same
-   `FLEET_REVIEW_MODEL` env var — so all three move together from the one
-   variable change.
+**#812 retired `opencode`/Kimi as the reviewer engine entirely.** Operator
+decision: coding-agent SESSIONS review better than a thin API call. Most of
+the `opencode` engine's failures were infrastructure (UNREADABLE from
+turn-budget exhaustion, smoke-test failures, provider quota exhausted
+mid-week) rather than the reviewer actually missing something, and its
+2-3-turn cap could not even be enforced on `opencode`'s own CLI (no
+equivalent flag existed). `fleet/review` now runs a `claude` session on a
+dedicated self-hosted runner (`llamenos-review-box`, labels
+`self-hosted,Linux,X64,fleet-review`), authenticated under the operator's own
+account and the operator's own Max subscription — not a metered,
+weekly-quota'd key.
 
-This is what unblocked the fleet on 2026-09-15: the Moonshot Kimi
-subscription backing the hardcoded `kimi-for-coding` provider had exhausted
-its weekly quota, so every `fleet/review` smoke test failed and the required
-check was red repo-wide, with no way to recover short of waiting out the
-week. Fail-closed on a real outage is correct; being un-switchable to a
-different provider was not.
+What this changes structurally:
+
+- `runs-on: [self-hosted, fleet-review]`, never a GitHub-hosted runner — the
+  only label combination that reaches that box.
+- A MANDATORY fork guard is the job's literal first step: a self-hosted
+  runner must never process a fork PR
+  (`github.event.pull_request.head.repo.full_name != github.repository`
+  fails the job before anything else runs — a `workflow_dispatch` run has no
+  `pull_request` payload at all and is exempt by construction).
+- `vars.FLEET_REVIEW_PROVIDER` is gone — there is exactly one provider now.
+  `vars.FLEET_REVIEW_MODEL` (default `sonnet`) remains, read identically by
+  the smoke-test step and by `review.ts`'s `REVIEWER_MODEL`, so raising the
+  reviewer's tier (e.g. to `opus`) is still one repo variable, never a code
+  change.
+- The "Install the non-author review engine" and "Authenticate the review
+  engine" steps are gone — `claude` is pre-installed and pre-authenticated
+  on the runner itself, so there is nothing left to fetch or configure.
+  `FLEET_REVIEW_API_KEY` stays a required repo secret, but is no longer
+  forwarded into the reviewer's own environment; it now serves only as (1)
+  the operator's explicit "review is enabled" toggle and (2) what keeps
+  CodeQL's cache-poisoning query treating this job as privileged (see
+  `REVIEW_KEY_ENV`'s doc comment in `orchestrator/src/ci.ts`).
+- The budget widened from the thin-API-call sizing (`DEFAULT_MAX_TURNS = 2`
+  / `HIGH_IMPACT_MAX_TURNS = 3`, 5/8-minute wall clock) to a full session's
+  budget (`DEFAULT_MAX_TURNS = 10` / `HIGH_IMPACT_MAX_TURNS = 20`,
+  10/20-minute wall clock) — see the constants and their doc comments in
+  `orchestrator/src/review.ts`. The job's own `timeout-minutes: 30` stays
+  above the 20-minute high-impact ceiling.
+
+**The honest cost, stated plainly:** the fleet's workers author with
+`claude`, and the reviewer is now ALSO `claude` — a different session on a
+different machine with no shared context, but no longer an independent
+VENDOR the way `opencode` (Kimi) was. A model does not review its own blind
+spots as well as a different model would. Recommended mitigation, not yet
+applied: run the reviewer on a different MODEL TIER than the lanes use
+(`FLEET_REVIEW_MODEL` is the dial) once budget allows. See `verifierFor`'s
+doc comment in `orchestrator/src/review.ts` for the full accounting.
+
+**Availability**, honestly stated: if `llamenos-review-box` is offline, this
+job QUEUES rather than fails outright — GitHub Actions holds a job for a
+runner matching its labels — and a PR waiting on `fleet/review` simply
+cannot merge until the box comes back. This is the intended fail-closed
+behaviour, not a bug: the same posture this file has had since #848, just
+with a different reason the job might not be running yet.
 
 The smoke-test step also now names *why* the engine call failed, on one line,
 before it fails the job — it never turns a bad call into a pass. Three
@@ -311,7 +352,7 @@ causes: `engine-quota` (weekly/usage-limit language from the provider),
 engine running but never producing a valid verdict). See the comment above
 "Smoke-test the review engine" in `.github/workflows/fleet-review.yml` for
 the exact classification, which is a best-effort heuristic over the engine's
-own error text, not a structured error code opencode exposes.
+own error text, not a structured error code `claude` exposes.
 
 **`fleet/review` now lives in its own workflow file, `fleet-review.yml`, not
 `ci.yml`.** It moved there to fix a fail-open bug: `ci.yml` also triggers on

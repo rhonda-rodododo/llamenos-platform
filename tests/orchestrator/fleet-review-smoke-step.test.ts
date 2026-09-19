@@ -7,27 +7,31 @@ import { parse as parseYaml } from 'yaml'
 
 /**
  * Rail for the "Smoke-test the review engine" step in fleet-review.yml
- * silently swallowing an engine failure (see the PR that added this file).
+ * silently swallowing an engine failure (see the PR that added this file,
+ * #872 — updated for #866, which retired `opencode` as the reviewer engine
+ * entirely and rewrote this step to invoke `claude` directly instead).
  *
- * Root cause: GitHub runs a `run:` step with no `shell:` override as
- * `bash -e {0}` — `-e` is active from the moment the script starts. The
- * step's own `set -uo pipefail` does NOT clear an inherited `-e`; it only
- * adds `-u`/`pipefail` on top. Two captures in the step —
- * `run_out="$(... opencode run ...)"` and `verdict_out="$(... bun -e ...)"`
- * — were UNGUARDED (no `||` after the assignment), so the first one that
- * failed was itself a failing simple command under `-e`: the script died on
- * that line, before `run_status=$?`/`verdict_status=$?` were ever read,
- * before `classify()` ran, before `fail()` ever printed anything. The step
- * exited 1 with no diagnostic — exactly the opacity two supervision cycles
- * were spent grepping raw workflow logs to work around. The fix adds
- * `set +e` right after `set -uo pipefail`, which clears the inherited `-e`
- * so both captures reach their own status check and, on failure, `fail()`.
+ * Root cause (#872, still the invariant this file guards): GitHub runs a
+ * `run:` step with no `shell:` override as `bash -e {0}` — `-e` is active
+ * from the moment the script starts. The step's own `set -uo pipefail` does
+ * NOT clear an inherited `-e`; it only adds `-u`/`pipefail` on top. Two
+ * captures in the step — `run_out="$(... claude ...)"` and
+ * `verdict_out="$(... bun -e ...)"` — are UNGUARDED (no `||` after the
+ * assignment), so the first one that fails is itself a failing simple
+ * command under `-e`: the script would die on that line, before
+ * `run_status=$?`/`verdict_status=$?` are ever read, before `classify()`
+ * runs, before `fail()` ever prints anything. The fix is `set +e` right
+ * after `set -uo pipefail`, clearing the inherited `-e` so both captures
+ * reach their own status check and, on failure, `fail()`. #866 replaced the
+ * engine underneath this step (opencode → claude) but did not change this
+ * shape at all — the same two unguarded captures exist in the claude-based
+ * script, so the fix (and this rail) stays required verbatim.
  *
  * This is a real functional test, not a text/regex rail over the YAML: it
  * extracts the step's ACTUAL `run:` script with a YAML parser (so it always
  * tests the literal bytes GitHub would run, and can never drift from a
  * hand-copied snippet), executes it with `bash -e <script>` — the same
- * invocation GitHub uses for an unshelled step — against a fake `opencode`
+ * invocation GitHub uses for an unshelled step — against a fake `claude`
  * binary on PATH, and asserts on the real stdout/stderr and exit code.
  *
  * Reproduced the underlying mechanism first, in isolation (three lines: an
@@ -76,37 +80,29 @@ function withoutTheFix(script: string): string {
   return mutated
 }
 
-const FAKE_OPENCODE = `#!/usr/bin/env bash
-case "$1" in
-  debug)
-    cat <<'JSON'
-{"permission":{"bash":"deny","edit":"deny","webfetch":"deny","websearch":"deny","external_directory":{"*":"deny"}}}
-JSON
+// Stands in for `claude --print --permission-mode plan --model <m> --max-turns 1`
+// (the exact invocation `invokeVerifierEngine` in review.ts uses, and this
+// step mirrors). Reads and discards stdin (the piped prompt) exactly as the
+// real CLI would, then behaves per MOCK_CLAUDE_RUN_MODE — no subcommand
+// switching needed, unlike the retired opencode fake, since this step never
+// passes claude a verb.
+const FAKE_CLAUDE = `#!/usr/bin/env bash
+cat >/dev/null
+case "\${MOCK_CLAUDE_RUN_MODE:-fail}" in
+  fail)
+    echo "simulated: Unexpected server error from provider" >&2
+    exit 1
+    ;;
+  bad-verdict)
+    printf 'I looked at the diff.\\nVERDICT: MAYBE\\n'
     exit 0
     ;;
-  run)
-    cat >/dev/null
-    case "\${MOCK_OPENCODE_RUN_MODE:-fail}" in
-      fail)
-        echo "simulated: Unexpected server error from provider" >&2
-        exit 1
-        ;;
-      bad-verdict)
-        echo '{"type":"text","part":{"type":"text","text":"I looked at the diff.\\nVERDICT: MAYBE"}}'
-        exit 0
-        ;;
-      pass)
-        echo '{"type":"text","part":{"type":"text","text":"VERDICT: PASS"}}'
-        exit 0
-        ;;
-    esac
-    ;;
-  --version)
-    echo "mock-opencode 0.0.0"
+  pass)
+    printf 'VERDICT: PASS\\n'
     exit 0
     ;;
   *)
-    echo "unhandled fake opencode invocation: $*" >&2
+    echo "unhandled fake claude invocation: $*" >&2
     exit 99
     ;;
 esac
@@ -123,8 +119,8 @@ beforeEach(() => {
   runnerTemp = join(scratch, 'runner-temp')
   mkdirSync(binDir)
   mkdirSync(runnerTemp)
-  writeFileSync(join(binDir, 'opencode'), FAKE_OPENCODE)
-  chmodSync(join(binDir, 'opencode'), 0o755)
+  writeFileSync(join(binDir, 'claude'), FAKE_CLAUDE)
+  chmodSync(join(binDir, 'claude'), 0o755)
   originalPath = process.env['PATH']
   process.env['PATH'] = `${binDir}${delimiter}${originalPath ?? ''}`
 })
@@ -146,9 +142,8 @@ function runStep(script: string, runMode: 'fail' | 'bad-verdict' | 'pass'): { st
       ...process.env,
       PATH: `${binDir}${delimiter}${process.env['PATH'] ?? ''}`,
       RUNNER_TEMP: runnerTemp,
-      FLEET_REVIEW_PROVIDER: 'test-provider',
       FLEET_REVIEW_MODEL: 'test-model',
-      MOCK_OPENCODE_RUN_MODE: runMode,
+      MOCK_CLAUDE_RUN_MODE: runMode,
     },
   })
   return { status: result.status, output: `${result.stdout}\n${result.stderr}` }
@@ -159,7 +154,7 @@ describe('rail: the review-engine smoke step must always say why it failed', () 
     expect(smokeStepScript().length).toBeGreaterThan(500)
   })
 
-  it('opencode run failing (simulated provider outage) reaches fail() and reports engine-unavailable', () => {
+  it('claude failing (simulated provider outage) reaches fail() and reports engine-unavailable', () => {
     const { status, output } = runStep(smokeStepScript(), 'fail')
     expect(status).toBe(1)
     expect(output).toContain(FAILED_MARKER)
@@ -167,7 +162,7 @@ describe('rail: the review-engine smoke step must always say why it failed', () 
     expect(output).toContain('simulated: Unexpected server error from provider')
   })
 
-  it('opencode run succeeding but never producing a PASS verdict also reaches fail() (the verdict_out capture is guarded too)', () => {
+  it('claude succeeding but never producing a PASS verdict also reaches fail() (the verdict_out capture is guarded too)', () => {
     const { status, output } = runStep(smokeStepScript(), 'bad-verdict')
     expect(status).toBe(1)
     expect(output).toContain(FAILED_MARKER)
