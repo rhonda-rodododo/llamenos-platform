@@ -1286,3 +1286,91 @@ describe('rail: decideReviewGate enforces the three fleet/review branches (cache
     expect(outcome.kind).toBe('not-requested')
   })
 })
+
+/**
+ * `decideReviewGate` itself was never the bug (the suite above already
+ * proved every one of its branches, including a throwing cache lookup,
+ * degrades correctly). The real, observed failure — run 35403493398 on
+ * #630, and the same run class on #626 — was one step earlier: `bun
+ * orchestrator/src/cli.ts review-gate` a few steps into `fleet-review.yml`
+ * assumes the BASE checkout it runs from has both `orchestrator/src/cli.ts`
+ * and a `review-gate` command registered in it. GitHub does not refresh an
+ * open PR's `base.sha` on every push to the base branch — only on a
+ * synchronize/update event on the PR itself — so a PR nobody has touched in
+ * days (dependabot PRs routinely sit for weeks) can carry a `base.sha` from
+ * well before either landed on main, with nothing on the PR side having
+ * removed anything.
+ *
+ * #630's base predated `orchestrator/src/cli.ts` entirely → bun's own
+ * uncaught `error: Module not found`, no `outcome` output, job goes red
+ * with no diagnostic. #626's base had `cli.ts` but predated `review-gate`
+ * being registered in `HANDLERS` → `usage: llamenos-fleet <doctor|tick|...>`
+ * (no `review-gate` in the list), exit 2, same result. Because the crash
+ * happens INSIDE the gate step, the existing "Check the base provides the
+ * gate" step (guarding `review-ci`, further down, `if:
+ * steps.gate.outputs.outcome == 'run-engine'`) can never be reached to
+ * explain either case — `outcome` was never set.
+ *
+ * This rail pins the fix: a NEW, unconditional step — "Check the base
+ * provides the review gate itself" — runs BEFORE "Decide whether to run the
+ * review engine" and checks both failure shapes in bash (the only language
+ * that can run before bun has even confirmed `cli.ts` exists), turning a
+ * bare crash into one clear, actionable message.
+ */
+describe('rail: a base-provides-the-gate check runs BEFORE the gate step ever invokes bun', () => {
+  const fleetReviewYaml = (): string =>
+    readFileSync(join(process.cwd(), '.github', 'workflows', 'fleet-review.yml'), 'utf8')
+
+  const GUARD_STEP = '- name: Check the base provides the review gate itself'
+  const GATE_STEP = '- name: Decide whether to run the review engine'
+
+  function guardBlock(yaml: string): string {
+    const guardIdx = yaml.indexOf(GUARD_STEP)
+    const gateIdx = yaml.indexOf(GATE_STEP)
+    expect(guardIdx, 'bootstrap guard step not found — the grep must not pass vacuously').toBeGreaterThan(-1)
+    expect(gateIdx, 'gate step not found — the grep must not pass vacuously').toBeGreaterThan(-1)
+    expect(guardIdx, 'the guard must run BEFORE the gate step it protects').toBeLessThan(gateIdx)
+    return yaml.slice(guardIdx, gateIdx)
+  }
+
+  it('the guard step exists and precedes the gate step', () => {
+    // guardBlock() itself asserts both existence and ordering — a non-throw
+    // here already proves the property; this test names it explicitly so a
+    // failure reads as "ordering broke", not as an assertion buried in a
+    // helper used by every other test in this suite.
+    expect(() => guardBlock(fleetReviewYaml())).not.toThrow()
+  })
+
+  it('the guard checks cli.ts exists BEFORE ever invoking bun on it — the exact shape of the #630 crash', () => {
+    const block = guardBlock(fleetReviewYaml())
+    const fileCheckIdx = block.indexOf('if [ ! -f orchestrator/src/cli.ts ]')
+    const firstBunCallIdx = block.indexOf('bun orchestrator/src/cli.ts')
+    expect(fileCheckIdx, 'no file-existence check found').toBeGreaterThan(-1)
+    expect(firstBunCallIdx, 'no bun invocation found in the guard').toBeGreaterThan(-1)
+    expect(fileCheckIdx).toBeLessThan(firstBunCallIdx)
+  })
+
+  it('the guard checks the base\'s usage output for "review-gate" — the exact shape of the #626 crash', () => {
+    const block = guardBlock(fleetReviewYaml())
+    expect(block).toContain('*review-gate*')
+  })
+
+  // Never itself gated — same reasoning as "Decide whether to run the
+  // review engine" (see the rail on that step in the `describe` above): a
+  // guard that only runs conditionally could be skipped exactly when a
+  // stale base needs it most.
+  it('the guard step carries no step-level if: of its own — it must always run', () => {
+    const block = guardBlock(fleetReviewYaml())
+    expect(block).not.toMatch(/\n {8}if:/)
+  })
+
+  it('the guard fails closed with an actionable message naming the review label re-apply step, for both crash shapes', () => {
+    const block = guardBlock(fleetReviewYaml())
+    expect(block).toMatch(/exit 1/)
+    // Backtick-escaped in the YAML source itself (double-quoted bash
+    // string), so the raw file text carries a literal backslash before each
+    // backtick — matched here against that raw text, not the string bash
+    // would ultimately print.
+    expect(block).toContain('re-apply the \\`review\\` label')
+  })
+})
