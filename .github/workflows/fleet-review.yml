@@ -535,7 +535,24 @@ jobs:
       - name: Smoke-test the review engine
         if: steps.gate.outputs.outcome == 'run-engine'
         run: |
+          # Deliberately without -e (and with `set +e` below to make sure of
+          # it): GitHub invokes `run:` steps as `bash -e {0}` by default, and
+          # that -e is already active by the time this script starts — a
+          # bare `set -uo pipefail` does NOT clear an inherited -e, it only
+          # adds -u/pipefail on top. Left alone, the FIRST unguarded failing
+          # assignment below (`run_out="$(opencode run ...)"` when the engine
+          # call fails) is a failing simple command, so -e kills the script
+          # on that line — before `run_status=$?` is read, before `classify`
+          # runs, before `fail` ever prints anything. The step then dies
+          # silently with exit 1 and no diagnostic, which is the exact
+          # opacity this step exists to remove. `set +e` clears the
+          # inherited -e so every capture below reaches its own status check
+          # and, on failure, `fail()` — which is the only path that exits,
+          # and always exits 1. (Captures already guarded with `||`, like
+          # `config_out=... || fail ...`, were never affected by -e; this
+          # fixes the unguarded ones: `run_out=` and `verdict_out=`.)
           set -uo pipefail
+          set +e
           root="$(mktemp -d)"
           cfg="$(mktemp -d)"
           jq -n '{
