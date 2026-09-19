@@ -25,12 +25,31 @@ CHANGED_FILES=$(cat)
 # platform below — so a pure backend change no longer drags in Android/iOS
 # builds the way the old per-workflow regexes did (that coupling was part of
 # the over-triggering #664 exists to fix).
-SHARED_DEPS_RE='^(packages/crypto/|packages/protocol/|packages/shared/|packages/i18n/|package\.json$|bun\.lock|\.mise\.toml$|tsconfig[^/]*\.json$|vitest[^/]*\.config\.ts$|scripts/|\.github/workflows/ci\.yml$)'
+#
+# .github/scripts/detect-changed-platforms.sh (this file) is included here
+# too: it is the single thing that decides every other flag below, so a
+# change to it gets the same "run everything" treatment as ci.yml itself —
+# anything narrower risks a broken rewrite of this script shipping with its
+# own blast radius silently gated to `false`.
+SHARED_DEPS_RE='^(packages/crypto/|packages/protocol/|packages/shared/|packages/i18n/|package\.json$|bun\.lock|\.mise\.toml$|tsconfig[^/]*\.json$|vitest[^/]*\.config\.ts$|scripts/|\.github/workflows/ci\.yml$|\.github/scripts/detect-changed-platforms\.sh$)'
 
 IOS_RE='^apps/ios/'
 ANDROID_RE='^apps/android/'
 DESKTOP_RE='^(apps/desktop/|src/client/|tests/)'
-BACKEND_RE='^(apps/worker/|sip-bridge/|signal-notifier/|deploy/docker/)'
+# src/server/ is the actual Bun server entry point (`bun run build:server`,
+# and the image `docker compose ... up --build` produces for e2e/backend-bdd/
+# android-e2e) — it lives outside apps/worker/ but is exactly as
+# backend-relevant. drizzle/ (migration files + snapshots) and
+# drizzle.config.ts are the literal inputs `bun run migration:check` (the
+# migration-drift job) diffs, and backend-bdd applies these migrations via
+# the bootstrapped backend — both need the `backend` flag, not just
+# migration-drift. tests/steps/backend/ is backend-bdd's own step
+# definitions (playwright.config.ts's `backend-bdd` project points its
+# `steps` glob there specifically, distinct from the desktop `bdd` project's
+# steps) — already caught by the blanket `tests/` prefix below for the
+# `desktop` flag, but backend-bdd itself only gates on `backend`, so it needs
+# its own hit here too.
+BACKEND_RE='^(apps/worker/|sip-bridge/|signal-notifier/|deploy/docker/|src/server/|drizzle/|drizzle\.config\.ts$|tests/steps/backend/)'
 CRYPTO_RE='^packages/crypto/'
 ANSIBLE_RE='^deploy/ansible/'
 # Dependency manifests only — deliberately narrower than SHARED_DEPS_RE: a
@@ -42,6 +61,21 @@ AUDIT_RE='^(package\.json$|bun\.lock)'
 # ci.yml) — its own source and tests must gate that job too, independent of
 # the `backend` flag.
 ORCHESTRATOR_RE='^(orchestrator/|tests/orchestrator/|vitest\.orchestrator\.config\.ts$)'
+# The cross-platform BDD feature corpus (packages/test-specs/features/**)
+# and the one composite action every backend-bootstrapping job shares
+# (.github/actions/bootstrap-backend) — both are read directly by ci.yml's
+# `e2e` (desktop bdd + backend-bdd Playwright projects), `backend-bdd`, and
+# `android-e2e` (collects `packages/test-specs/features/platform/mobile/**`
+# into androidTest assets) jobs, and by desktop-e2e.yml's own `test` job
+# (also bootstraps via the same action). None of the three platform-specific
+# regexes above would catch either path on its own, so a change here sets
+# `desktop`, `backend`, AND `android` directly rather than relying on one of
+# them to coincidentally already be true.
+E2E_INFRA_RE='^(packages/test-specs/|\.github/actions/)'
+# playwright.config.ts is read directly by ci.yml's `e2e` job and by
+# desktop-e2e.yml's `test` job (both invoke `bunx playwright test` against
+# it) — not by android/ios, which don't use Playwright at all.
+PLAYWRIGHT_CONFIG_RE='^playwright\.config\.ts$'
 DOCS_ONLY_EXEMPT_RE='\.md$|^site/'
 
 docs_only=true
@@ -74,6 +108,8 @@ while IFS= read -r file; do
   echo "$file" | grep -qE "$ANSIBLE_RE" && { ansible=true; echo "Ansible file changed: $file" >&2; }
   echo "$file" | grep -qE "$AUDIT_RE" && { audit=true; echo "Dependency manifest changed: $file" >&2; }
   echo "$file" | grep -qE "$ORCHESTRATOR_RE" && { orchestrator=true; echo "Fleet orchestrator file changed: $file" >&2; }
+  echo "$file" | grep -qE "$E2E_INFRA_RE" && { desktop=true; backend=true; android=true; echo "E2E test infra file changed: $file" >&2; }
+  echo "$file" | grep -qE "$PLAYWRIGHT_CONFIG_RE" && { desktop=true; backend=true; echo "Playwright config changed: $file" >&2; }
 done <<< "$CHANGED_FILES"
 
 app=$([ "$docs_only" = "false" ] && echo true || echo false)

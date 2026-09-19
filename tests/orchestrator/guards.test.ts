@@ -1500,6 +1500,23 @@ describe("rail: a PR's changes decide which ci.yml platform jobs run (#664)", ()
       // is expected to skip.
       ['audit'],
     ],
+    [
+      // Round 2 of #664's review (fleet/review on PR #862): a
+      // packages/test-specs/-only change (the shared BDD feature corpus)
+      // must RUN e2e, backend-bdd, and android-e2e — not skip them. Before
+      // this fix, none of the three platform regexes matched
+      // packages/test-specs/, so a PR that broke a feature file (or added
+      // one with no matching step) merged with all three suites silently
+      // skipped and ci-status green.
+      'a packages/test-specs/-only change',
+      ['packages/test-specs/features/security/foo.feature'],
+      ['android-build-test', 'android-e2e', 'desktop-unit', 'e2e', 'backend-bdd', 'backend-unit', 'migration-drift', 'ansible-validate'],
+      // `ios-build-test` and `crypto-tests` correctly skip — iOS doesn't
+      // consume packages/test-specs/ yet (ios-e2e.yml stays dispatch-only
+      // pending #661) and this touches no Rust. `audit` stays scoped to
+      // dependency manifests.
+      ['ios-build-test', 'crypto-tests', 'audit'],
+    ],
   ])('%s: the right ci.yml jobs run and skip', (_name, files, expectRun, expectSkip) => {
     const outputs = classify(files as string[])
     const yaml = ciYaml()
@@ -1532,6 +1549,39 @@ describe("rail: a PR's changes decide which ci.yml platform jobs run (#664)", ()
     ['audit', "needs.changes.outputs.audit == 'true'"],
   ])('"%s" carries exactly the expected job-level if: — removing it must fail this test', (job, expected) => {
     expect(jobLevelIf(jobBlock(ciYaml(), job))).toBe(expected)
+  })
+
+  /**
+   * Round 2 of #664's own review (fleet/review on PR #862): "the new path
+   * map omits inputs that decide real checks." The scenario table above
+   * only exercises three specific diffs — a path could be missing from the
+   * map and still pass every scenario there, as long as none of the three
+   * happened to touch it. This rail is narrower and more direct: for every
+   * (job, file) pair below, that exact file is the ONLY change, and the
+   * job must run. Each pair names a file a real PR would plausibly touch on
+   * its own — a migration, a BDD feature, a step definition, the server
+   * entry point, the Playwright config, the shared bootstrap action — and
+   * pins it to the job whose verdict it can silently invalidate if skipped.
+   * Removing any one of these paths from its regex in
+   * detect-changed-platforms.sh makes the corresponding row fail.
+   */
+  it.each([
+    ['migration-drift', 'drizzle.config.ts'],
+    ['migration-drift', 'drizzle/migrations/0001_add_foo/migration.sql'],
+    ['backend-bdd', 'drizzle.config.ts'],
+    ['backend-bdd', 'tests/steps/backend/foo.steps.ts'],
+    ['backend-bdd', 'packages/test-specs/features/security/foo.feature'],
+    ['backend-bdd', 'src/server/index.ts'],
+    ['backend-bdd', '.github/actions/bootstrap-backend/action.yml'],
+    ['e2e', 'playwright.config.ts'],
+    ['e2e', 'packages/test-specs/features/security/foo.feature'],
+    ['e2e', 'src/server/index.ts'],
+    ['android-e2e', 'packages/test-specs/features/platform/mobile/foo.feature'],
+    ['android-e2e', '.github/actions/bootstrap-backend/action.yml'],
+  ])('"%s" runs when its own input "%s" changes alone', (job, file) => {
+    const outputs = classify([file])
+    const runs = evalJobIf(jobLevelIf(jobBlock(ciYaml(), job)), outputs)
+    expect(runs, `expected "${job}" to RUN when only "${file}" changes; outputs=${JSON.stringify(outputs)}`).toBe(true)
   })
 
   it('the changes job diffs against the PR/merge-group base sha, not HEAD^', () => {
