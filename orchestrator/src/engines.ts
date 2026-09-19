@@ -5,7 +5,8 @@ import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { DISPATCH_SCRIPT } from './paths.js'
 import { checkDispatchDependency } from './dependency.js'
-import type { Lane } from './config.js'
+import { fleetBranchFor } from './ci.js'
+import type { Lane, EngineId } from './config.js'
 import type { WorkItem } from './source.js'
 import type { Outcome } from './ledger.js'
 
@@ -147,11 +148,38 @@ export function readStatus(name: string): Record<string, string> | undefined {
 
 interface BuildArgsInput {
   name: string
+  /** The work item's id — with the lane, the only input to the branch name. */
+  itemId: string
   briefPath: string
   lane: Lane
   timeoutSec: number
   model: string
   effort: EffortLevel
+}
+
+/**
+ * The model selectors `dispatch-one.sh`'s `case "$model"` already understands
+ * as whole tokens (audited against the script): the Claude CLI names, the
+ * opencode shorthands, and the other runtimes' `name[:model]` forms. A model
+ * string matching this passes through untouched; anything else under the
+ * `opencode` engine is a raw provider/model id that must be wrapped as
+ * `opencode:<id>` for the dispatcher to route it to the right runtime.
+ */
+const DISPATCHER_TOKEN = /^(?:opus|sonnet|haiku|fable|kimi|kimi-thinking|glm|copilot|kimi-cli)(?::.*)?$|^opencode:.+$/
+
+/**
+ * dispatch-one.sh maps the bare `kimi`/`kimi-thinking` tokens to exactly this
+ * verified-working opencode registry model, so a lane configured with the raw
+ * id maps back to the token rather than to `opencode:<id>` — same runtime,
+ * same model, but via the dispatcher's maintained selector.
+ */
+const KIMI_DISPATCHER_MODEL = 'kimi-for-coding/k3-256k'
+
+export function resolveDispatchModel(engine: EngineId, model: string): string {
+  if (engine !== 'opencode') return model
+  if (DISPATCHER_TOKEN.test(model)) return model
+  if (model === KIMI_DISPATCHER_MODEL) return 'kimi'
+  return `opencode:${model}`
 }
 
 /**
@@ -173,16 +201,29 @@ export function buildArgs(req: BuildArgsInput): string[] {
       '--owns is the only thing standing between two workers and the same file',
     )
   }
-  return [
+  // `--branch` on EVERY dispatch: without it dispatch-one.sh cuts the
+  // worktree on the worker NAME (`fleet-<lane>-<item>`), which is a tmux
+  // session name, not the `fleet/<lane>/<item>` grammar everything
+  // downstream derives lane, item and worktree from (issue #812).
+  const args = [
+    '--branch', fleetBranchFor(req.lane.id, req.itemId),
     '--agent', `${req.lane.id}-supervisor`,
     '--owns', req.lane.scope.owned.join(','),
-    '--effort', req.effort,
+  ]
+  // Only the Claude CLI accepts --effort; dispatch-one.sh warns and ignores it
+  // for every other runtime. Omit it outright for opencode lanes instead of
+  // paying a spurious warning on every dispatch.
+  if (req.lane.engine !== 'opencode') {
+    args.push('--effort', req.effort)
+  }
+  args.push(
     '--rules', 'llamenos',
     req.name,
     req.briefPath,
     String(req.timeoutSec),
-    req.model,
-  ]
+    resolveDispatchModel(req.lane.engine, req.model),
+  )
+  return args
 }
 
 function sleep(ms: number): Promise<void> {
@@ -216,7 +257,7 @@ const POLL_GRACE_MS = 30_000
  */
 export async function dispatch(req: DispatchRequest): Promise<DispatchResult> {
   const args = buildArgs({
-    name: req.name, briefPath: req.briefPath, lane: req.lane,
+    name: req.name, itemId: req.item.id, briefPath: req.briefPath, lane: req.lane,
     timeoutSec: req.timeoutSec, model: req.model, effort: req.effort,
   })
 
@@ -226,6 +267,14 @@ export async function dispatch(req: DispatchRequest): Promise<DispatchResult> {
   // own; the long wait below is for the worker's actual progress, tracked
   // through the status file, not through this child process.
   await execFileAsync(DISPATCH_SCRIPT, args, { timeout: 60_000, maxBuffer: 8 * 1024 * 1024 })
+
+  // The launcher's DISPATCHED seed is the one status write that carries
+  // `branch` and `worktree` — the worker's own terminal write never does
+  // (issue #660). Read it NOW, before the worker overwrites it, so the
+  // worktree dispatch-one.sh actually cut is known without reconstructing
+  // its path convention. Best-effort: if the worker already overwrote it,
+  // cli.ts's `resolveDispatchResult` falls back to asking git.
+  const seed = readStatus(req.name)
 
   const deadline = Date.now() + req.timeoutSec * 1000 + POLL_GRACE_MS
   let status = readStatus(req.name)
@@ -250,9 +299,9 @@ export async function dispatch(req: DispatchRequest): Promise<DispatchResult> {
   const pr = status?.['pr']
   return {
     outcome,
-    branch: status?.['branch'],
+    branch: status?.['branch'] ?? seed?.['branch'],
     pr: pr !== undefined && pr !== 'none' ? pr : undefined,
     note,
-    worktree: status?.['worktree'],
+    worktree: status?.['worktree'] ?? seed?.['worktree'],
   }
 }

@@ -13,7 +13,6 @@ import {
   apiPost,
   apiDelete,
   createUserViaApi,
-  createRoleViaApi,
   uniqueName,
 } from '../../api-helpers'
 

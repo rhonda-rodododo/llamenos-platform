@@ -7,7 +7,6 @@ import {
 } from '../../api-helpers'
 import { bytesToHex, hexToBytes } from '@shared/encoding'
 import { ed25519 } from '@noble/curves/ed25519.js'
-import { getScenarioState } from './common.steps'
 
 function seedHexToPubkey(seedHex: string): string {
   return bytesToHex(ed25519.getPublicKey(hexToBytes(seedHex)))
@@ -44,7 +43,6 @@ function getState_(world: Record<string, unknown>): EntityUnificationState {
 
 Given('an entity type with category {string} exists for the hub', async ({ request, world }, category: string) => {
   const state = getState_(world)
-  const hubId = getScenarioState(world).hubId
   const res = await apiPost<{ id: string }>(request, '/settings/cms/entity-types', {
     name: `test_${category}_type_${Date.now()}`,
     label: `Test ${category} Type`,
@@ -85,7 +83,6 @@ Given('the builtin template {string} has been applied', async ({ request, world 
 Given('an event entity type exists with start_date field \\(indexType=date\\)',
   async ({ request, world }) => {
     const state = getState_(world)
-    const hubId = getScenarioState(world).hubId
     const res = await apiPost<{ id: string }>(request, '/settings/cms/entity-types', {
       name: `event_date_type_${Date.now()}`,
       label: 'Event Date Type',
@@ -127,7 +124,7 @@ Given('a record exists with start_date blind indexes for {string}',
 )
 
 Given('a user has permission {string} but not {string}',
-  async ({ request, world }, hasPermission: string, missingPermission: string) => {
+  async ({ request, world }, hasPermission: string, _missingPermission: string) => {
     const roleRes = await apiPost<{ id: string }>(request, '/roles', {
       name: `perm_test_role_${Date.now()}`,
       permissions: [hasPermission],
@@ -348,7 +345,7 @@ Then('that entity type should have a field named {string} with indexType {string
 )
 
 Then('only one entity type with templateId {string} should exist',
-  async ({ request, world }, templateId: string) => {
+  async ({ request }, templateId: string) => {
     const res = await apiGet<{ entityTypes: Array<{ templateId?: string }> }>(request, '/settings/cms/entity-types')
     expect(res.status).toBe(200)
     const matching = res.data.entityTypes.filter(et => et.templateId === templateId)
@@ -361,7 +358,7 @@ Then('I should receive {int} record', async ({ world }, count: number) => {
   expect(state.listResult?.records).toHaveLength(count)
 })
 
-Then('the server should not have seen the plaintext date', async ({ request, world }) => {
+Then('the server should not have seen the plaintext date', async ({ world }) => {
   const state = getState_(world)
   if (state.listResult?.records) {
     for (const record of state.listResult.records) {
@@ -394,7 +391,7 @@ Then('the response should contain pendingCount {int}', async ({ world }, count: 
   expect(body?.pendingCount).toBe(count)
 })
 
-Then('all {int} events should have deprecated_at set', async ({ request, world }, count: number) => {
+Then('all {int} events should have deprecated_at set', async ({ world }, count: number) => {
   const state = getState_(world)
   const body = state.lastResponse?.body as { migrated?: number } | null
   expect(body?.migrated).toBe(count)

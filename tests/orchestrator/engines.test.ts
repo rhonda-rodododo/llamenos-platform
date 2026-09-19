@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { statusToOutcome, parseStatusFile, buildArgs, isTerminalStatus } from '../../orchestrator/src/engines.js'
+import { statusToOutcome, parseStatusFile, buildArgs, isTerminalStatus, resolveDispatchModel } from '../../orchestrator/src/engines.js'
+import { itemIdFromBranch, laneIdFromBranch } from '../../orchestrator/src/ci.js'
 import type { Lane } from '../../orchestrator/src/config.js'
 
 describe('parseStatusFile', () => {
@@ -61,26 +62,105 @@ describe('buildArgs', () => {
     scope: { owned: ['apps/worker/', 'sip-bridge/'], notOwned: [] },
   }
   it('passes the lane supervisor as --agent', () => {
-    expect(buildArgs({ name: 'n', briefPath: '/b', lane, timeoutSec: 60, model: 'sonnet', effort: 'medium' }))
+    expect(buildArgs({ name: 'n', itemId: '704', briefPath: '/b', lane, timeoutSec: 60, model: 'sonnet', effort: 'medium' }))
       .toContain('--agent')
-    expect(buildArgs({ name: 'n', briefPath: '/b', lane, timeoutSec: 60, model: 'sonnet', effort: 'medium' }))
+    expect(buildArgs({ name: 'n', itemId: '704', briefPath: '/b', lane, timeoutSec: 60, model: 'sonnet', effort: 'medium' }))
       .toContain('backend-supervisor')
   })
   it('passes the lane scope as --owns, comma separated', () => {
-    const a = buildArgs({ name: 'n', briefPath: '/b', lane, timeoutSec: 60, model: 'sonnet', effort: 'medium' })
+    const a = buildArgs({ name: 'n', itemId: '704', briefPath: '/b', lane, timeoutSec: 60, model: 'sonnet', effort: 'medium' })
     expect(a[a.indexOf('--owns') + 1]).toBe('apps/worker/,sip-bridge/')
   })
   it('refuses to build args for a lane with an empty scope', () => {
     const bare = { ...lane, scope: { owned: [], notOwned: [] } }
-    expect(() => buildArgs({ name: 'n', briefPath: '/b', lane: bare, timeoutSec: 60, model: 'sonnet', effort: 'medium' }))
+    expect(() => buildArgs({ name: 'n', itemId: '704', briefPath: '/b', lane: bare, timeoutSec: 60, model: 'sonnet', effort: 'medium' }))
       .toThrow(/scope/i)
   })
   it('always injects the llamenos project rules', () => {
-    const a = buildArgs({ name: 'n', briefPath: '/b', lane, timeoutSec: 60, model: 'sonnet', effort: 'medium' })
+    const a = buildArgs({ name: 'n', itemId: '704', briefPath: '/b', lane, timeoutSec: 60, model: 'sonnet', effort: 'medium' })
     expect(a[a.indexOf('--rules') + 1]).toBe('llamenos')
   })
+  // Issue #812: without --branch, dispatch-one.sh cuts the worktree on the
+  // worker NAME (`fleet-backend-704`), which the fleet's own branch grammar
+  // does not recognise — verify is skipped and CI treats the PR as unscoped.
+  // Dropping the flag (mutation) fails this test: indexOf misses and the
+  // branch assertions below never see the grammar.
+  it('passes --branch fleet/<lane>/<item> on every dispatch', () => {
+    const a = buildArgs({ name: 'fleet-backend-704', itemId: '704', briefPath: '/b', lane, timeoutSec: 60, model: 'sonnet', effort: 'medium' })
+    expect(a).toContain('--branch')
+    const branch = a[a.indexOf('--branch') + 1] ?? ''
+    expect(branch).toBe('fleet/backend/704')
+    expect(laneIdFromBranch(branch)).toBe('backend')
+    expect(itemIdFromBranch(branch)).toBe('704')
+  })
+  it('refuses to build a branch the fleet grammar cannot read back', () => {
+    expect(() => buildArgs({ name: 'n', itemId: '7/04', briefPath: '/b', lane, timeoutSec: 60, model: 'sonnet', effort: 'medium' }))
+      .toThrow(/fleet branch/)
+  })
   it('passes name, brief path, timeout and model as positionals after the flags', () => {
-    const a = buildArgs({ name: 'n', briefPath: '/b', lane, timeoutSec: 60, model: 'sonnet', effort: 'medium' })
+    const a = buildArgs({ name: 'n', itemId: '704', briefPath: '/b', lane, timeoutSec: 60, model: 'sonnet', effort: 'medium' })
     expect(a.slice(-4)).toEqual(['n', '/b', '60', 'sonnet'])
+  })
+})
+
+describe('buildArgs with an opencode lane', () => {
+  const ocLane: Lane = {
+    id: 'backend', mode: 'live', cap: 1, engine: 'opencode',
+    requireLabel: 'agent-dispatchable', vetoLabels: [],
+    scope: { owned: ['apps/worker/'], notOwned: [] },
+  }
+  const req = { name: 'n', itemId: '704', briefPath: '/b', timeoutSec: 60, effort: 'high' as const }
+
+  it('omits --effort entirely (dispatch-one.sh only warns and ignores it for opencode)', () => {
+    const a = buildArgs({ ...req, lane: ocLane, model: 'kimi' })
+    expect(a).not.toContain('--effort')
+  })
+
+  it('still passes --effort for a claude lane', () => {
+    const a = buildArgs({ ...req, lane: { ...ocLane, engine: 'claude' }, model: 'sonnet' })
+    expect(a[a.indexOf('--effort') + 1]).toBe('high')
+  })
+
+  it('passes the lane model through as the final positional argument', () => {
+    const a = buildArgs({ ...req, lane: ocLane, model: 'kimi-thinking' })
+    expect(a[a.length - 1]).toBe('kimi-thinking')
+    expect(a.slice(-4)).toEqual(['n', '/b', '60', 'kimi-thinking'])
+  })
+
+  it('maps the raw kimi registry model id to the dispatcher\'s kimi token', () => {
+    const a = buildArgs({ ...req, lane: ocLane, model: 'kimi-for-coding/k3-256k' })
+    expect(a[a.length - 1]).toBe('kimi')
+  })
+
+  it('wraps any other raw provider/model id as opencode:<model>', () => {
+    const a = buildArgs({ ...req, lane: ocLane, model: 'zai-coding-plan/glm-4.6' })
+    expect(a[a.length - 1]).toBe('opencode:zai-coding-plan/glm-4.6')
+  })
+
+  it('passes existing dispatcher tokens through untouched', () => {
+    for (const token of ['kimi', 'kimi-thinking', 'opencode:foo/bar', 'glm', 'glm:glm-5.3-flash', 'copilot', 'copilot:gpt-5.4', 'kimi-cli', 'kimi-cli:kimi-code/kimi-for-coding']) {
+      const a = buildArgs({ ...req, lane: ocLane, model: token })
+      expect(a[a.length - 1]).toBe(token)
+    }
+  })
+})
+
+describe('resolveDispatchModel', () => {
+  it('leaves claude-engine models untouched', () => {
+    expect(resolveDispatchModel('claude', 'sonnet')).toBe('sonnet')
+    expect(resolveDispatchModel('claude', 'opus')).toBe('opus')
+  })
+
+  it('maps the kimi registry id to the kimi token for the opencode engine', () => {
+    expect(resolveDispatchModel('opencode', 'kimi-for-coding/k3-256k')).toBe('kimi')
+  })
+
+  it('wraps unknown raw ids as opencode:<model>', () => {
+    expect(resolveDispatchModel('opencode', 'some-provider/some-model')).toBe('opencode:some-provider/some-model')
+  })
+
+  it('does not double-wrap a model that is already a dispatcher token', () => {
+    expect(resolveDispatchModel('opencode', 'opencode:some-provider/some-model')).toBe('opencode:some-provider/some-model')
+    expect(resolveDispatchModel('opencode', 'kimi-thinking')).toBe('kimi-thinking')
   })
 })

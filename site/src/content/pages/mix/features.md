@@ -268,7 +268,7 @@ Llámenos no está codificado nuu caso uso específico. Todo es template-driven.
 
 ### Docker Compose (Servidor Único)
 
-- Stack completo: servidor HTTP Bun, PostgreSQL, RustFS (almacenamiento objetos), relé WebSocket (WebSocket relay)
+- Stack completo: servidor HTTP Bun, PostgreSQL, RustFS (almacenamiento objetos), relé WebSocket
 - Perfiles opcionales: `--profile signal` (sidecar signal-cli), `--profile telephony` (Kamailio + CoTURN), `--profile inference` (agente firehose LLM), `--profile monitoring` (Prometheus + Grafana)
 - `docker-compose.dev.yml` nuu desarrollo local nuu observación archivos
 - `docker-compose.production.yml` overlay nuu endurecimiento producción

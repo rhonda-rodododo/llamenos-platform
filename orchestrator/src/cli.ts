@@ -15,14 +15,16 @@ import { loadContracts, contractsFor, buildMemoryContext, augmentBrief } from '.
 import { dispatch as dispatchWorker, type EffortLevel } from './engines.js'
 import { verifyMechanical } from './verify.js'
 import { secondOpinion, postReview } from './review.js'
+import { artifactReviewCache } from './review-cache.js'
 import {
-  runVerifyCi, runReviewCi, ciContextFromEnv, ciDiff,
-  REVIEW_JOB, REVIEW_KEY_ENV, VERIFY_JOB, itemIdFromBranch, type CiContext, type CiVerdict,
+  runVerifyCi, runReviewCi, decideReviewGate, ciContextFromEnv, ciDiff,
+  REVIEW_JOB, REVIEW_KEY_ENV, VERIFY_JOB, itemIdFromBranch, fleetBranchFor, type CiContext, type CiVerdict,
 } from './ci.js'
 import {
   settle as settleWorktree,
   destroyWorktree,
   findWorktreeForBranch,
+  currentBranch,
   deleteLocalBranch,
   type SettleTarget,
 } from './worktree.js'
@@ -46,6 +48,16 @@ function log(msg: string): void {
   const line = `${new Date().toISOString()} ${msg}\n`
   appendFileSync(LOG_FILE, line)
   process.stdout.write(line)
+}
+
+/**
+ * Rejected lanes.json entries must surface where an operator actually looks:
+ * the fleet log and stdout. Fail-closed (the lane stays off) is only safe if
+ * the rejection is also loud — a silently ignored override reads as "the dial
+ * did nothing" and gets debugged as a fleet bug.
+ */
+function rejectLogger(laneId: string, reason: string): void {
+  log(`lanes.json rejected: ${reason}`)
 }
 
 /**
@@ -109,10 +121,22 @@ export async function doctor(): Promise<number> {
     remotes.length === 1 && remotes[0] === 'origin',
     'git remote remove <name> — this repo must only ever have origin -> llamenos-platform'])
 
-  const lanes = await loadLanes(REPO_ROOT)
+  const lanes = await loadLanes(REPO_ROOT, LANE_MODES_FILE, rejectLogger)
   for (const l of lanes) {
     checks.push([`lane ${l.id} has scope paths`, l.scope.owned.length > 0,
       `check .claude/agents/fragments/${l.id}-supervisor.md "**Owned paths:**" section`])
+  }
+
+  // A live opencode lane with no opencode binary dispatches workers that all
+  // die at launch — a hard misconfiguration, surfaced as FAIL, not WARN.
+  const liveOpencode = lanes.filter((l) => l.mode === 'live' && l.engine === 'opencode')
+  if (liveOpencode.length > 0) {
+    let opencodeOk = false
+    try { execFileSync('opencode', ['--version'], { stdio: 'pipe' }); opencodeOk = true } catch { /* not on PATH */ }
+    for (const l of liveOpencode) {
+      checks.push([`lane ${l.id} is live on opencode, opencode binary on PATH`, opencodeOk,
+        'install opencode (https://opencode.ai), or set this lane\'s engine back to claude in ~/.llamenos-fleet/lanes.json'])
+    }
   }
   checks.push(['not halted', !haltedLocally(),
     existsSync(HALT_REASON_FILE) ? `halted: ${readFileSync(HALT_REASON_FILE, 'utf8').trim()} — clear with: llamenos-fleet resume` : ''])
@@ -181,8 +205,8 @@ export async function doctor(): Promise<number> {
     }
   }
 
-  const modes = lanes.map((l) => `${l.id}=${l.mode}`).join(' ')
-  process.stdout.write(`\nlanes: ${modes}\n`)
+  const modes = lanes.map((l) => `${l.id}=${l.mode}/${l.engine}${l.model !== undefined ? `/${l.model}` : ''}`).join(' ')
+  process.stdout.write(`\nlanes (mode/engine/model): ${modes}\n`)
   process.stdout.write(`lane modes file: ${LANE_MODES_FILE}${existsSync(LANE_MODES_FILE) ? '' : ' (absent — all lanes off)'}\n`)
   if (warnings > 0) {
     process.stdout.write(`\n${warnings} warning(s) above — non-fatal, see WARN lines\n`)
@@ -221,6 +245,11 @@ const BRIEFS_DIR = join(FLEET_DIR, 'briefs')
 const DEFAULT_TIMEOUT_SEC = 90 * 60
 const DEFAULT_EFFORT: EffortLevel = 'high'
 const DEFAULT_MODEL = 'sonnet'
+// An opencode lane with no model override must not fall back to the Claude
+// default — 'sonnet' would route the dispatch to the claude CLI, silently
+// defeating the engine selection. 'kimi' is dispatch-one.sh's maintained
+// opencode token (maps to kimi-for-coding/k3-256k inside the script).
+const DEFAULT_OPENCODE_MODEL = 'kimi'
 
 /** One name identifies a dispatched item everywhere: the tmux session
  *  dispatch-one.sh starts, the status file it polls, and the handle `settle`
@@ -231,48 +260,97 @@ function nameFor(lane: Lane, item: WorkItem): string {
   return `fleet-${lane.id}-${item.id}`
 }
 
+export interface ResolveDispatchDeps {
+  /** `git worktree list` lookup — worktree.ts's `findWorktreeForBranch`. */
+  findWorktree(repoRoot: string, branch: string): Promise<string | undefined>
+  /** `git -C <wt> rev-parse --abbrev-ref HEAD` — worktree.ts's `currentBranch`. */
+  currentBranch(worktree: string): Promise<string | undefined>
+  /** The PR's head branch as GitHub reports it; `undefined` when unreadable. */
+  prHeadBranch(pr: string): Promise<string | undefined>
+}
+
 /**
- * G3's root-caused fix for issue #660/PR #662: audited directly against
- * `dispatch-one.sh` (`~/.claude/skills/supervising-dispatched-sessions/`),
- * the WORKER's own terminal status write (as opposed to the throwaway
- * DISPATCHED seed file the launcher writes before the worker starts) only
- * ever carries `session`, `status`, `pr`, `merged_sha`, `duration_sec`, and
- * `notes` — NEVER `branch` or `worktree`, even though the seed file has
- * both. `engines.ts`'s `dispatch()` reads the WORKER's file, so
- * `DispatchResult.branch`/`.worktree` are `undefined` for every real
- * terminal status a worker writes itself — which is exactly what silently
- * skipped the mechanical verify -> review -> merge pipeline for #660: the
- * `result.outcome === 'SUCCESS' && branch !== undefined && pr !== undefined
- * && worktree !== undefined` guard in `tick.ts`'s `runLiveDispatch` was
- * never satisfied, so the item fell straight to the pass-through branch with
- * zero scope check, zero tests, and zero non-author review.
+ * Turns a worker's dispatch report into the facts the pipeline acts on, and
+ * refuses to act on a report whose work is not on the branch it dispatched.
  *
- * This does not change `engines.ts` or ask it to guess at a contract it does
- * not own (`dispatch-one.sh` is a separate, unvendored dependency — see
- * paths.ts's `DISPATCH_SCRIPT` comment). It repairs both fields at the one
- * place that already has a correct answer independent of the worker's own
- * report:
- *   - `branch` is deterministic and known BEFORE dispatch even starts (built
- *     right below) — the worker's report is never trusted for it.
- *   - `worktree` is asked of git directly via `findWorktreeForBranch`
- *     (worktree.ts), exactly the reasoning that function's own doc comment
- *     already gives for `revert`/`integrate`.
+ * G3 (issue #660/PR #662): audited directly against `dispatch-one.sh`
+ * (`~/.claude/skills/supervising-dispatched-sessions/`), the WORKER's own
+ * terminal status write (as opposed to the throwaway DISPATCHED seed file
+ * the launcher writes before the worker starts) only ever carries `session`,
+ * `status`, `pr`, `merged_sha`, `duration_sec`, and `notes` — NEVER `branch`
+ * or `worktree`. `branch` is therefore the one known BEFORE dispatch
+ * (`fleetBranchFor`, passed to dispatch-one.sh as `--branch` by
+ * engines.ts's `buildArgs`), and `worktree` is the one dispatch-one.sh's
+ * launch seed reported (engines.ts reads it before the worker can overwrite
+ * the file) or, failing that, asked of git directly via `findWorktree`.
  *
- * Exported and pure-ish (the git lookup is injected) so this exact repair is
- * unit-tested without a real dispatch-one.sh in sight.
+ * Issue #812: knowing the expected branch is not the same as the work being
+ * on it. dispatch-one.sh used to cut every worktree on the worker NAME
+ * (`fleet-shared-704`), so `findWorktree` for `fleet/shared/704` found
+ * nothing and tick.ts skipped verification for a "missing worktree" while
+ * the PR sat open on a branch neither the fleet nor CI recognised. Both the
+ * worktree's ACTUAL checked-out branch and the PR's ACTUAL head branch are
+ * now checked against the expected one, and any difference — including one
+ * that cannot be read — marks the run FAILED with note
+ * `branch-mismatch:<actual>` and sets `branchMismatch`, which tick.ts turns
+ * into a PR comment + `needs-human` and never into a verify or an arming.
+ * Fail-closed on an unreadable PR head on purpose: auto-merge is armed on a
+ * PR NUMBER, and a number whose head is unknown may merge a diff nobody
+ * verified.
+ *
+ * A worker-reported `branch` is never trusted over git: it is replaced by
+ * the verified expected branch, or by the actual one on a mismatch.
+ *
+ * Exported and pure-ish (the git/gh lookups are injected) so this exact
+ * repair is unit-tested without a real dispatch-one.sh in sight.
  */
 export async function resolveDispatchResult(
   result: DispatchOutcome,
-  branch: string,
+  expectedBranch: string,
   repoRoot: string,
-  findWorktree: (repoRoot: string, branch: string) => Promise<string | undefined>,
+  deps: ResolveDispatchDeps,
 ): Promise<DispatchOutcome> {
-  const worktree = result.worktree ?? await findWorktree(repoRoot, branch)
-  return { ...result, branch: result.branch ?? branch, worktree }
+  const worktree = result.worktree ?? await deps.findWorktree(repoRoot, expectedBranch)
+
+  // `actual` is what the note reports; `actualBranch` is only ever a branch
+  // git or GitHub really named — a placeholder must never reach the ledger's
+  // `branch`, which `revert` later deletes and salvage names branches after.
+  let actual: string | undefined
+  let actualBranch: string | undefined
+  if (worktree !== undefined) {
+    const onWorktree = await deps.currentBranch(worktree)
+    if (onWorktree !== expectedBranch) { actual = onWorktree ?? 'unknown'; actualBranch = onWorktree }
+  }
+  if (actual === undefined && result.pr !== undefined) {
+    const head = await deps.prHeadBranch(result.pr)
+    if (head !== expectedBranch) { actual = head ?? 'unreadable-pr-head'; actualBranch = head }
+  }
+
+  if (actual !== undefined) {
+    const reason = `branch-mismatch:${actual}`
+    return {
+      ...result,
+      outcome: 'FAILED',
+      branch: actualBranch,
+      worktree,
+      branchMismatch: actual,
+      note: result.note ? `${reason} ${result.note}` : reason,
+    }
+  }
+  return { ...result, branch: expectedBranch, worktree }
+}
+
+function defaultResolveDispatchDeps(): ResolveDispatchDeps {
+  return {
+    findWorktree: findWorktreeForBranch,
+    currentBranch,
+    prHeadBranch: async (pr) =>
+      (await ghJson<{ headRefName: string }>(['pr', 'view', pr, '--json', 'headRefName']))?.headRefName,
+  }
 }
 
 async function realDispatch(item: WorkItem, lane: Lane): Promise<DispatchOutcome> {
-  const branch = `fleet/${lane.id}/${item.id}`
+  const branch = fleetBranchFor(lane.id, item.id)
   const baseBrief = buildBrief(item, lane, branch)
   // Prior-attempt history and governing contracts are memory.ts's sole
   // concern (see brief.ts's own comment on why: a caller rendering both
@@ -291,15 +369,20 @@ async function realDispatch(item: WorkItem, lane: Lane): Promise<DispatchOutcome
     lane,
     briefPath,
     timeoutSec: DEFAULT_TIMEOUT_SEC,
-    model: lane.model ?? DEFAULT_MODEL,
+    model: lane.model ?? (lane.engine === 'opencode' ? DEFAULT_OPENCODE_MODEL : DEFAULT_MODEL),
     effort: DEFAULT_EFFORT,
   })
-  const resolved = await resolveDispatchResult(result, branch, REPO_ROOT, findWorktreeForBranch)
+  const resolved = await resolveDispatchResult(result, branch, REPO_ROOT, defaultResolveDispatchDeps())
+  if (resolved.branchMismatch !== undefined) {
+    log(`dispatch: item ${item.id} ${resolved.note ?? ''} — expected ${branch}`)
+  }
 
   // At PR open, which is the earliest moment the PR exists. Best-effort: the
   // worst case is an issue that stays open after its PR merges, which the
   // digest already surfaces, and it must never cost the dispatch itself.
-  if (resolved.pr !== undefined) {
+  // Not on a mismatched branch: the item number is derived from the PR's
+  // head branch, which by definition is not a fleet branch there.
+  if (resolved.pr !== undefined && resolved.branchMismatch === undefined) {
     try {
       await ensureIssueLinkWith(resolved.pr, defaultIssueLinkDeps())
     } catch (e) {
@@ -475,7 +558,7 @@ function defaultIssueLinkDeps(): IssueLinkDeps {
 }
 
 async function runTick(): Promise<number> {
-  const lanes = await loadLanes(REPO_ROOT)
+  const lanes = await loadLanes(REPO_ROOT, LANE_MODES_FILE, rejectLogger)
 
   const deps: TickDeps = {
     lanes,
@@ -816,7 +899,7 @@ async function runDigest(hoursArg?: string): Promise<number> {
     hours = parsed
   }
 
-  const lanes = await loadLanes(REPO_ROOT)
+  const lanes = await loadLanes(REPO_ROOT, LANE_MODES_FILE, rejectLogger)
   const haltedNow = haltedLocally()
   const haltReason = haltedNow && existsSync(HALT_REASON_FILE)
     ? readFileSync(HALT_REASON_FILE, 'utf8').trim()
@@ -1073,6 +1156,48 @@ async function runCiGate(job: string, run: (ctx: CiContext) => Promise<CiVerdict
   return verdict.ok ? 0 : 1
 }
 
+/**
+ * `review-gate` — the step `fleet-review.yml` runs BEFORE installing the
+ * review engine, now that the job carries no job-level `if:` at all (#848's
+ * fail-open bug — a job instantiated on an event and then skipped by `if:`
+ * satisfies branch protection exactly like a green check). Its exit code is
+ * what actually enforces branch (c) of `decideReviewGate`'s three outcomes:
+ * a `not-requested` result exits 1 here, which is what stops every
+ * subsequent step (engine install, auth, the smoke test, the real review)
+ * from ever running — GitHub Actions does not run later steps after one
+ * fails unless they opt in with `if: always()`/`if: failure()`, and none of
+ * the engine steps do. `cache-hit` and `run-engine` both exit 0; the
+ * `outcome` step output is what the workflow's own `if:` on each later step
+ * reads to decide whether IT runs.
+ */
+async function runReviewGate(): Promise<number> {
+  const ctx = ciContextFromEnv(process.env, REPO_ROOT)
+  if (ctx === undefined) {
+    process.stderr.write(
+      'review-gate: FLEET_CI_BRANCH, FLEET_CI_HEAD_DIR, FLEET_CI_HEAD_SHA and FLEET_CI_BASE_SHA ' +
+      'must all be set — refusing to judge an unknown tree\n',
+    )
+    return 2
+  }
+  const outcome = await decideReviewGate({
+    ctx,
+    prDiff: () => ciDiff(ctx),
+    cache: artifactReviewCache(process.env['FLEET_REVIEW_CACHE_DIR'], ciLog),
+    requested: process.env['FLEET_REVIEW_REQUESTED'] === 'true',
+    log: ciLog,
+  })
+  const ghOutput = process.env['GITHUB_OUTPUT']
+  if (ghOutput !== undefined) appendFileSync(ghOutput, `outcome=${outcome.kind}\n`)
+  if (outcome.kind === 'not-requested') {
+    process.stderr.write(
+      `${REVIEW_JOB}: review not requested — add the \`review\` label to run the non-author review\n`,
+    )
+    return 1
+  }
+  ciLog(`${REVIEW_JOB}: gate outcome = ${outcome.kind}`)
+  return 0
+}
+
 type CommandHandler = (rest: string[]) => Promise<number> | number
 
 /**
@@ -1105,7 +1230,7 @@ const HANDLERS: Record<string, CommandHandler> = {
   digest: (rest) => runDigest(rest[0]),
   'verify-ci': () => runCiGate(VERIFY_JOB, (ctx) => runVerifyCi({
     ctx,
-    lanes: () => loadLanes(REPO_ROOT),
+    lanes: () => loadLanes(REPO_ROOT, LANE_MODES_FILE, rejectLogger),
     verify: verifyMechanical,
     pathExists: existsSync,
     log: ciLog,
@@ -1113,13 +1238,18 @@ const HANDLERS: Record<string, CommandHandler> = {
   'review-ci': () => runCiGate(REVIEW_JOB, (ctx) => runReviewCi({
     ctx,
     apiKey: process.env[REVIEW_KEY_ENV],
-    lanes: () => loadLanes(REPO_ROOT),
+    lanes: () => loadLanes(REPO_ROOT, LANE_MODES_FILE, rejectLogger),
     verify: verifyMechanical,
     pathExists: existsSync,
     log: ciLog,
     prDiff: () => ciDiff(ctx),
     secondOpinion,
+    // `FLEET_REVIEW_CACHE_DIR` unset (e.g. a local run) disables recording
+    // without disabling lookup — a lookup that finds nothing behaves
+    // identically either way, and this command still runs the engine.
+    cache: artifactReviewCache(process.env['FLEET_REVIEW_CACHE_DIR'], ciLog),
   })),
+  'review-gate': () => runReviewGate(),
   plan: () => runPlan(),
   integrate: () => runIntegrate(),
 }

@@ -23,8 +23,6 @@ import {
   linkRecordToEventViaApi,
   linkReportToEventViaApi,
   createReportViaApi,
-  listEventRecordsViaApi,
-  listEventReportsViaApi,
 } from '../../api-helpers'
 
 // State is now in casesWorld fixture (casesWorld.eventEntityTypeId, casesWorld.lastEventId, casesWorld.lastEventName)
@@ -191,7 +189,7 @@ Given('an event {string} exists', async ({ backendRequest: request, casesWorld, 
   casesWorld.lastEventName = eventName
 })
 
-When('I click on the {string} event card', async ({ page }, eventName: string) => {
+When('I click on the {string} event card', async ({ page }, _eventName: string) => {
   // Event cards are rendered as case cards — find by text content
   const card = page.getByTestId('case-card').first()
   await expect(card).toBeVisible({ timeout: Timeouts.ELEMENT })
@@ -255,7 +253,7 @@ Given('an event with linked reports exists', async ({ backendRequest: request, c
   await linkReportToEventViaApi(request, casesWorld.lastEventId!, (report as { id: string }).id, ADMIN_NSEC, workerHub).catch(() => {})
 })
 
-When('I view the event detail', async ({ page, backendRequest: request, casesWorld, workerHub }) => {
+When('I view the event detail', async ({ page }) => {
   await navigateAfterLogin(page, '/events')
   // Click first case card (event) to open detail
   const card = page.getByTestId('case-card').first()
@@ -280,7 +278,7 @@ Then('each case link should show a case number', async ({ page }) => {
   await expect(detailHeader).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
-Then('the linked cases count should show {int}', async ({ page }, count: number) => {
+Then('the linked cases count should show {int}', async ({ page }, _count: number) => {
   // The contact count badge is shown on the Contacts tab button
   const contactsTab = page.getByTestId('case-contacts-tab')
   if (await contactsTab.isVisible({ timeout: 3000 }).catch(() => false)) {
@@ -289,7 +287,7 @@ Then('the linked cases count should show {int}', async ({ page }, count: number)
   }
 })
 
-Then('the linked cases count should increase by {int}', async ({ page }, increment: number) => {
+Then('the linked cases count should increase by {int}', async ({ page }, _increment: number) => {
   // Accept that linking was successful if the detail is still visible
   await expect(page.getByTestId('case-detail-header')).toBeVisible({ timeout: Timeouts.ELEMENT })
 })

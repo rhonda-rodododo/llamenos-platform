@@ -4,16 +4,12 @@
  */
 import { expect } from '@playwright/test'
 import {Given, When, Then, getState, setState, Before} from './fixtures'
-import { getScenarioState } from './common.steps'
 import {
-  apiGet,
-  apiPost,
   generateTestKeypair,
   getMeViaApi,
   testEndpointAccess,
   createVolunteerViaApi,
   createRoleViaApi,
-  ADMIN_SEED,
 } from '../../api-helpers'
 import { ed25519 } from '@noble/curves/ed25519.js'
 import { hexToBytes, bytesToHex, utf8ToBytes } from '@shared/encoding'
@@ -233,7 +229,7 @@ Given('a role with {string} permission', async ({request, world}, permission: st
   getAuthTestState(world).roleIds.push(role.id)
 })
 
-Then('it should grant {string} and {string} and {string}', async ({ world }, _p1: string, _p2: string, _p3: string) => {
+Then('it should grant {string} and {string} and {string}', async ({}, _p1: string, _p2: string, _p3: string) => {
   // Domain wildcard verification — the server resolves wildcards internally
   // This is verified by the permission checks in the steps above
   expect(true).toBeTruthy()
