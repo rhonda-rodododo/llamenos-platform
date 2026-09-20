@@ -46,6 +46,15 @@ import { LEDGER_FILE } from './paths.js'
  * `circuit.ts`'s consecutive-failure streak: three verification gaps in a
  * row are not three failures, and halting the fleet over them is exactly
  * the false alarm this outcome exists to prevent.
+ *
+ * Extension of that same principle (the fix for the #705/#724/#729/#775/
+ * #784/#785 incident): `UNVERIFIED` also must never decrement an item's OWN
+ * per-attempt retry budget (`failedAttemptsIn`, below) — see that function's
+ * doc comment. `needsHuman` (tick.ts) already stops the item being
+ * re-claimed while the label stands; the retry budget is a SEPARATE
+ * question — "once a human clears that label, how many attempts does this
+ * item still have?" — and an infrastructure gap that was never the worker's
+ * fault must not have spent any of them, exactly as a QUOTA row never does.
  */
 export type Outcome =
   | 'DISPATCHED' | 'SUCCESS' | 'FAILED' | 'BLOCKED'
@@ -107,13 +116,24 @@ export function since(windowMs: number, now = Date.now()): RunRecord[] {
   return sinceIn(readAll(), windowMs, now)
 }
 
-// UNVERIFIED counts here (bounding an item's per-attempt retries — same
-// reasoning as BLOCKED, immediately below in this list) even though it must
-// NOT feed circuit.ts's fleet-wide streak (see the `Outcome` doc comment
-// above): an item whose verification keeps coming back inconclusive still
-// needs to stop being re-claimed forever, it just must not take the whole
-// fleet down while it does.
-const TERMINAL_FAILURES: ReadonlySet<Outcome> = new Set<Outcome>(['FAILED', 'TIMEOUT', 'BLOCKED', 'REJECTED', 'UNVERIFIED'])
+// UNVERIFIED is deliberately excluded, same as QUOTA immediately below it in
+// the `Outcome` union — and for the extension of the exact same reason (see
+// the `Outcome` doc comment above): only an outcome attributable to the
+// WORKER'S OWN diff may decrement this budget. UNVERIFIED means the fleet's
+// own verification pipeline — a reviewer-engine outage, a review that never
+// got a verdict, or (the shape this fix targets) the fleet re-dispatching a
+// brand-new worker onto a branch that already had a correct, finished PR —
+// never reached a real verdict on the work at all, so it must not cost the
+// item any of its three attempts. This does NOT reopen the item to
+// unbounded re-claiming: `needsHuman` (tick.ts) already attaches
+// `needs-human`, which `judge()`'s veto (select.ts) uses to stop dispatch
+// regardless of how many attempts remain. The retry budget and the veto
+// label answer two different questions — "how many attempts are left" vs.
+// "is this claimable right now" — and conflating them is what let three
+// consecutive UNVERIFIED rows (or, per issue #870's own worked incident, a
+// mix of infra failures) burn through an item's entire budget before a
+// human ever looked at it.
+const TERMINAL_FAILURES: ReadonlySet<Outcome> = new Set<Outcome>(['FAILED', 'TIMEOUT', 'BLOCKED', 'REJECTED'])
 
 /** Counts backward from the newest record for this item and stops at a SUCCESS. */
 export function failedAttemptsIn(rows: RunRecord[], itemId: string): number {

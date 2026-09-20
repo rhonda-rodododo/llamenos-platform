@@ -31,6 +31,33 @@ const __dirname = dirname(__filename)
 const GENERATED_DIR = resolve(__dirname, '../generated')
 const CRYPTO_LABELS_FILE = resolve(__dirname, '../crypto-labels.json')
 
+/** Get the array at `key`, creating an empty one first if absent, and return it for mutation. */
+function getOrCreateArray<K, V>(map: Map<K, V[]>, key: K): V[] {
+  const existing = map.get(key)
+  if (existing) return existing
+  const created: V[] = []
+  map.set(key, created)
+  return created
+}
+
+/** Get the Set at `key`, creating an empty one first if absent, and return it for mutation. */
+function getOrCreateSet<K, V>(map: Map<K, Set<V>>, key: K): Set<V> {
+  const existing = map.get(key)
+  if (existing) return existing
+  const created = new Set<V>()
+  map.set(key, created)
+  return created
+}
+
+/** Get the Map at `key`, creating an empty one first if absent, and return it for mutation. */
+function getOrCreateMap<K1, K2, V>(map: Map<K1, Map<K2, V>>, key: K1): Map<K2, V> {
+  const existing = map.get(key)
+  if (existing) return existing
+  const created = new Map<K2, V>()
+  map.set(key, created)
+  return created
+}
+
 /**
  * Schema store backed by the full registry. Resolves $ref addresses by name
  * so that any future schema using $defs or z.lazy() resolves correctly.
@@ -167,8 +194,7 @@ function deduplicateAnonymousSchemas(
       if (propSchema['type'] === 'object' && propSchema['properties']) {
         const canon = canonicalize(propSchema)
         const ref: InlineRef = { schemaIdx, path: propPath, propertyName: propName, isArrayItem: false, canonical: canon }
-        if (!inlinesByHash.has(canon)) inlinesByHash.set(canon, [])
-        inlinesByHash.get(canon)!.push(ref)
+        getOrCreateArray(inlinesByHash, canon).push(ref)
         collectInlines(propSchema, propPath, schemaIdx)
       }
 
@@ -176,8 +202,7 @@ function deduplicateAnonymousSchemas(
       if (propSchema['type'] === 'string' && Array.isArray(propSchema['enum'])) {
         const canon = canonicalize(propSchema)
         const ref: InlineRef = { schemaIdx, path: propPath, propertyName: propName, isArrayItem: false, canonical: canon }
-        if (!inlinesByHash.has(canon)) inlinesByHash.set(canon, [])
-        inlinesByHash.get(canon)!.push(ref)
+        getOrCreateArray(inlinesByHash, canon).push(ref)
       }
 
       // Array items
@@ -187,8 +212,7 @@ function deduplicateAnonymousSchemas(
           const itemPath = [...propPath, 'items']
           const canon = canonicalize(items)
           const ref: InlineRef = { schemaIdx, path: itemPath, propertyName: propName, isArrayItem: true, canonical: canon }
-          if (!inlinesByHash.has(canon)) inlinesByHash.set(canon, [])
-          inlinesByHash.get(canon)!.push(ref)
+          getOrCreateArray(inlinesByHash, canon).push(ref)
           collectInlines(items, itemPath, schemaIdx)
         }
       }
@@ -204,16 +228,14 @@ function deduplicateAnonymousSchemas(
             const varPath = [...propPath, combiner, String(i)]
             const canon = canonicalize(variant)
             const ref: InlineRef = { schemaIdx, path: varPath, propertyName: propName, isArrayItem: false, canonical: canon }
-            if (!inlinesByHash.has(canon)) inlinesByHash.set(canon, [])
-            inlinesByHash.get(canon)!.push(ref)
+            getOrCreateArray(inlinesByHash, canon).push(ref)
             collectInlines(variant, varPath, schemaIdx)
           }
           if (variant['type'] === 'string' && Array.isArray(variant['enum'])) {
             const varPath = [...propPath, combiner, String(i)]
             const canon = canonicalize(variant)
             const ref: InlineRef = { schemaIdx, path: varPath, propertyName: propName, isArrayItem: false, canonical: canon }
-            if (!inlinesByHash.has(canon)) inlinesByHash.set(canon, [])
-            inlinesByHash.get(canon)!.push(ref)
+            getOrCreateArray(inlinesByHash, canon).push(ref)
           }
         }
       }
@@ -344,8 +366,7 @@ function collectIntegerFieldsDeep(
     if (!propSchema || typeof propSchema !== 'object') continue
 
     if (propSchema['type'] === 'integer') {
-      if (!perType.has(typeName)) perType.set(typeName, new Set())
-      perType.get(typeName)!.add(propName)
+      getOrCreateSet(perType, typeName).add(propName)
       asInt.set(propName, (asInt.get(propName) ?? 0) + 1)
       continue
     }
@@ -362,8 +383,7 @@ function collectIntegerFieldsDeep(
       const hasInt = variants.some(v => v['type'] === 'integer')
       const hasNum = variants.some(v => v['type'] === 'number')
       if (hasInt) {
-        if (!perType.has(typeName)) perType.set(typeName, new Set())
-        perType.get(typeName)!.add(propName)
+        getOrCreateSet(perType, typeName).add(propName)
         asInt.set(propName, (asInt.get(propName) ?? 0) + 1)
       }
       if (hasNum) {
@@ -799,7 +819,7 @@ function postProcessKotlin(
   raw: string,
   schemas: Array<{ name: string; schema: string }>,
 ): string {
-  let output = raw
+  const output = raw
 
   // Build a map of schema defaults: { TypeName: { fieldName: defaultValue } }
   const defaultsMap = new Map<string, Map<string, unknown>>()
@@ -871,8 +891,7 @@ function postProcessKotlin(
       } else if (pendingSerialName) {
         const fMatch = line.match(/^\s+val (\w+):/)
         if (fMatch) {
-          if (!classSerialNames.has(curClass)) classSerialNames.set(curClass, new Map())
-          classSerialNames.get(curClass)!.set(fMatch[1], pendingSerialName) // hubID → hubId
+          getOrCreateMap(classSerialNames, curClass).set(fMatch[1], pendingSerialName) // hubID → hubId
         }
         pendingSerialName = null
       }
@@ -893,8 +912,8 @@ function postProcessKotlin(
     }
 
     // Check if this line is a field declaration that needs a default
-    if (currentType && defaultsMap.has(currentType)) {
-      const defaults = defaultsMap.get(currentType)!
+    const defaults = currentType ? defaultsMap.get(currentType) : undefined
+    if (defaults) {
       // Match: val fieldName: Type,  OR  val fieldName: Type
       const fieldMatch = line.match(/^(\s+val )(\w+)(: .+?)(,?\s*)$/)
       if (fieldMatch) {
