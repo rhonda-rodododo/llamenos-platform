@@ -1,31 +1,34 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { spawnSync } from 'node:child_process'
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { describe, it, expect } from 'vitest'
+import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { parse as parseYaml } from 'yaml'
 
 /**
- * Rail for two related defects in release.yml, both surfaced by run
- * 35489888506 (v0.19.13): `check`/`build`/`release` all succeeded, but
- * `dispatch` — the job that actually triggers the desktop and mobile
- * release workflows a tester would install — was SKIPPED, because
- * `docker-stable` (pure container-registry publishing) failed and sat in
- * `dispatch`'s `needs`. `docker-stable` itself failed for a reason that has
- * nothing to do with producing an installer: Docker Hub credentials are not
- * configured in this repo, so `docker/login-action` errored with "Username
- * and password required", which cascaded into a failed Trivy upload
- * (`trivy-results.sarif` never existed because the scan never ran).
+ * Rail for a defect in release.yml surfaced by run 35489888506 (v0.19.13):
+ * `check`/`build`/`release` all succeeded, but `dispatch` — the job that
+ * actually triggers the desktop and mobile release workflows a tester would
+ * install — was SKIPPED, because `docker-stable` (pure container-registry
+ * publishing) failed and sat in `dispatch`'s `needs`. `docker-stable` itself
+ * failed for a reason that has nothing to do with producing an installer:
+ * Docker Hub credentials were never configured in this repo, so
+ * `docker/login-action` errored with "Username and password required",
+ * which cascaded into a failed Trivy upload (`trivy-results.sarif` never
+ * existed because the scan never ran).
  *
- * Two fixes, two rails:
+ * `dispatch` must depend only on what it actually needs (`check` for the
+ * version, `release` for the release existing) — never on `docker-stable`.
+ * That rail (Rail 1 below) is unchanged by the later GHCR migration: an
+ * optional/independent publish job must never gate a required artifact job,
+ * regardless of which registry it publishes to.
  *
- * 1. `dispatch` must depend only on what it actually needs (`check` for the
- *    version, `release` for the release existing) — never on `docker-stable`.
- * 2. `docker-stable` must skip its publish steps cleanly, with a log line,
- *    when Docker Hub credentials are absent — the same precedent already set
- *    by the "GPG sign CHECKSUMS.txt" step in the `release` job. Crucially,
- *    if credentials ARE present and login/build/push/sign then fails for a
- *    real reason, that must still be a hard job failure, never swallowed.
+ * Rail 2's shape changed with that GHCR migration
+ * (tests/orchestrator/release-ghcr-publish.test.ts covers the new job in
+ * full): `docker-stable` no longer has an "unconfigured" case to skip —
+ * GHCR publishing authenticates with the built-in `GITHUB_TOKEN`, which is
+ * always present, so the job runs unconditionally on every release. What
+ * carries forward from the original Rail 2 intent ("configured but broken
+ * must still hard-fail") is asserted here structurally: none of the
+ * publish/scan/sign/attest steps may tolerate failure.
  *
  * Per "audit gates by breaking them": both rails below include a MUTATION
  * that reintroduces the exact defect being guarded against, and asserts the
@@ -40,6 +43,7 @@ interface WorkflowStep {
   if?: string
   run?: string
   uses?: string
+  with?: Record<string, unknown>
   'continue-on-error'?: boolean
 }
 interface WorkflowJob {
@@ -149,15 +153,20 @@ describe('rail: dispatch must not be gated by optional container publishing', ()
 })
 
 // ---------------------------------------------------------------------------
-// Rail 2: docker-stable must skip cleanly when Docker Hub credentials are
-// absent, and must still hard-fail when credentials are present but the
-// registry step itself fails.
+// Rail 2 (post-GHCR-migration shape): docker-stable no longer has an
+// "unconfigured" case — GHCR authenticates with the always-present
+// GITHUB_TOKEN — so every publish/scan/sign/attest step must run
+// unconditionally (no docker-creds-style gate reintroduced) and none may
+// tolerate failure. Full coverage of the GHCR job (image naming, login,
+// tag computation, signing) lives in release-ghcr-publish.test.ts; this
+// rail only re-asserts the "never gated, never tolerant" shape in the same
+// place the old Docker Hub gating rail used to live, so a future PR that
+// tries to reintroduce a credential gate here still trips something.
 // ---------------------------------------------------------------------------
 
-const CREDS_STEP_NAME = 'Check Docker Hub credentials'
-const GATED_STEP_NAMES = [
+const UNGATED_STEP_NAMES = [
   'Set up Docker Buildx',
-  'Log in to Docker Hub',
+  'Log in to GHCR',
   'Compute stable tags',
   'Build and push stable image',
   'Generate SBOM attestation',
@@ -166,137 +175,83 @@ const GATED_STEP_NAMES = [
   'Run Trivy vulnerability scanner',
 ]
 
-let scratch: string
-
-beforeEach(() => {
-  scratch = mkdtempSync(join(tmpdir(), 'llamenos-docker-creds-'))
-})
-
-afterEach(() => {
-  rmSync(scratch, { recursive: true, force: true })
-})
-
-/** Runs the "Check Docker Hub credentials" step's actual `run:` script the
- *  way GitHub runs an unshelled step: `bash -e <file>`, with GITHUB_OUTPUT
- *  pointed at a real scratch file so `>> "$GITHUB_OUTPUT"` behaves exactly
- *  as it does in Actions. */
-function runCredsCheck(env: { DOCKERHUB_USERNAME?: string; DOCKERHUB_TOKEN?: string }): {
-  status: number | null
-  output: string
-  githubOutput: string
-} {
-  const doc = loadWorkflow()
-  const dockerStable = job(doc, 'docker-stable')
-  const credsStep = step(dockerStable, CREDS_STEP_NAME)
-  if (typeof credsStep.run !== 'string') {
-    throw new Error(`"${CREDS_STEP_NAME}" has no run: block — the parser must not pass vacuously`)
-  }
-  const scriptPath = join(scratch, 'step.sh')
-  const outputPath = join(scratch, 'github-output')
-  writeFileSync(scriptPath, credsStep.run)
-  writeFileSync(outputPath, '')
-  const result = spawnSync('bash', ['-e', scriptPath], {
-    cwd: scratch,
-    encoding: 'utf8',
-    env: {
-      ...process.env,
-      GITHUB_OUTPUT: outputPath,
-      DOCKERHUB_USERNAME: env.DOCKERHUB_USERNAME ?? '',
-      DOCKERHUB_TOKEN: env.DOCKERHUB_TOKEN ?? '',
-    },
-  })
-  return { status: result.status, output: `${result.stdout}\n${result.stderr}`, githubOutput: readFileSync(outputPath, 'utf8') }
-}
-
-describe('rail: docker-stable skips cleanly when unconfigured, fails hard when configured-but-broken', () => {
-  it('finds a non-trivial credentials-check script — the parser must not pass vacuously', () => {
-    const doc = loadWorkflow()
-    const credsStep = step(job(doc, 'docker-stable'), CREDS_STEP_NAME)
-    expect((credsStep.run ?? '').length).toBeGreaterThan(20)
-  })
-
-  it('with both credentials absent: skips cleanly, logs why, and sets configured=false', () => {
-    const { status, output, githubOutput } = runCredsCheck({})
-    expect(status).toBe(0)
-    expect(output).toContain('Docker Hub credentials not configured')
-    expect(output).toContain('skipping')
-    expect(githubOutput).toContain('configured=false')
-  })
-
-  it('with only username set: still treated as unconfigured', () => {
-    const { githubOutput } = runCredsCheck({ DOCKERHUB_USERNAME: 'someuser' })
-    expect(githubOutput).toContain('configured=false')
-  })
-
-  it('with both credentials present: configured=true, no skip message', () => {
-    const { status, output, githubOutput } = runCredsCheck({ DOCKERHUB_USERNAME: 'someuser', DOCKERHUB_TOKEN: 'sometoken' })
-    expect(status).toBe(0)
-    expect(output).not.toContain('not configured')
-    expect(githubOutput).toContain('configured=true')
-  })
-
-  it('every publish/scan step is gated on steps.docker-creds.outputs.configured', () => {
+describe('rail: docker-stable (GHCR) runs unconditionally and never tolerates failure', () => {
+  it('no "Check Docker Hub credentials"-style gating step exists anymore', () => {
     const doc = loadWorkflow()
     const dockerStable = job(doc, 'docker-stable')
-    for (const name of GATED_STEP_NAMES) {
+    const gateNames = dockerStable.steps
+      .map((s) => s.name)
+      .filter((n): n is string => typeof n === 'string' && /credential/i.test(n))
+    expect(gateNames).toEqual([])
+  })
+
+  it('none of the publish/scan/sign/attest steps carry an `if:` gate', () => {
+    const doc = loadWorkflow()
+    const dockerStable = job(doc, 'docker-stable')
+    for (const name of UNGATED_STEP_NAMES) {
       const s = step(dockerStable, name)
-      expect(s.if, `step "${name}" must be gated on docker-creds`).toContain("steps.docker-creds.outputs.configured == 'true'")
+      expect(s.if, `step "${name}" must not be conditionally gated`).toBeUndefined()
     }
   })
 
-  it('"Upload Trivy scan results" keeps its always() (upload-on-scan-failure) behavior AND is gated', () => {
+  it('"Upload Trivy scan results" keeps its always() (upload-on-scan-failure) behavior, ungated', () => {
     const doc = loadWorkflow()
     const s = step(job(doc, 'docker-stable'), 'Upload Trivy scan results')
-    expect(s.if).toContain('always()')
-    expect(s.if).toContain("steps.docker-creds.outputs.configured == 'true'")
+    expect(s.if).toBe('always()')
   })
 
-  // MUTATION GUARD: prove the "still runs" half of Rail 1 above is actually
-  // exercised by the real needs graph, not just structurally true in
-  // isolation — i.e., that removing the gate from dispatch really does mean
-  // docker-stable being skipped-when-unconfigured no longer matters to it.
-  it('MUTATION: restoring docker-stable into dispatch needs would make an unconfigured (skipped) docker-stable block dispatch again', () => {
-    // docker-stable, when unconfigured, has every gated step SKIPPED. A
-    // job whose steps are all skipped still reports overall conclusion
-    // `success` in real GitHub Actions — but if some future edit changed
-    // that (e.g. a required step outside the gate failed), and someone also
-    // re-added docker-stable to dispatch's needs, dispatch would silently
-    // stop running again. This asserts the two defenses are independent:
-    // even if docker-stable's own success/failure semantics ever changed,
-    // dispatch not depending on it at all is the actual fix.
+  it('authenticates with the built-in GITHUB_TOKEN, not an operator-provided Docker Hub secret', () => {
     const doc = loadWorkflow()
-    const realNeeds = needsOf(job(doc, 'dispatch'))
-    const mutatedNeeds = [...realNeeds, 'docker-stable']
-    const statuses: Record<string, JobStatus> = { check: 'success', release: 'success', 'docker-stable': 'failure' }
-    expect(wouldRunUnderDefaultCondition(mutatedNeeds, statuses)).toBe(false)
-    expect(wouldRunUnderDefaultCondition(realNeeds, statuses)).toBe(true)
+    const loginStep = step(job(doc, 'docker-stable'), 'Log in to GHCR')
+    const serialized = JSON.stringify(loginStep.with)
+    expect(serialized).toContain('secrets.GITHUB_TOKEN')
+    expect(serialized).not.toContain('DOCKERHUB')
   })
 
-  it('none of the gated steps tolerate failure once configured (no continue-on-error)', () => {
+  it('none of the steps tolerate failure (no continue-on-error)', () => {
     const doc = loadWorkflow()
     const dockerStable = job(doc, 'docker-stable')
-    for (const name of GATED_STEP_NAMES) {
+    for (const name of UNGATED_STEP_NAMES) {
       const s = step(dockerStable, name)
       expect(s['continue-on-error'], `step "${name}" must not tolerate failure`).not.toBe(true)
     }
   })
 
-  // MUTATION GUARD: add continue-on-error to the real "Log in to Docker Hub"
-  // step definition and prove the assertion above would have caught it —
-  // this is the "configured but broken must still hard-fail" half of the
-  // rail from the "audit gates by breaking them" requirement.
-  it('MUTATION: adding continue-on-error to "Log in to Docker Hub" is caught by the no-tolerance assertion', () => {
+  // MUTATION GUARD (per "audit gates by breaking them"): add
+  // continue-on-error to the real "Build and push stable image" step
+  // definition — the exact class of regression that would let a broken
+  // GHCR push silently "succeed" — and prove the assertion above would have
+  // caught it.
+  it('MUTATION: adding continue-on-error to "Build and push stable image" is caught by the no-tolerance assertion', () => {
     const doc = loadWorkflow()
     const dockerStable = job(doc, 'docker-stable')
-    const loginStep = step(dockerStable, 'Log in to Docker Hub')
-    const mutated: WorkflowStep = { ...loginStep, 'continue-on-error': true }
+    const pushStep = step(dockerStable, 'Build and push stable image')
+    const mutated: WorkflowStep = { ...pushStep, 'continue-on-error': true }
     expect(mutated['continue-on-error']).toBe(true) // sanity: mutation applied
     // The real assertion this mirrors (`expect(s['continue-on-error']).not.toBe(true)`)
     // would fail against `mutated` — proving it is not vacuous.
     expect(() => {
       if (mutated['continue-on-error'] === true) {
-        throw new Error('continue-on-error tolerated a Docker Hub login failure')
+        throw new Error('continue-on-error tolerated a GHCR push failure')
       }
-    }).toThrow(/tolerated a Docker Hub login failure/)
+    }).toThrow(/tolerated a GHCR push failure/)
+  })
+
+  // MUTATION GUARD: reintroduce a docker-creds-style `if:` gate onto a copy
+  // of the real "Build and push stable image" step and prove the
+  // ungated-ness assertion above would have caught it — this guards against
+  // silently reintroducing the pre-GHCR skip-when-unconfigured shape, which
+  // no longer applies once auth is GITHUB_TOKEN (always present).
+  it('MUTATION: reintroducing an `if:` gate on the push step is caught by the ungated assertion', () => {
+    const doc = loadWorkflow()
+    const dockerStable = job(doc, 'docker-stable')
+    const pushStep = step(dockerStable, 'Build and push stable image')
+    const mutated: WorkflowStep = { ...pushStep, if: "steps.docker-creds.outputs.configured == 'true'" }
+    expect(mutated.if).toBeDefined() // sanity: mutation applied
+    expect(() => {
+      if (mutated.if !== undefined) {
+        throw new Error('push step was conditionally gated again')
+      }
+    }).toThrow(/conditionally gated again/)
   })
 })
