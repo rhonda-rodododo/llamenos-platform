@@ -3,6 +3,13 @@ versioned_files = [
     "package.json",
     "apps/desktop/tauri.conf.json",
     "apps/desktop/Cargo.toml",
+    # Keeps apps/desktop/Cargo.lock's own "llamenos-desktop" entry in lockstep
+    # with the Cargo.toml bump above — without this, PrepareRelease only
+    # bumps Cargo.toml and every release leaves Cargo.lock one version behind,
+    # which fails `cargo metadata --locked` / `cargo build --locked` on main
+    # (see the lockfile-consistency check added in #895). The dependency name
+    # is inferred from the first Cargo.toml listed above (llamenos-desktop).
+    "apps/desktop/Cargo.lock",
     { path = "apps/android/app/build.gradle.kts", regex = 'versionName = "(?<version>[0-9]+[.][0-9]+[.][0-9]+)"' },
     { path = "apps/ios/Sources/App/Info.plist", regex = "<key>CFBundleShortVersionString</key>\n\t<string>(?<version>[0-9]+[.][0-9]+[.][0-9]+)</string>" },
 ]
