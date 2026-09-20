@@ -410,11 +410,21 @@ describe('rail: fleet/review runs as a claude session on a self-hosted runner, w
     expect(block).not.toContain('$HOME/.local/share/opencode')
   })
 
-  it('passes the model variable, not a literal, to the smoke-test invocation', () => {
+  // #866: the binary AND the model are both resolved dynamically, via
+  // `reviewerInvocationFor` (review.ts) — the SAME function
+  // `invokeVerifierEngine` (the real review) calls — never a literal typed
+  // into this workflow file. A literal here is exactly what let the smoke
+  // test "pass" while the real review, running the BASE checkout's own
+  // (possibly different) resolution, silently disagreed with it.
+  it('resolves the reviewer binary/model dynamically via reviewerInvocationFor, never a literal pinned in the invocation', () => {
     const text = fleetReviewJobText()
-    expect(text).toMatch(/claude --print --permission-mode plan --model "\$FLEET_REVIEW_MODEL"/)
-    expect(text, 'smoke test pins a literal model again instead of the variable')
-      .not.toMatch(/claude --print --permission-mode plan --model sonnet\b/)
+    expect(text).toMatch(/\| "\$rev_binary" --print --permission-mode plan --model "\$rev_model"/)
+    expect(text, 'smoke test does not import reviewerInvocationFor from review.ts')
+      .toMatch(/import \{ reviewerInvocationFor \} from "\.\/orchestrator\/src\/review\.ts"/)
+    expect(text, 'smoke test pins a literal model again instead of resolving one')
+      .not.toMatch(/--model "?sonnet"?\b/)
+    expect(text, 'smoke test pins a literal claude binary again instead of resolving one')
+      .not.toMatch(/\|\s*claude --print --permission-mode plan/)
   })
 
   // Scoped to the smoke-test step's own run: block — the job's surrounding

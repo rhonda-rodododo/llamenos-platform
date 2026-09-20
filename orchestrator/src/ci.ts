@@ -361,9 +361,20 @@ export async function runReviewCi(deps: ReviewCiDeps): Promise<CiVerdict> {
 
   // UNREADABLE and FAIL both fail the job, but they are different facts and
   // the summary says which: "the reviewer could not be run" is not "the
-  // reviewer found a problem".
+  // reviewer found a problem". Within UNREADABLE, `failureKind` draws one
+  // more distinction that used to be lost here: `'engine-misconfigured'`
+  // (a `--model`/engine id the reviewer refuses outright) is a
+  // MISCONFIGURATION — a defect retrying will never fix — not an
+  // AVAILABILITY problem, which is what "unavailable" implies to a human
+  // reading the check. #866 hit exactly this: the engine was reachable and
+  // ran, and still produced an opaque `review unavailable: {"name":
+  // "UnknownError",...}` for what was, underneath, a bad model id — the
+  // wrong diagnostic sent whoever read it looking for an outage that was
+  // never happening. `'engine-unavailable'` (or no failureKind at all, e.g.
+  // a thrown tamper-detection error below) keeps the original wording.
+  const unreadablePrefix = result.failureKind === 'engine-misconfigured' ? 'review misconfigured' : 'review unavailable'
   const summary = result.verdict === 'UNREADABLE'
-    ? `review unavailable: ${verdictSummary(result.text)}`
+    ? `${unreadablePrefix}: ${verdictSummary(result.text)}`
     : verdictSummary(result.text)
   const verdict: CiVerdict = { ok: result.verdict === 'PASS', summary: `${summary}\n\n${result.text}` }
 

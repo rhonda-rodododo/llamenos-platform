@@ -241,21 +241,115 @@ const REVIEWER_MODEL = process.env['FLEET_REVIEW_MODEL'] || 'sonnet'
  * took reading logs by hand.
  *
  *   - `'engine-misconfigured'`: the reviewer's own configuration is invalid
- *     in a way retrying will never fix on its own. Added for the retired
- *     `opencode` reviewer, whose `provider/model` id went stale twice in one
- *     week (see this file's git history, and #876) and needed a pre-flight
- *     registry check to name the bad id instead of collapsing into the same
- *     opaque UNREADABLE a real outage produces. Currently unreachable now
- *     that the reviewer is always `claude` invoked with a plain `--model`
- *     string — kept as a documented value for a future reviewer-side
- *     configuration check, rather than deleted outright.
+ *     in a way retrying will never fix on its own. Originally added for the
+ *     retired `opencode` reviewer, whose `provider/model` id went stale
+ *     twice in one week (see this file's git history, and #876) and needed
+ *     a pre-flight registry check to name the bad id instead of collapsing
+ *     into the same opaque UNREADABLE a real outage produces. #876's own
+ *     check only ever matched a well-formed `provider/model` id that
+ *     opencode's registry didn't recognise — a bare model name with no
+ *     slash at all (exactly what `FLEET_REVIEW_MODEL` held during #866's own
+ *     bootstrap window: `sonnet`, a `claude` model shorthand, handed to the
+ *     BASE's then-still-`opencode` reviewer) came back `'indeterminate'` and
+ *     was silently invoked anyway, producing the exact opaque
+ *     `review unavailable: {"name":"UnknownError",...}` this kind exists to
+ *     prevent. `classifyEngineFailure` (below) is the general form of that
+ *     fix: it reads `claude`'s OWN "unrecognized model" error text — stable
+ *     across releases, verified against the installed binary — and reaches
+ *     this branch whenever `claude --model <bad-id>` itself refuses to run,
+ *     REGARDLESS of what shape the bad id has. No longer unreachable.
  *   - `'engine-unavailable'`: the reviewer was reachable in principle, but
  *     the call still failed — a crash, a timeout, a missing binary, or a
- *     real error from `claude` itself. This is the transient case retrying
- *     can plausibly fix, and it is the only kind `invokeVerifierEngine` can
- *     produce today.
+ *     real error from `claude` itself that is not a model-id complaint.
+ *     This is the transient case retrying can plausibly fix.
  */
 export type EngineFailureKind = 'engine-misconfigured' | 'engine-unavailable'
+
+/**
+ * `claude`'s own, stable error text for a `--model` id its build does not
+ * recognise (verified against the installed binary: `claude --model
+ * <bogus>` exits 1, printing "There's an issue with the selected model…" to
+ * stdout and "…isn't described by this version's model catalog… [claude-
+ * code:unrecognized_model]" to stderr, before any assistant text). This is a
+ * configuration defect — the id is wrong, not the network or the account —
+ * so it is `engine-misconfigured`, never `engine-unavailable`, regardless of
+ * what the bad id looks like (unlike #876's opencode-only, provider/model-
+ * shaped check, this has no "well-formed but unknown" precondition to miss).
+ * Heuristic, not authoritative: `claude` does not expose a structured error
+ * code here, the same caveat the workflow's own smoke-test `classify()`
+ * (fleet-review.yml) already carries for quota/auth text.
+ */
+export function classifyEngineFailure(text: string): EngineFailureKind {
+  if (/unrecognized_model|isn'?t described by this version'?s model catalog|issue with the selected model/i.test(text)) {
+    return 'engine-misconfigured'
+  }
+  return 'engine-unavailable'
+}
+
+/** The binary and model a `ReviewerCommand` invocation actually runs — see
+ *  `reviewerInvocationFor`, the one function both the smoke test and the
+ *  real review call to get this. */
+export interface ReviewerInvocation { readonly engine: EngineId; readonly binary: string; readonly model: string }
+
+/**
+ * The ONE place that maps a resolved reviewer `EngineId` to a runnable
+ * binary. Throws for anything it does not know how to invoke — a resolved
+ * engine with no wired invocation must be a loud, immediate failure here,
+ * never a silent fallback to whatever the caller assumed the binary was.
+ * This is what makes "the smoke test and the real review agree on the
+ * engine" a property of the CODE rather than a coincidence of two
+ * hand-kept literals: there is exactly one function that can name a binary
+ * at all, and it refuses outright for anything besides `claude`.
+ *
+ * Exported (rather than kept file-private, like the rest of
+ * `reviewerInvocationFor`'s helpers) specifically so the hard-fail contract
+ * is directly testable: `verifierFor` cannot itself be driven to return
+ * anything but `'claude'` today, so a test exercising `reviewerInvocationFor`
+ * alone could never observe this function refusing a second engine. See the
+ * "MUTATION" test in review.test.ts, which calls this directly with
+ * `'opencode'` and asserts the throw — proving a resolved engine can never
+ * silently acquire an invocation nobody wired for it.
+ */
+export function reviewerBinaryFor(engine: EngineId): string {
+  if (engine !== 'claude') {
+    throw new Error(
+      `reviewerInvocationFor: engine "${engine}" has no wired reviewer invocation — only "claude" is ` +
+      'supported since #812 retired the opencode reviewer; this is a hard failure, never a silent fallback',
+    )
+  }
+  return 'claude'
+}
+
+/**
+ * THE single source for what the reviewer actually runs — binary AND model
+ * together, so nothing downstream can mix a binary resolved one way with a
+ * model resolved another. `invokeVerifierEngine` (the real review) calls
+ * this directly, and so does `fleet-review.yml`'s "Smoke-test the review
+ * engine" step — via a `bun -e` import of this exact function, the same
+ * mechanism that step already used for `parseVerdict`, run from the trusted
+ * BASE checkout the real review also runs from (see the file header of
+ * fleet-review.yml on why that checkout is the one that matters). One
+ * function, imported twice from the same file, cannot resolve two different
+ * answers to "what does the reviewer run" the way two independently
+ * hardcoded literals could.
+ *
+ * This is the direct structural fix for #866's own failure mode: before it,
+ * the smoke step's shell script hardcoded `claude` directly in the workflow
+ * YAML, while the real review resolved its engine from `verifierFor` /
+ * `VERIFIER_ENGINE` — two independent decisions that happened to agree only
+ * because nobody had changed one without the other YET. They diverged the
+ * instant one of them changed (this PR's own fix to `verifierFor`) without
+ * the other picking it up (the trusted BASE the review job actually runs
+ * from, which only sees this PR's fix once it MERGES — see the file header
+ * of fleet-review.yml on why the gate always judges from base, never from
+ * the commit it judges). "Hardcode the same value in two places" was never
+ * a fix, only a coincidence with an expiry date; calling this one function
+ * from both places is what removes the expiry date.
+ */
+export function reviewerInvocationFor(authorEngine: EngineId): ReviewerInvocation {
+  const engine = verifierFor(authorEngine)
+  return { engine, binary: reviewerBinaryFor(engine), model: REVIEWER_MODEL }
+}
 
 /**
  * A full session's budget, not a thin API call's. Originally cut to
@@ -556,8 +650,8 @@ function verifierEnv(): NodeJS.ProcessEnv {
 
 interface EngineRun {
   /** False for a crash, a timeout, a non-zero exit or a missing binary
-   *  (which now includes a configured model id that opencode's own registry
-   *  does not resolve — see `failureKind`). */
+   *  (which now includes a `--model` id `claude` itself refuses to run —
+   *  see `classifyEngineFailure` and `failureKind`). */
   reached: boolean
   /** The model's own words — the only text a verdict may be read from. */
   assistantText: string
@@ -621,15 +715,21 @@ function decodeEngineOutput(stdout: string, stderr: string): Omit<EngineRun, 're
  * above `gitState`.
  */
 async function invokeVerifierEngine(input: {
+  authorEngine: EngineId
   exportDir: string
   prompt: string
   maxTurns: number
   timeoutMs: number
 }): Promise<EngineRun> {
+  // `reviewerInvocationFor` — never a literal `'claude'`/`REVIEWER_MODEL`
+  // pair inlined here — is what ties this call to the exact same resolution
+  // the smoke test proves works (see that function's doc comment for why
+  // the two hardcoded literals this replaced were never actually a fix).
+  const { binary, model } = reviewerInvocationFor(input.authorEngine)
   const projectRoot = await mkdtemp(join(tmpdir(), 'llamenos-fleet-reviewer-root-'))
   try {
     const env = verifierEnv()
-    const args = ['--print', '--permission-mode', 'plan', '--model', REVIEWER_MODEL,
+    const args = ['--print', '--permission-mode', 'plan', '--model', model,
       '--max-turns', String(input.maxTurns), '--add-dir', input.exportDir]
 
     try {
@@ -637,7 +737,7 @@ async function invokeVerifierEngine(input: {
       // be written to the child's own stdin instead. `promisify(execFile)`
       // still returns a `PromiseWithChild`, so `.child` is available
       // synchronously before the promise settles.
-      const call = execFileAsync('claude', args, {
+      const call = execFileAsync(binary, args, {
         cwd: projectRoot,
         env,
         timeout: input.timeoutMs,
@@ -647,12 +747,16 @@ async function invokeVerifierEngine(input: {
       const { stdout, stderr } = await call
       return { reached: true, ...decodeEngineOutput(stdout, stderr ?? '') }
     } catch (e) {
-      // A crash, a timeout, or a missing binary. An unreachable reviewer is
-      // not a pass — keep whatever partial output exists (often none) for the
-      // log, and let the caller record this explicitly as UNREADABLE rather
-      // than silently falling through parseVerdict's own "no VERDICT line" path.
+      // A crash, a timeout, a missing binary, or (see `classifyEngineFailure`)
+      // a model id the binary refuses to run at all. An unreachable reviewer
+      // is not a pass — keep whatever partial output exists (often none) for
+      // the log, and let the caller record this explicitly as UNREADABLE
+      // rather than silently falling through parseVerdict's own "no VERDICT
+      // line" path.
       const err = e as { stdout?: string; stderr?: string }
-      return { reached: false, failureKind: 'engine-unavailable', ...decodeEngineOutput(err.stdout ?? '', err.stderr ?? '') }
+      const decoded = decodeEngineOutput(err.stdout ?? '', err.stderr ?? '')
+      const failureKind = classifyEngineFailure(`${decoded.assistantText}\n${decoded.diagnostics}`)
+      return { reached: false, failureKind, ...decoded }
     }
   } finally {
     await rm(projectRoot, { recursive: true, force: true })
@@ -751,7 +855,7 @@ export async function secondOpinion(input: SecondOpinionInput): Promise<SecondOp
   if (input.snapshotDir !== undefined) {
     await stripReviewerControlFiles(input.snapshotDir)
     const prompt = buildReviewPrompt(input.pr, input.diff, input.report, input.snapshotDir)
-    return toSecondOpinion(await invokeVerifierEngine({ exportDir: input.snapshotDir, prompt, ...turns }))
+    return toSecondOpinion(await invokeVerifierEngine({ authorEngine: input.authorEngine, exportDir: input.snapshotDir, prompt, ...turns }))
   }
 
   const worktree = input.worktree as string
@@ -759,7 +863,7 @@ export async function secondOpinion(input: SecondOpinionInput): Promise<SecondOp
   const snapshot = await exportReviewSnapshot(worktree, before.head)
   try {
     const prompt = buildReviewPrompt(input.pr, input.diff, input.report, snapshot.dir)
-    const result = await invokeVerifierEngine({ exportDir: snapshot.dir, prompt, ...turns })
+    const result = await invokeVerifierEngine({ authorEngine: input.authorEngine, exportDir: snapshot.dir, prompt, ...turns })
 
     // Detective layer (see the honest accounting in the comment above
     // `gitState`): with GitHub's per-SHA required statuses as the actual

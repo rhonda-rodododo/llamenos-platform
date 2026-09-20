@@ -579,40 +579,53 @@ jobs:
           # that -e is already active by the time this script starts — a
           # bare `set -uo pipefail` does NOT clear an inherited -e, it only
           # adds -u/pipefail on top. Left alone, the FIRST unguarded failing
-          # assignment below (`run_out="$(... claude ... )"` when the engine
-          # call fails) is a failing simple command, so -e kills the script
-          # on that line — before `run_status=$?` is read, before `classify`
-          # runs, before `fail` ever prints anything. The step then dies
-          # silently with exit 1 and no diagnostic, which is the exact
-          # opacity this step exists to remove. `set +e` clears the
+          # assignment below (`run_out="$(... "$rev_binary" ... )"` when the
+          # engine call fails) is a failing simple command, so -e kills the
+          # script on that line — before `run_status=$?` is read, before
+          # `classify` runs, before `fail` ever prints anything. The step
+          # then dies silently with exit 1 and no diagnostic, which is the
+          # exact opacity this step exists to remove. `set +e` clears the
           # inherited -e so every capture below reaches its own status check
           # and, on failure, `fail()` — which is the only path that exits,
           # and always exits 1. This bug and fix were originally found and
           # applied against the retired non-author engine's smoke test
           # (#872); the same unguarded-capture shape (`run_out=`,
-          # `verdict_out=`) carries over unchanged to this `claude`-based
-          # rewrite (#866), so the fix stays required here too.
+          # `verdict_out=`, and now `engine_json=`) carries over unchanged to
+          # this `claude`-based rewrite (#866), so the fix stays required
+          # here too.
           set -uo pipefail
           set +e
           root="$(mktemp -d)"
+          # Set before engine resolution runs, so `fail()` can reference them
+          # under `set -u` even if resolution itself is what failed.
+          rev_binary=""
+          rev_model=""
 
-          # $1: engine-quota | engine-auth | engine-unavailable. $2: the raw
-          # engine text to print for a human, then always exits 1 — this
-          # function is the only way the step fails, and it always fails.
+          # $1: engine-misconfigured | engine-quota | engine-auth |
+          # engine-unavailable. $2: the raw engine text to print for a
+          # human, then always exits 1 — this function is the only way the
+          # step fails, and it always fails.
           fail() {
-            echo "fleet/review FAILED: review engine smoke test FAILED: $1 (engine=claude model=$FLEET_REVIEW_MODEL)"
+            echo "fleet/review FAILED: review engine smoke test FAILED: $1 (engine=${rev_binary:-unresolved} model=${rev_model:-unresolved})"
             printf '%s\n' "$2"
             exit 1
           }
 
           # Best-effort classification of the engine's own error text —
           # heuristic, not authoritative, because claude does not expose a
-          # structured error code here. Usage-limit language is engine-quota;
-          # 401/invalid-credential/not-logged-in language is engine-auth;
-          # anything else the engine said is engine-unavailable.
+          # structured error code here. A `--model` id claude itself refuses
+          # to run at all (`classifyEngineFailure` in review.ts carries the
+          # identical check — see its doc comment for why a bare, slash-free
+          # id like the `sonnet` that triggered #866 must classify here too,
+          # not just a well-formed-but-unknown one) is engine-misconfigured;
+          # usage-limit language is engine-quota; 401/invalid-credential/
+          # not-logged-in language is engine-auth; anything else the engine
+          # said is engine-unavailable.
           classify() {
             local text="$1"
-            if printf '%s' "$text" | grep -qiE 'quota|rate.?limit|usage.?limit|too many requests|\b429\b'; then
+            if printf '%s' "$text" | grep -qiE "unrecognized_model|isn'?t described by this version'?s model catalog|issue with the selected model"; then
+              echo "engine-misconfigured"
+            elif printf '%s' "$text" | grep -qiE 'quota|rate.?limit|usage.?limit|too many requests|\b429\b'; then
               echo "engine-quota"
             elif printf '%s' "$text" | grep -qiE '\b401\b|unauthorized|invalid.*(api.?key|token|credential)|not logged in|please (run|login|re-?authenticate)|authenticat(e|ion)? (fail|error|required)'; then
               echo "engine-auth"
@@ -621,12 +634,51 @@ jobs:
             fi
           }
 
-          if ! command -v claude >/dev/null 2>&1; then
-            fail "engine-unavailable" "the claude CLI is not on PATH on this runner"
+          # THE single source for what to smoke-test: a `bun -e` import of
+          # `reviewerInvocationFor` from THIS job's own BASE checkout of
+          # review.ts — the exact function `invokeVerifierEngine` (the real
+          # "Review" step below) calls too. Deliberately NOT a literal
+          # `claude`/`$FLEET_REVIEW_MODEL` pair typed into this file: #866
+          # shipped with exactly that pair, agreeing with the real review's
+          # own resolution only by coincidence, and the coincidence broke
+          # the instant this PR's OWN fix to `verifierFor` landed on this
+          # branch without yet reaching the BASE this job actually runs
+          # review-ci from (see the file header above for why the gate
+          # always judges from base) — the smoke test kept "passing" against
+          # `claude` while the real review, still running base's old
+          # cross-engine logic, silently invoked a DIFFERENT reviewer binary
+          # entirely, handed a `claude`-shaped model id it could not resolve.
+          # Importing the same function both places removes the coincidence,
+          # and therefore the failure mode, entirely: there is no second
+          # literal left to drift.
+          # stderr goes to its own temp file, exactly like `run_out`/`run_err`
+          # below — never `2>&1` merged into `engine_json` itself, which must
+          # stay pure JSON on the success path for `jq` to parse. A stray
+          # warning line on stderr merged onto stdout would otherwise corrupt
+          # every jq call after it for a reason with nothing to do with
+          # engine configuration.
+          engine_json="$(bun -e '
+            import { reviewerInvocationFor } from "./orchestrator/src/review.ts"
+            const inv = reviewerInvocationFor("claude")
+            console.log(JSON.stringify({ binary: inv.binary, model: inv.model }))
+          ' 2>"$RUNNER_TEMP/engine-resolve-stderr.log")"
+          engine_status=$?
+          engine_err="$(cat "$RUNNER_TEMP/engine-resolve-stderr.log" 2>/dev/null || true)"
+          if [ "$engine_status" -ne 0 ]; then
+            fail "engine-misconfigured" "$engine_json"$'\n'"$engine_err"
+          fi
+          rev_binary="$(printf '%s' "$engine_json" | jq -r '.binary')"
+          rev_model="$(printf '%s' "$engine_json" | jq -r '.model')"
+          if [ -z "$rev_binary" ] || [ "$rev_binary" = "null" ] || [ -z "$rev_model" ] || [ "$rev_model" = "null" ]; then
+            fail "engine-misconfigured" "reviewerInvocationFor printed unparseable output: $engine_json"$'\n'"$engine_err"
+          fi
+
+          if ! command -v "$rev_binary" >/dev/null 2>&1; then
+            fail "engine-unavailable" "the $rev_binary CLI is not on PATH on this runner"
           fi
 
           run_out="$(cd "$root" && printf 'Reply with exactly: VERDICT: PASS\n' \
-            | claude --print --permission-mode plan --model "$FLEET_REVIEW_MODEL" --max-turns 1 2>"$RUNNER_TEMP/claude-run-stderr.log")"
+            | "$rev_binary" --print --permission-mode plan --model "$rev_model" --max-turns 1 2>"$RUNNER_TEMP/claude-run-stderr.log")"
           run_status=$?
           run_err="$(cat "$RUNNER_TEMP/claude-run-stderr.log" 2>/dev/null || true)"
           if [ "$run_status" -ne 0 ]; then
@@ -646,7 +698,7 @@ jobs:
             fail "engine-unavailable" "$verdict_out"
           fi
           printf '%s\n' "$verdict_out"
-          echo "review engine smoke test OK (engine=claude model=$FLEET_REVIEW_MODEL)"
+          echo "review engine smoke test OK (engine=$rev_binary model=$rev_model)"
 
       # Bootstrap guard. The gate runs from the BASE checkout by design, so
       # the FIRST pull request that introduces the gate cannot be judged by

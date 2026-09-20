@@ -38,6 +38,22 @@ import { parse as parseYaml } from 'yaml'
  * assignment from a command that exits 1 under `set -uo pipefail` inside a
  * script invoked as `bash -e`, followed by an echo — the echo never runs).
  * See the PR body for that transcript.
+ *
+ * Also guards the SEPARATE #866-of-its-own-PR bug this file's tests were
+ * extended for: this step used to hardcode `claude` and `$FLEET_REVIEW_MODEL`
+ * directly in the workflow YAML, agreeing with the real review's own engine
+ * resolution (`invokeVerifierEngine`, via `reviewerInvocationFor` in
+ * review.ts) only by coincidence — a coincidence that broke the moment one
+ * side changed without the other (see `reviewerInvocationFor`'s doc comment
+ * for the live incident). The step now resolves its binary/model with a
+ * `bun -e` import of `reviewerInvocationFor` from the SAME review.ts the
+ * real review calls, so the two can no longer disagree about what "the
+ * reviewer" even is. The tests below at the bottom of this file
+ * (`describe('rail: smoke and review must derive from one source', ...)`)
+ * prove this empirically: they resolve the engine/model independently (a
+ * standalone `bun -e` call with the identical env) and assert the step's
+ * own printed line matches it exactly, then mutate the step to hardcode the
+ * engine/model again and prove that same equality breaks.
  */
 
 const FLEET_REVIEW_YML = join(process.cwd(), '.github', 'workflows', 'fleet-review.yml')
@@ -97,6 +113,23 @@ case "\${MOCK_CLAUDE_RUN_MODE:-fail}" in
     printf 'I looked at the diff.\\nVERDICT: MAYBE\\n'
     exit 0
     ;;
+  bad-model)
+    # The stable substring from the real claude CLI's own text for a
+    # --model id it does not recognize ("There's an issue with the selected
+    # model...", verified against the installed binary — see
+    # classifyEngineFailure's doc comment in review.ts) — this is what
+    # classify() here, and classifyEngineFailure there, must read as
+    # engine-misconfigured, never engine-unavailable. #866's own bug:
+    # FLEET_REVIEW_MODEL held a bare claude model shorthand ("sonnet")
+    # handed to a DIFFERENT engine that could not resolve it either, and
+    # got exactly this shape of rejection back with no classification for
+    # it at all. Apostrophes deliberately avoided below (shell-quoting
+    # hazard inside this already-quoted fixture); the classify() regex
+    # matches on "issue with the selected model" alone, no apostrophe
+    # required.
+    echo "there is an issue with the selected model (bogus-model-id)" >&2
+    exit 1
+    ;;
   pass)
     printf 'VERDICT: PASS\\n'
     exit 0
@@ -133,7 +166,7 @@ afterEach(() => {
 /** Runs a script body the way GitHub runs an unshelled `run:` step:
  *  `bash -e <file>`. Captures stdout+stderr combined, the way a job log
  *  reads it. */
-function runStep(script: string, runMode: 'fail' | 'bad-verdict' | 'pass'): { status: number | null; output: string } {
+function runStep(script: string, runMode: 'fail' | 'bad-verdict' | 'bad-model' | 'pass'): { status: number | null; output: string } {
   const scriptPath = join(scratch, 'step.sh')
   writeFileSync(scriptPath, script)
   const result = spawnSync('bash', ['-e', scriptPath], {
@@ -169,6 +202,21 @@ describe('rail: the review-engine smoke step must always say why it failed', () 
     expect(output).toContain('engine-unavailable')
   })
 
+  // #866's own fix: an unresolvable `--model` id is a MISCONFIGURATION, not
+  // an unavailability — see classifyEngineFailure's doc comment in
+  // review.ts. Before this classification existed, this exact failure
+  // shape (the engine reachable, the model rejected) collapsed into the
+  // same "engine-unavailable" every other failure got, which is what let
+  // #866's real incident read as an opaque outage instead of what it was.
+  it('claude refusing an unrecognized --model id reaches fail() and reports engine-misconfigured, not engine-unavailable', () => {
+    const { status, output } = runStep(smokeStepScript(), 'bad-model')
+    expect(status).toBe(1)
+    expect(output).toContain(FAILED_MARKER)
+    expect(output).toContain('engine-misconfigured')
+    expect(output).not.toContain('engine-unavailable')
+    expect(output).toContain('issue with the selected model')
+  })
+
   it('the happy path still reports OK and exits 0', () => {
     const { status, output } = runStep(smokeStepScript(), 'pass')
     expect(status).toBe(0)
@@ -188,5 +236,99 @@ describe('rail: the review-engine smoke step must always say why it failed', () 
     expect(output).not.toContain(FAILED_MARKER)
     expect(output).not.toContain('engine-unavailable')
     expect(output).not.toContain('simulated: Unexpected server error from provider')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// #866: the smoke step and the real review must derive their engine/model
+// from ONE source, by construction — never two hand-kept literals that
+// happen to agree. See `reviewerInvocationFor`'s doc comment in review.ts
+// for the incident this is the direct fix for: the smoke step hardcoded
+// `claude` in this workflow file while the real review (running the BASE
+// checkout's review.ts, per the file header's "gate always judges from
+// base" design) resolved a completely different engine — and nothing
+// caught the difference until the real review ran and failed opaquely.
+// ---------------------------------------------------------------------------
+
+/** Runs the identical `reviewerInvocationFor("claude")` resolution the
+ *  smoke step's own `bun -e` call makes — as its own standalone `bun -e`
+ *  subprocess, with the SAME env, rather than an `import()` inside this
+ *  vitest process (which would risk reading a module cached before
+ *  `FLEET_REVIEW_MODEL` was ever set to `'test-model'` — a different, and
+ *  entirely avoidable, source of flakiness). This is the independent
+ *  reference the tests below compare the step's own printed line against. */
+function resolveReviewerInvocationDirectly(env: NodeJS.ProcessEnv): { binary: string; model: string } {
+  const result = spawnSync('bun', ['-e', `
+    import { reviewerInvocationFor } from "./orchestrator/src/review.ts"
+    const inv = reviewerInvocationFor("claude")
+    console.log(JSON.stringify({ binary: inv.binary, model: inv.model }))
+  `], { encoding: 'utf8', env })
+  if (result.status !== 0) {
+    throw new Error(`reference reviewerInvocationFor("claude") resolution failed: ${result.stdout}\n${result.stderr}`)
+  }
+  return JSON.parse(result.stdout.trim()) as { binary: string; model: string }
+}
+
+/** The pre-fix shape (#866): replaces the shared `bun -e` resolution block
+ *  (which imports `reviewerInvocationFor` from review.ts) with a literal,
+ *  hardcoded `rev_binary`/`rev_model` pair — reintroducing exactly the
+ *  divergence risk this PR's fix removes. Asserts the resolution block was
+ *  actually present, so this can never pass vacuously against a script that
+ *  already dropped it for some other reason. */
+function withoutTheSharedSource(script: string): string {
+  const startMarker = "engine_json=\"$(bun -e '"
+  const endMarker = 'reviewerInvocationFor printed unparseable output: $engine_json"'
+  const startIdx = script.indexOf(startMarker)
+  const endMarkerIdx = script.indexOf(endMarker)
+  expect(startIdx, 'shared-source resolution block ("engine_json=...") not found — this mutation is vacuous').toBeGreaterThanOrEqual(0)
+  expect(endMarkerIdx, 'shared-source resolution block end marker not found — this mutation is vacuous').toBeGreaterThan(startIdx)
+  // Extend past the end marker's own line, then past the closing `fi` line
+  // right after it.
+  const afterEndMarkerLine = script.indexOf('\n', endMarkerIdx) + 1
+  const afterFiLine = script.indexOf('\n', afterEndMarkerLine) + 1
+  expect(afterFiLine, 'could not find the closing "fi" line after the resolution block — this mutation is vacuous').toBeGreaterThan(afterEndMarkerLine)
+  const before = script.slice(0, startIdx)
+  const after = script.slice(afterFiLine)
+  const hardcoded = 'rev_binary="claude"\n          rev_model="hardcoded-mismatched-model"\n\n'
+  const mutated = before + hardcoded + after
+  expect(mutated, 'mutation produced no change — vacuous').not.toBe(script)
+  return mutated
+}
+
+describe('rail: the smoke step and the real review must resolve the SAME engine/model', () => {
+  it('the step\'s own "smoke test OK" line names exactly what an independent reviewerInvocationFor("claude") call resolves, for the same env', () => {
+    const env = {
+      ...process.env,
+      PATH: `${binDir}${delimiter}${process.env['PATH'] ?? ''}`,
+      FLEET_REVIEW_MODEL: 'test-model',
+    }
+    const direct = resolveReviewerInvocationDirectly(env)
+    const { status, output } = runStep(smokeStepScript(), 'pass')
+    expect(status).toBe(0)
+    expect(output).toContain(`review engine smoke test OK (engine=${direct.binary} model=${direct.model})`)
+  })
+
+  // MUTATION (per "audit gates by breaking them"): reintroduce the exact
+  // shape of #866's bug — a hardcoded engine/model instead of the shared
+  // `reviewerInvocationFor` import — and prove the equality the test above
+  // relies on breaks. A hardcoded literal happily "passes" the smoke test
+  // while testing a DIFFERENT model than `FLEET_REVIEW_MODEL` (and
+  // therefore the real review) actually resolves to; the fixed script has
+  // no such literal left to drift.
+  it('MUTATION: hardcoding rev_binary/rev_model instead of importing reviewerInvocationFor silently diverges from what the real review would use', () => {
+    const env = {
+      ...process.env,
+      PATH: `${binDir}${delimiter}${process.env['PATH'] ?? ''}`,
+      FLEET_REVIEW_MODEL: 'test-model',
+    }
+    const direct = resolveReviewerInvocationDirectly(env)
+    const { status, output } = runStep(withoutTheSharedSource(smokeStepScript()), 'pass')
+    // The mutated step still "passes" — that is the whole danger: nothing
+    // about running it looks wrong.
+    expect(status).toBe(0)
+    expect(output).toContain('review engine smoke test OK (engine=claude model=hardcoded-mismatched-model)')
+    // But it is no longer testing what the real review will actually run.
+    expect(output).not.toContain(`engine=${direct.binary} model=${direct.model}`)
+    expect(direct.model).toBe('test-model')
   })
 })

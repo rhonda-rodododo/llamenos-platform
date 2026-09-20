@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
   parseVerdict, stripReviewerControlFiles, verifierFor,
+  classifyEngineFailure, reviewerBinaryFor, reviewerInvocationFor,
 } from '../../orchestrator/src/review.js'
 
 // #812: `fleet/review` retired `opencode` as the reviewer engine entirely —
@@ -16,6 +17,55 @@ describe('verifierFor', () => {
   it('always resolves to claude now, regardless of the author engine', () => {
     expect(verifierFor('claude')).toBe('claude')
     expect(verifierFor('opencode')).toBe('claude')
+  })
+})
+
+// #866: the smoke test and the real review must derive their engine/model
+// from the SAME function — never two hand-kept literals that happen to
+// agree until one of them changes. See `reviewerInvocationFor`'s own doc
+// comment in review.ts for the live incident this rail guards.
+describe('reviewerInvocationFor / reviewerBinaryFor', () => {
+  it('resolves claude for either author engine (verifierFor collapses both today)', () => {
+    expect(reviewerInvocationFor('claude')).toEqual({ engine: 'claude', binary: 'claude', model: expect.any(String) })
+    expect(reviewerInvocationFor('opencode')).toEqual({ engine: 'claude', binary: 'claude', model: expect.any(String) })
+  })
+
+  // MUTATION (per "audit gates by breaking them"): `verifierFor` cannot
+  // itself be driven to return anything but `'claude'` today, so a test
+  // that only calls `reviewerInvocationFor` could never observe
+  // `reviewerBinaryFor` refusing a second engine. Calling the hard-fail
+  // helper directly proves the contract holds independently of
+  // `verifierFor`'s current, coincidentally-single-valued behavior: if a
+  // future edit ever makes `verifierFor` resolve to `'opencode'` again
+  // without ALSO teaching `reviewerBinaryFor` how to invoke it, this is the
+  // function that turns that gap into a loud, immediate throw instead of a
+  // silent divergence from whatever the smoke test proved.
+  //
+  // Verified live: commenting out this function's `if` guard (so it always
+  // returns `'claude'` regardless of `engine`) makes this exact test fail
+  // with "expected [Function] to throw an error" — see the PR body for the
+  // transcript.
+  it('MUTATION: refuses (throws) for any engine besides claude — never a silent fallback', () => {
+    expect(() => reviewerBinaryFor('opencode')).toThrow(/no wired reviewer invocation/)
+  })
+})
+
+describe('classifyEngineFailure', () => {
+  it('reads claude\'s own "unrecognized model" text as engine-misconfigured, not engine-unavailable', () => {
+    // Verbatim (stdout + stderr) from the installed claude binary given
+    // `--model this-is-not-a-real-model` — captured for this PR's own
+    // investigation into #866's live failure.
+    const stdout = "There's an issue with the selected model (this-is-not-a-real-model). " +
+      'It may not exist or you may not have access to it. Run --model to pick a different model.'
+    const stderr = '"this-is-not-a-real-model" isn\'t described by this version\'s model catalog; ' +
+      '[claude-code:unrecognized_model] {"model":"this-is-not-a-real-model","query_source":"sdk"}'
+    expect(classifyEngineFailure(`${stdout}\n${stderr}`)).toBe('engine-misconfigured')
+  })
+
+  it('reads an ordinary crash/timeout/outage as engine-unavailable', () => {
+    expect(classifyEngineFailure('spawn ENOENT')).toBe('engine-unavailable')
+    expect(classifyEngineFailure('simulated: Unexpected server error from provider')).toBe('engine-unavailable')
+    expect(classifyEngineFailure('')).toBe('engine-unavailable')
   })
 })
 
@@ -273,10 +323,32 @@ describe('secondOpinion', () => {
       authorEngine: 'opencode', pr: '1', worktree, diff: '', report: passedReport,
     })
     expect(result.verdict).toBe('UNREADABLE')
-    // A crash/timeout/missing-binary is the only EngineFailureKind
-    // `invokeVerifierEngine` can still produce now that the reviewer is
-    // always `claude` — see the doc comment on `EngineFailureKind`.
+    // A plain crash (no model-id complaint in the text) classifies as
+    // engine-unavailable — see `classifyEngineFailure` for the other branch.
     expect(result.failureKind).toBe('engine-unavailable')
+  })
+
+  // #866: an unresolvable `--model` id is a MISCONFIGURATION, not an
+  // unavailability — this is what let #866's own live incident (a bare
+  // model shorthand handed to the wrong engine) surface as an opaque
+  // "review unavailable" instead of naming the actual, fixable defect.
+  it('treats a claude "unrecognized model" rejection as UNREADABLE with failureKind engine-misconfigured', async () => {
+    const err = Object.assign(new Error('Command failed'), {
+      stdout: "There's an issue with the selected model (bogus). It may not exist or you may not have access to it.",
+      stderr: '"bogus" isn\'t described by this version\'s model catalog; [claude-code:unrecognized_model]',
+    })
+    mockExecFileRejects(err)
+    const { secondOpinion } = await import('../../orchestrator/src/review.js')
+    const worktree = makeAuthorWorktree()
+    const passedReport = {
+      passed: true, reasons: [], changedFiles: [], addedLines: 0,
+      impact: 'low' as const, impactReasons: [],
+    }
+    const result = await secondOpinion({
+      authorEngine: 'claude', pr: '1', worktree, diff: '', report: passedReport,
+    })
+    expect(result.verdict).toBe('UNREADABLE')
+    expect(result.failureKind).toBe('engine-misconfigured')
   })
 
   it('requests more turns for a high-impact diff than a low-impact one', async () => {
