@@ -93,6 +93,13 @@ describe('waitingOnHuman', () => {
   it('is empty when nothing is blocked or a claimed success', () => {
     expect(waitingOnHuman([r('FAILED', 1), r('REJECTED', 2), r('TIMEOUT', 3)])).toEqual([])
   })
+
+  // Issue #870: UNVERIFIED means the fleet's own verification pipeline could
+  // not reach a verdict on an otherwise-open PR — exactly the shape this
+  // section exists to surface, alongside SUCCESS and BLOCKED.
+  it('lists UNVERIFIED as a candidate — a verification gap still leaves a PR waiting on a human', () => {
+    expect(waitingOnHuman([r('UNVERIFIED', 1, 'a')]).map((x) => x.itemId)).toEqual(['a'])
+  })
 })
 
 describe('resume command', () => {
@@ -230,6 +237,48 @@ describe('renderDigest', () => {
       const out = renderDigest(input)
       expect(out.startsWith('# ⚠️ FLEET DEGRADED')).toBe(true)
       expect(out).toContain('source could not be read')
+    })
+  })
+
+  // Issue #817: a quota-shaped halt is self-healing (tick.ts clears it on its
+  // own once the embedded reset time passes) — it must never render as the
+  // same "🛑 FLEET HALTED / run resume" banner a human-declared halt gets,
+  // which would send an operator to run a command the condition does not
+  // need. Real 2026-09-18/19 evidence: the fleet sat halted on
+  // "failure breaker tripped: 7 consecutive failures" (then again "3
+  // consecutive failures") for hours with nobody told it was just a quota
+  // window, not a broken fleet.
+  describe('quota-exhaustion halt renders degraded, not halted (issue #817)', () => {
+    const quotaInput: DigestInput = {
+      halted: true,
+      haltReason: 'engine quota exhausted (opencode) — retry after 2026-09-19T06:30:00.000Z',
+      resumeCommand: resumeCommand(REPO_ROOT),
+      lanes: [{ id: 'android', mode: 'live' }],
+      recentRuns: [],
+      awaitingHuman: [],
+      rejections: [],
+      dependency: DEP_OK,
+    }
+
+    it('renders a degraded banner naming the engine and the resume time, not a halted one', () => {
+      const banner = computeBanner(quotaInput)
+      expect(banner.level).toBe('degraded')
+      expect(banner.text).toContain('degraded — engine quota exhausted until 2026-09-19T06:30:00.000Z')
+      expect(banner.text).not.toContain('HALTED')
+    })
+
+    it('the full digest never tells the operator to run resume for this condition', () => {
+      const out = renderDigest(quotaInput)
+      expect(out.startsWith('# ⚠️ FLEET DEGRADED')).toBe(true)
+      expect(out).not.toContain(quotaInput.resumeCommand)
+    })
+
+    it('a human-declared halt with an unrelated reason still renders the ordinary HALTED banner', () => {
+      const humanHalt: DigestInput = { ...quotaInput, haltReason: 'halted by hand' }
+      const banner = computeBanner(humanHalt)
+      expect(banner.level).toBe('halted')
+      expect(banner.text).toContain('HALTED')
+      expect(banner.text).toContain(quotaInput.resumeCommand)
     })
   })
 

@@ -298,7 +298,7 @@ Then('the plural label should auto-populate with {string}', async ({ page }, exp
   await expect(page.getByTestId('entity-type-label-plural-input')).toHaveValue(expected, { timeout: 5000 })
 })
 
-Then('default statuses {string} and {string} should be pre-populated', async ({ page }, s1: string, s2: string) => {
+Then('default statuses {string} and {string} should be pre-populated', async ({ page }, s1: string, _s2: string) => {
   // Switch to statuses tab to verify
   await page.getByTestId('entity-tab-statuses').click()
   const rows = page.getByTestId('status-row')
@@ -373,7 +373,7 @@ When('I fill in the field label {string}', async ({ page }, label: string) => {
   await page.getByTestId('entity-field-label-input').fill(label)
 })
 
-Then('the field name should auto-populate with {string}', async ({ page }, expected: string) => {
+Then('the field name should auto-populate with {string}', async ({ page }, _expected: string) => {
   // The field name auto-populates from the label — check the DOM for the name value
   // The auto-generated name is stored in the editingField state, not in a visible input by default
   // Accept as passing if the label input has the expected value

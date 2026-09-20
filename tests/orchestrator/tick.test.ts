@@ -19,6 +19,7 @@ function deps(over: Partial<TickDeps> = {}): TickDeps {
     now: () => 1000,
     acquireLock: () => ({ held: true, release: () => {} }),
     checkHalt: async () => ({ halted: false }),
+    resumeFleet: vi.fn(),
     readLedger: () => [],
     resumedAt: () => 0,
     listItems: async () => ({ ok: true as const, items: [item('1')] }),
@@ -244,6 +245,91 @@ describe('tick', () => {
     const r = await tick(d)
     expect(dispatch).toHaveBeenCalledTimes(2)
     expect(r.attempted).toBe(2)
+  })
+})
+
+// Issue #817: real 2026-09-18/19 incident — the fleet halted twice
+// ("failure breaker tripped: 7 consecutive failures", then again "3
+// consecutive failures") on nothing but a provider quota rejection, and sat
+// halted for hours until a human noticed. `checkBreakers`/`quotaBreaker`
+// (circuit.ts) now halt with a SELF-describing, SELF-healing reason instead
+// — this is `tick()`'s half of that fix: refuse to dispatch while that
+// specific reason's embedded reset time has not yet passed, but clear the
+// halt and proceed the moment it has, with no human involved. An injected
+// clock (`now`) is what makes "has the reset time passed" testable without
+// a real wall-clock wait.
+describe('tick auto-resumes a quota halt once its recorded reset time passes (issue #817)', () => {
+  const resumeAt = Date.parse('2026-09-19T06:30:00.000Z')
+  const quotaReason = `engine quota exhausted (opencode) — retry after ${new Date(resumeAt).toISOString()}`
+
+  it('clears the halt itself and proceeds with the pass once now() is past the recorded reset time', async () => {
+    const lines: string[] = []
+    // Stateful, like the real killswitch.ts: checkHalt() reports halted
+    // until resumeFleet() (killswitch.resume() in production) actually
+    // clears it — a stateless mock that stays halted forever would also trip
+    // the mid-pass re-check tick() does between every dispatch and mask
+    // whether the top-of-pass auto-resume actually let the pass through.
+    let halted = true
+    const resumeFleet = vi.fn(() => { halted = false })
+    const d = deps({
+      lanes: [lane('ios', 'live')],
+      checkHalt: async () => (halted ? { halted: true, reason: quotaReason } : { halted: false }),
+      resumeFleet,
+      now: () => resumeAt + 1000,
+      log: (msg: string) => { lines.push(msg) },
+    })
+    const r = await tick(d)
+    expect(resumeFleet).toHaveBeenCalledTimes(1)
+    expect(lines).toContain('RESUMED (quota window elapsed)')
+    expect(r.halted).toBeUndefined()
+    expect(d.dispatch).toHaveBeenCalledTimes(1) // the pass actually proceeded, not just "didn't return halted"
+  })
+
+  it('stays halted, and does not touch resumeFleet, while the recorded reset time has not yet passed', async () => {
+    const resumeFleet = vi.fn()
+    const d = deps({
+      lanes: [lane('ios', 'live')],
+      checkHalt: async () => ({ halted: true, reason: quotaReason }),
+      resumeFleet,
+      now: () => resumeAt - 1000,
+    })
+    const r = await tick(d)
+    expect(resumeFleet).not.toHaveBeenCalled()
+    expect(r.halted).toBe(true)
+    expect(r.haltReason).toBe(quotaReason)
+    expect(d.dispatch).not.toHaveBeenCalled()
+  })
+
+  // The mutation issue #817 explicitly calls out: strip the
+  // `isQuotaHaltReason` check (i.e. treat every halt as auto-resumable once
+  // enough time has passed) and this must fail. A halt reason a human wrote
+  // by hand, or the plain consecutive-failure breaker, carries no promise
+  // that anything has changed just because time did — only a human's
+  // `resume` may clear it.
+  it('never auto-resumes a non-quota halt, no matter how far now() is pushed', async () => {
+    const resumeFleet = vi.fn()
+    const d = deps({
+      lanes: [lane('ios', 'live')],
+      checkHalt: async () => ({ halted: true, reason: '3 consecutive failures since last success' }),
+      resumeFleet,
+      now: () => resumeAt + 1_000_000_000,
+    })
+    const r = await tick(d)
+    expect(resumeFleet).not.toHaveBeenCalled()
+    expect(r.halted).toBe(true)
+    expect(d.dispatch).not.toHaveBeenCalled()
+  })
+
+  it('never auto-resumes a halt with no reason string at all', async () => {
+    const resumeFleet = vi.fn()
+    const d = deps({
+      checkHalt: async () => ({ halted: true }),
+      resumeFleet,
+      now: () => resumeAt + 1_000_000_000,
+    })
+    const r = await tick(d)
+    expect(resumeFleet).not.toHaveBeenCalled()
+    expect(r.halted).toBe(true)
   })
 })
 

@@ -166,7 +166,7 @@ Cliente A (acción voluntario)
     | Cifra contenido evento nuu clave hub
     | Firma como evento WebSocket (Schnorr)
     v
-Relé WebSocket (WebSocket relay / Nosflare)
+Relé WebSocket
     |
     | Difunde a suscriptores
     v
