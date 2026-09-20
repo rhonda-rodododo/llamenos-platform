@@ -17,7 +17,7 @@ Shared Rust cryptographic core for Llamenos. All cryptographic operations are im
 - **PUK (Per-User Key)** — user-level key hierarchy with Cascading Lazy Key Rotation (CLKR)
 - **57 domain separation labels** — Albrecht defense; enforced at decrypt
 - **Blind indexing** — HMAC-SHA256-based server-side search over encrypted data
-- **MLS** (RFC 9420, OpenMLS 0.8) — group key management for hub state
+- **MLS** (RFC 9420, OpenMLS 0.9) — group key management for hub state
 - **SFrame** — voice E2EE key derivation
 - **Payload padding** — power-of-2 bucketing for traffic analysis resistance
 

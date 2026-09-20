@@ -7,6 +7,18 @@ export type Rejection =
   | 'vetoed'
   | 'other-lane'
   | 'body-too-short'
+  /**
+   * Never produced by `judge()` below — `judge` is pure (no I/O) and this
+   * reason can only be known by asking GitHub whether a PR is already open
+   * on the item's branch. `tick.ts` applies it as a second, I/O-backed gate
+   * immediately before dispatch, regardless of attempt count or prior
+   * outcome: issues #705/#724/#729/#775/#784/#785 each burned three worker
+   * attempts rediscovering a PR that was already open and simply waiting on
+   * the review gate. Included here (rather than as a parallel type) so it
+   * flows through the same rejection histogram (`digest.ts`) as every other
+   * reason an item did not get dispatched.
+   */
+  | 'pr-already-open'
 
 export type Verdict = { ok: true } | { ok: false; reason: Rejection }
 

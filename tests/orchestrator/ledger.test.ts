@@ -29,14 +29,28 @@ describe('ledger', () => {
     expect(failedAttemptsIn(rows, '7')).toBe(1)
   })
 
-  // Issue #870: UNVERIFIED (the fleet's own verification pipeline could not
-  // reach a verdict — see ledger.ts's Outcome comment) still counts here,
-  // same reasoning as BLOCKED: it must not feed circuit.ts's fleet-wide
-  // streak (see circuit.test.ts), but an item that keeps coming back
-  // inconclusive still needs to stop being re-claimed forever.
-  it('counts UNVERIFIED as a failed attempt, same as BLOCKED', () => {
-    const rows = [rec({ itemId: '7', outcome: 'UNVERIFIED', ts: 1 }), rec({ itemId: '7', outcome: 'UNVERIFIED', ts: 2 })]
-    expect(failedAttemptsIn(rows, '7')).toBe(2)
+  // Issue #705/#724/#729/#775/#784/#785 (extending #857/#870's own
+  // classification): UNVERIFIED means the fleet's own verification pipeline
+  // never reached a real verdict on the work — a reviewer-engine outage, or
+  // (this incident's shape) a brand-new worker re-dispatched onto a branch
+  // that already held a correct, finished PR. That is not the worker's diff
+  // failing, so — exactly like QUOTA — it must not decrement the item's own
+  // retry budget. `needsHuman` (tick.ts) is what actually stops re-claiming
+  // while the label stands; this is a separate question ("how many attempts
+  // are left once a human clears that label") and conflating the two is
+  // what let three UNVERIFIED rows silently exhaust an item's whole budget.
+  it('does not count UNVERIFIED as a failed attempt, same as QUOTA', () => {
+    const rows = [rec({ itemId: '7', outcome: 'UNVERIFIED', ts: 1 }), rec({ itemId: '7', outcome: 'FAILED', ts: 2 })]
+    expect(failedAttemptsIn(rows, '7')).toBe(1)
+  })
+
+  // The mutation rail 2's own PR must guard against: reclassifying a genuine
+  // reviewer FAIL (REJECTED — a real second opinion read the diff and
+  // objected) the same way as an infrastructure gap. REJECTED is
+  // attributable to the worker's own diff and must still cost an attempt.
+  it('still counts REJECTED as a failed attempt — only fleet-infra gaps are excused', () => {
+    const rows = [rec({ itemId: '7', outcome: 'REJECTED', ts: 1 }), rec({ itemId: '7', outcome: 'UNVERIFIED', ts: 2 })]
+    expect(failedAttemptsIn(rows, '7')).toBe(1)
   })
 
   it('ignores DISPATCHED rows when counting attempts', () => {

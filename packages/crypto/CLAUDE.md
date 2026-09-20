@@ -24,7 +24,7 @@ This crate provides a single, auditable implementation of all cryptographic oper
 | `auth` | Ed25519 auth token generation/verification |
 | `blind_index` | Blind indexing for server-side E2EE search (HMAC-SHA256) |
 | `provisioning` | X25519 ECDH device provisioning with SAS verification |
-| `mls` | MLS group management (RFC 9420, OpenMLS 0.8) — **behind the `mls` feature, default-off** (see Feature Flags) |
+| `mls` | MLS group management (RFC 9420, OpenMLS 0.9) — **behind the `mls` feature, default-off** (see Feature Flags) |
 | `sframe` | SFrame voice E2EE key derivation |
 | `padding` | Power-of-2 payload padding (traffic analysis mitigation) |
 | `ffi`, `ffi_v3` | UniFFI bindings for iOS/Android |
@@ -55,7 +55,7 @@ bun run crypto:fmt           # cargo fmt --check
 - `mobile` — Enable UniFFI scaffolding for iOS/Android. Required for library builds targeting mobile. Without it, the static archive has zero UniFFI symbols.
 - `test-kdf` — Use minimal Argon2id params (1MB/1iter/1lane) instead of production params (64MB/3iter/4lanes). For emulator/CI testing only — MUST NEVER be in `default` features or release builds.
 - `uniffi-bindgen` — Extends `mobile` with the `uniffi-bindgen` CLI tool.
-- `mls` — **Default-off.** Gates `src/mls.rs` and its `openmls`/`openmls_rust_crypto`/`openmls_basic_credential` dependencies. MLS backs hub-state group messaging, which is not required for notes/calls/messaging (all HPKE-based) and is not on the Internal Availability path. The `openmls` → `hpke-rs` → `libcrux` chain has carried aarch64 constant-time-timing advisories (RUSTSEC-2026-0212, -0207, -0208) — gating keeps them out of every shipped iOS/Android binary (`mobile` feature) and the server build (`server` feature) unless a consumer explicitly opts in with `--features mls`. Decision recorded in [#708](https://github.com/rhonda-rodododo/llamenos-platform/issues/708). Verify exclusion with `cargo tree -e normal --manifest-path packages/crypto/Cargo.toml | grep libcrux` (empty without `--features mls`).
+- `mls` — **Default-off.** Gates `src/mls.rs` and its `openmls`/`openmls_rust_crypto`/`openmls_basic_credential` dependencies. MLS backs hub-state group messaging, which is not required for notes/calls/messaging (all HPKE-based) and is not on the Internal Availability path. The `openmls` → `hpke-rs` → `libcrux` chain has carried aarch64 constant-time-timing advisories (RUSTSEC-2026-0212, -0207, -0208) — gating keeps them out of every shipped iOS/Android binary (`mobile` feature) and the server build (`server` feature) unless a consumer explicitly opts in with `--features mls`. The pinned `openmls` 0.9 / `openmls_rust_crypto` 0.6 / `hpke-rs` 0.7 chain resolves to the patched `libcrux-sha3` 0.0.10 / `libcrux-secrets` 0.0.6, so opt-in `mls` builds are covered as well. Decision recorded in [#708](https://github.com/rhonda-rodododo/llamenos-platform/issues/708). Verify exclusion with `cargo tree -e normal --manifest-path packages/crypto/Cargo.toml | grep libcrux` (empty without `--features mls`).
 
 ## Crypto Architecture
 

@@ -27,7 +27,6 @@ You are the Desktop supervisor for Llamenos, a secure crisis response hotline ap
 
 - **`platform.ts` is the ONLY crypto bridge** — never import `@tauri-apps/*` directly
 - **Playwright uses IPC mocks**: `PLAYWRIGHT_TEST=true` triggers mock Vite aliases
-- **`data-testid` for ALL selectors** — never `getByRole`/`getByText`/CSS
 - **No `waitForTimeout()`** — Playwright `waitFor` only
 - **Tauri-only**: No browser/PWA fallback
 - **Path aliases**: `@/*`, `@worker/*`, `@shared/*`, `@protocol/*`
@@ -35,7 +34,6 @@ You are the Desktop supervisor for Llamenos, a secure crisis response hotline ap
 
 ## Quality Gates (workers must run before pushing)
 
-- Invoke `crypto-security-reviewer` on IPC changes (`apps/desktop/src/crypto.rs` or `platform.ts`)
 - `bun run typecheck` — TypeScript type checking
 - `bun run build` — Vite production build
 - `bun run test` — Playwright E2E tests (auto-builds with mocks)
