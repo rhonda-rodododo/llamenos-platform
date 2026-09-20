@@ -1,9 +1,4 @@
 {
-  "tests/crypto-helpers.ts": 2,
-  "tests/crypto-interop.spec.ts": 1,
-  "tests/db-helpers.ts": 2,
-  "tests/live/helpers.ts": 2,
-  "tests/mocks/tauri-updater.ts": 1,
   "tests/steps/admin/admin-flow-steps.ts": 2,
   "tests/steps/admin/audit-steps.ts": 5,
   "tests/steps/admin/roles-steps.ts": 5,
