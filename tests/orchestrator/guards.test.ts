@@ -326,10 +326,23 @@ describe('rail: every lane starts off', () => {
  * editing a required, code-owned workflow file — which cannot itself go
  * green while the current review engine has no quota. This rail asserts the
  * property that makes a provider switch an operator action instead: the job
- * reads `vars.FLEET_REVIEW_PROVIDER` / `vars.FLEET_REVIEW_MODEL` (with safe
- * defaults matching today's engine, so an unconfigured repo behaves exactly
- * as before), the `auth.json` key comes from that variable rather than a
- * literal, and the smoke step can name why the engine failed.
+ * reads `vars.FLEET_REVIEW_PROVIDER` / `vars.FLEET_REVIEW_MODEL`, the
+ * `auth.json` key comes from that variable rather than a literal, and the
+ * smoke step can name why the engine failed.
+ *
+ * A SECOND incident, on 2026-09-19, changed what "safe" means here: these
+ * variables used to default to a literal (`|| 'kimi-for-coding'` /
+ * `|| 'kimi-for-coding/k3-256k'`) when unset. That literal was itself the id
+ * that got retired — the fallback then spent a full night silently
+ * substituting a dead provider for an unset variable, producing the exact
+ * same opaque `UnknownError: "Unexpected server error"` a genuine outage or
+ * quota exhaustion would, with no diff and no signal that anything had
+ * changed. The job has stayed green since only because the repo variables
+ * were set BY HAND to the live id after that incident — invisible,
+ * load-bearing configuration a cleared variable would silently undo. The
+ * fallback is gone; an unset variable now fails the job loud, naming what's
+ * missing (see fleet-review-config-gate.test.ts for the behavioural rail on
+ * that replacement step).
  *
  * `fleet/review` moved out of `ci.yml` into its own `fleet-review.yml` in the
  * PR that also fixed its fail-open trigger bug — see the "runs once, at
@@ -362,16 +375,52 @@ describe('rail: the review engine provider is a repo variable, never a hardcoded
     expect(fleetReviewJobText().length).toBeGreaterThan(500)
   })
 
-  it('reads FLEET_REVIEW_PROVIDER from vars with the kimi-for-coding default', () => {
-    expect(fleetReviewJobText()).toMatch(
-      /FLEET_REVIEW_PROVIDER:\s*\$\{\{\s*vars\.FLEET_REVIEW_PROVIDER\s*\|\|\s*'kimi-for-coding'\s*\}\}/,
-    )
+  it('reads FLEET_REVIEW_PROVIDER from vars with NO literal fallback — an unset variable must fail loud, not silently resolve to a guessed id', () => {
+    const text = fleetReviewJobText()
+    expect(text).toMatch(/FLEET_REVIEW_PROVIDER:\s*\$\{\{\s*vars\.FLEET_REVIEW_PROVIDER\s*\}\}/)
+    expect(text, 'FLEET_REVIEW_PROVIDER has a literal fallback again — this is the actual 2026-09-19 incident: the fallback silently substituted a retired provider id for an unset variable')
+      .not.toMatch(/FLEET_REVIEW_PROVIDER:[^\n]*\|\|/)
   })
 
-  it('reads FLEET_REVIEW_MODEL from vars with the kimi-for-coding/k3-256k default', () => {
-    expect(fleetReviewJobText()).toMatch(
-      /FLEET_REVIEW_MODEL:\s*\$\{\{\s*vars\.FLEET_REVIEW_MODEL\s*\|\|\s*'kimi-for-coding\/k3-256k'\s*\}\}/,
-    )
+  it('reads FLEET_REVIEW_MODEL from vars with NO literal fallback', () => {
+    const text = fleetReviewJobText()
+    expect(text).toMatch(/FLEET_REVIEW_MODEL:\s*\$\{\{\s*vars\.FLEET_REVIEW_MODEL\s*\}\}/)
+    expect(text, 'FLEET_REVIEW_MODEL has a literal fallback again')
+      .not.toMatch(/FLEET_REVIEW_MODEL:[^\n]*\|\|/)
+  })
+
+  it('fails the job with a named error instead of a silent fallback when the configuration is absent', () => {
+    const text = fleetReviewJobText()
+    expect(text).toMatch(/Require review engine configuration/)
+    // Behavioral coverage of what this step actually DOES when run lives in
+    // fleet-review-config-gate.test.ts — this only asserts the step exists
+    // and is wired to the same two variables, so the two files can never
+    // silently drift apart on which step name/variables are under test.
+    expect(text).toMatch(/FLEET_REVIEW_PROVIDER \(opencode provider id/)
+    expect(text).toMatch(/FLEET_REVIEW_MODEL \(opencode provider\/model id/)
+  })
+
+  // MUTATION GUARD (per "audit gates by breaking them"): reintroduce the
+  // exact literal fallback the 2026-09-19 incident ran on, and prove the
+  // "no literal fallback" assertions above are not vacuous — they actually
+  // flag a `||` reintroduced into either variable's env line.
+  it('MUTATION: reintroducing the retired literal fallback is caught by the no-fallback assertions above', () => {
+    const original = fleetReviewJobText()
+    const mutated = original
+      .replace(
+        /FLEET_REVIEW_PROVIDER:\s*\$\{\{\s*vars\.FLEET_REVIEW_PROVIDER\s*\}\}/,
+        "FLEET_REVIEW_PROVIDER: ${{ vars.FLEET_REVIEW_PROVIDER || 'kimi-for-coding' }}",
+      )
+      .replace(
+        /FLEET_REVIEW_MODEL:\s*\$\{\{\s*vars\.FLEET_REVIEW_MODEL\s*\}\}/,
+        "FLEET_REVIEW_MODEL: ${{ vars.FLEET_REVIEW_MODEL || 'kimi-for-coding/k3-256k' }}",
+      )
+    expect(mutated, 'fallback reintroduction is vacuous — the clean pattern was not found in the current file').not.toBe(original)
+    // The exact regex the "NO literal fallback" tests above use to fail —
+    // reproduced here to prove it actually matches the reintroduced defect,
+    // not just to restate the assertion.
+    expect(mutated).toMatch(/FLEET_REVIEW_PROVIDER:[^\n]*\|\|/)
+    expect(mutated).toMatch(/FLEET_REVIEW_MODEL:[^\n]*\|\|/)
   })
 
   it('derives the auth.json key from the provider variable, not a literal', () => {
@@ -394,11 +443,22 @@ describe('rail: the review engine provider is a repo variable, never a hardcoded
       .not.toMatch(/opencode run --pure --model kimi-for-coding\/k3-256k/)
   })
 
-  it('classifies a smoke-test failure as engine-quota, engine-auth, or engine-unavailable', () => {
+  it('classifies a smoke-test failure as engine-quota, engine-auth, engine-misconfigured, or engine-unavailable', () => {
     const text = fleetReviewJobText()
-    for (const cause of ['engine-quota', 'engine-auth', 'engine-unavailable']) {
+    for (const cause of ['engine-quota', 'engine-auth', 'engine-misconfigured', 'engine-unavailable']) {
       expect(text, `${cause} classification missing from the smoke-test step`).toContain(cause)
     }
+  })
+
+  it('the smoke step classifies an unresolvable provider/model id as engine-misconfigured via the SAME registry check the real review uses, never a text-based guess', () => {
+    const text = fleetReviewJobText()
+    // Reuses review.ts's checkOpencodeModelKnown — never reimplemented as a
+    // second, divergeable heuristic — so the smoke test and the real review
+    // (orchestrator/src/review.ts's invokeVerifierEngine) can never name
+    // this condition differently. Behavioral coverage of the actual branch
+    // lives in fleet-review-smoke-step.test.ts.
+    expect(text).toMatch(/import \{ checkOpencodeModelKnown \} from ".\/orchestrator\/src\/review\.ts"/)
+    expect(text).toMatch(/fail "engine-misconfigured"/)
   })
 
   it('review.ts reads the opencode model from FLEET_REVIEW_MODEL, not a bare literal', () => {

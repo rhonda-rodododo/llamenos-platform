@@ -76,6 +76,30 @@ function withoutTheFix(script: string): string {
   return mutated
 }
 
+/** The pre-2026-09-19-fix shape: strips the registry pre-check this PR adds
+ *  (`combined=...` through `fail "$(classify "$combined")" "$combined"`)
+ *  back down to the single unconditional `classify()` call it replaced —
+ *  reproducing exactly the defect where a dead provider/model id and a real
+ *  outage were indistinguishable. Asserts the block was actually present,
+ *  so this can never pass vacuously against a script that already dropped
+ *  it for some other reason. */
+function withoutMisconfiguredCheck(script: string): string {
+  // A function replacer, deliberately — not a string one. The replacement
+  // text below legitimately contains the literal two-character sequence
+  // `$'` (bash's ANSI-C-quoted-string syntax, `$'\n'`), which
+  // `String.prototype.replace` treats as ITS OWN special substitution
+  // pattern ("insert everything after the match") when the replacement is a
+  // plain string — silently splicing the rest of the script into the middle
+  // of this line instead of the intended one-liner. A function return value
+  // is inserted verbatim, with no macro-substitution at all.
+  const mutated = script.replace(
+    /combined="\$run_out"\$'\\n'"\$run_err"[\s\S]*?fail "\$\(classify "\$combined"\)" "\$combined"\n/,
+    () => 'fail "$(classify "$run_out"$\'\\n\'"$run_err")" "$run_out"$\'\\n\'"$run_err"\n',
+  )
+  expect(mutated, 'registry pre-check block not found in the smoke-test script — this mutation is vacuous').not.toBe(script)
+  return mutated
+}
+
 const FAKE_OPENCODE = `#!/usr/bin/env bash
 case "$1" in
   debug)
@@ -115,14 +139,25 @@ esac
 let scratch: string
 let binDir: string
 let runnerTemp: string
+let cacheHome: string
 let originalPath: string | undefined
+
+// `FLEET_REVIEW_MODEL` needs a `provider/model` shape (a bare id like the
+// old `'test-model'` has no slash, so `checkOpencodeModelKnown` — reused
+// from review.ts, see below — can never resolve it to anything but
+// 'indeterminate', which would make the engine-misconfigured tests vacuous).
+const TEST_PROVIDER = 'test-provider'
+const TEST_MODEL_ID = 'test-model'
+const FLEET_REVIEW_MODEL = `${TEST_PROVIDER}/${TEST_MODEL_ID}`
 
 beforeEach(() => {
   scratch = mkdtempSync(join(tmpdir(), 'llamenos-fleet-review-smoke-'))
   binDir = join(scratch, 'bin')
   runnerTemp = join(scratch, 'runner-temp')
+  cacheHome = join(scratch, 'cache')
   mkdirSync(binDir)
   mkdirSync(runnerTemp)
+  mkdirSync(cacheHome)
   writeFileSync(join(binDir, 'opencode'), FAKE_OPENCODE)
   chmodSync(join(binDir, 'opencode'), 0o755)
   originalPath = process.env['PATH']
@@ -133,6 +168,19 @@ afterEach(() => {
   process.env['PATH'] = originalPath
   rmSync(scratch, { recursive: true, force: true })
 })
+
+/** Writes a fixture standing in for opencode's own local models.dev cache
+ *  (`$XDG_CACHE_HOME/opencode/models.json`) — never the real one, so these
+ *  tests never depend on what happens to be cached on whatever box runs
+ *  them. Deliberately NOT called by default: an absent cache is
+ *  'indeterminate' (see checkOpencodeModelKnown in review.ts), which is what
+ *  keeps the pre-existing fail/bad-verdict/pass tests below exercising the
+ *  ordinary classify() heuristic, unaffected by this rail's addition. */
+function writeModelRegistry(registry: Record<string, unknown>): void {
+  const dir = join(cacheHome, 'opencode')
+  mkdirSync(dir, { recursive: true })
+  writeFileSync(join(dir, 'models.json'), JSON.stringify(registry))
+}
 
 /** Runs a script body the way GitHub runs an unshelled `run:` step:
  *  `bash -e <file>`. Captures stdout+stderr combined, the way a job log
@@ -146,8 +194,9 @@ function runStep(script: string, runMode: 'fail' | 'bad-verdict' | 'pass'): { st
       ...process.env,
       PATH: `${binDir}${delimiter}${process.env['PATH'] ?? ''}`,
       RUNNER_TEMP: runnerTemp,
-      FLEET_REVIEW_PROVIDER: 'test-provider',
-      FLEET_REVIEW_MODEL: 'test-model',
+      XDG_CACHE_HOME: cacheHome,
+      FLEET_REVIEW_PROVIDER: TEST_PROVIDER,
+      FLEET_REVIEW_MODEL,
       MOCK_OPENCODE_RUN_MODE: runMode,
     },
   })
@@ -193,5 +242,66 @@ describe('rail: the review-engine smoke step must always say why it failed', () 
     expect(output).not.toContain(FAILED_MARKER)
     expect(output).not.toContain('engine-unavailable')
     expect(output).not.toContain('simulated: Unexpected server error from provider')
+  })
+})
+
+/**
+ * Rail for the registry pre-check added alongside the config-gate step
+ * (fleet-review-config-gate.test.ts) and its counterpart in
+ * `orchestrator/src/review.ts` (`invokeVerifierEngine`'s
+ * `checkOpencodeModelKnown` call, see `tests/orchestrator/review.test.ts`).
+ *
+ * Before this, a dead provider/model id and a real transient outage failed
+ * the smoke test IDENTICALLY — both fell through to `classify()`'s text
+ * heuristic, which has no way to tell "the provider doesn't exist" from
+ * "the provider is temporarily down", and both produced the same opaque
+ * `engine-unavailable`. That ambiguity is the entire reason the
+ * `kimi-for-coding` retirement cost a full night: an unresolvable id and a
+ * quota outage looked the same in the log.
+ *
+ * The fix reuses `checkOpencodeModelKnown` from review.ts — the SAME
+ * function the real review's pre-flight check uses — rather than
+ * reimplementing the registry lookup a second time, so the smoke test and
+ * the real review can never name this condition differently.
+ */
+describe('rail: the smoke step names an unresolvable provider/model id as engine-misconfigured, not engine-unavailable', () => {
+  it('reports engine-misconfigured — not engine-unavailable — when the configured id is not in opencode\'s local model registry', () => {
+    writeModelRegistry({ 'some-other-provider': { models: { 'k3-256k': {} } } })
+    const { status, output } = runStep(smokeStepScript(), 'fail')
+    expect(status).toBe(1)
+    expect(output).toContain(FAILED_MARKER)
+    expect(output).toContain('engine-misconfigured')
+    expect(output).not.toContain('engine-unavailable')
+  })
+
+  it('still reports engine-unavailable — not engine-misconfigured — when the configured id IS known but the call itself fails', () => {
+    writeModelRegistry({ [TEST_PROVIDER]: { models: { [TEST_MODEL_ID]: {} } } })
+    const { status, output } = runStep(smokeStepScript(), 'fail')
+    expect(status).toBe(1)
+    expect(output).toContain(FAILED_MARKER)
+    expect(output).toContain('engine-unavailable')
+    expect(output).not.toContain('engine-misconfigured')
+  })
+
+  it('does not misreport engine-misconfigured on a cold/missing registry cache — falls through to the ordinary heuristic instead', () => {
+    // Deliberately no writeModelRegistry() call: matches the default
+    // fixtures used by the pre-existing fail/bad-verdict/pass tests above,
+    // reproducing a box that has never run opencode before.
+    const { status, output } = runStep(smokeStepScript(), 'fail')
+    expect(status).toBe(1)
+    expect(output).toContain('engine-unavailable')
+    expect(output).not.toContain('engine-misconfigured')
+  })
+
+  // MUTATION GUARD (per "audit gates by breaking them"): strip the registry
+  // pre-check back out and prove the smoke step regresses to the exact
+  // ambiguity this rail exists to remove — a dead id reported as the same
+  // generic engine-unavailable a transient outage would produce.
+  it('MUTATION: without the registry pre-check, an unresolvable id is misreported as engine-unavailable again', () => {
+    writeModelRegistry({ 'some-other-provider': { models: { 'k3-256k': {} } } })
+    const { status, output } = runStep(withoutMisconfiguredCheck(smokeStepScript()), 'fail')
+    expect(status).toBe(1) // still fails — that part was never in question
+    expect(output).toContain('engine-unavailable')
+    expect(output).not.toContain('engine-misconfigured')
   })
 })
