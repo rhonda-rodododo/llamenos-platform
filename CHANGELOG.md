@@ -404,6 +404,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - add E2E tests for device linking and fix /link-device public path
 
 
+## 0.19.15 (2026-09-20)
+
+### Fixes
+
+- move docker-stable's buildx cache off the shared Actions quota (#911)
+- stop tauri:build/tauri:dev from passing an unsupported positional path, pin @tauri-apps/cli (#915)
+
+## 0.19.14 (2026-09-20)
+
+### Features
+
+- add llamenos-ntfy Ansible role for Android push broker (#888)
+
+### Fixes
+
+- unblock installable artifacts from an unconfigured Docker Hub (#885)
+- eslint packages to zero (#836)
+- upgrade openmls 0.8 → 0.9 to pull patched libcrux (#652) (#852)
+- pin the three tag-pinned container images by digest (#861)
+- fail loud on unconfigured fleet/review engine, never a dead default (#891)
+- reject deleting an admin's last credential under requireForAdmins (#889)
+- desktop release workflow never produced installable artifacts (#893)
+- run fleet/review as a claude session on a self-hosted runner (#866)
+- publish release container images to GHCR instead of Docker Hub (#905)
+- pin Tauri Rust crate and npm package to matching versions (#895)
+
 ## 0.19.13 (2026-09-20)
 
 ### Features
