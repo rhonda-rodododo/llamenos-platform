@@ -11,8 +11,7 @@ import { WhatsAppProviderForm } from './WhatsAppProviderForm'
 import { SignalProviderForm } from './SignalProviderForm'
 import { testProviderConnection } from '@/lib/api/provider-setup'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
-import { Check, Loader2, Radio } from 'lucide-react'
+import { Loader2, Radio } from 'lucide-react'
 
 interface Props {
   data: SetupData

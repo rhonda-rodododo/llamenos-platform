@@ -127,7 +127,7 @@ function NotesPage() {
             payload = { text: note.encryptedContent }
           } else if (canDecrypt) {
             // Decrypt per-note HPKE envelope
-            const myPubkey = publicKey!
+            const myPubkey = publicKey ?? ''
             const envelope = isAdmin
               ? note.adminEnvelopes?.find(e => e.pubkey === myPubkey) ?? note.adminEnvelopes?.[0]
               : note.authorEnvelope
@@ -273,7 +273,7 @@ function NotesPage() {
     }))
     const jsonString = JSON.stringify(rows, null, 2)
     const ciphertextHex = await encryptExport(jsonString)
-    const binary = new Uint8Array(ciphertextHex.match(/.{2}/g)!.map(b => parseInt(b, 16)))
+    const binary = new Uint8Array((ciphertextHex.match(/.{2}/g) ?? []).map(b => parseInt(b, 16)))
     const blob = new Blob([binary.buffer as ArrayBuffer], { type: 'application/octet-stream' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
@@ -388,14 +388,15 @@ function NotesPage() {
                   {(() => {
                     const callInfo = callInfoMap.get(cId)
                     if (!callInfo) return t('notes.callWith', { number: cId.slice(0, 12) + '...' })
-                    const volunteerName = callInfo.answeredBy ? nameMap.get(callInfo.answeredBy) : null
+                    const answeredBy = callInfo.answeredBy
+                    const volunteerName = answeredBy ? nameMap.get(answeredBy) : null
                     const phone = callInfo.callerLast4 ? `***${callInfo.callerLast4}` : ''
                     return (
                       <span className="flex flex-wrap items-center gap-1.5">
                         {callInfo.status === 'unanswered' ? (
                           <span className="text-destructive">{t('callHistory.unanswered')}</span>
-                        ) : volunteerName && isAdmin ? (
-                          <Link to="/users/$pubkey" params={{ pubkey: callInfo.answeredBy! }} className="text-primary hover:underline">
+                        ) : volunteerName && isAdmin && answeredBy ? (
+                          <Link to="/users/$pubkey" params={{ pubkey: answeredBy }} className="text-primary hover:underline">
                             {volunteerName}
                           </Link>
                         ) : volunteerName ? (

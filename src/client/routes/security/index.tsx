@@ -75,8 +75,9 @@ function DevicesPage() {
         {devices?.map((device) => {
           const Icon = platformIcon(device.platform)
           const isRenaming = renamingId === device.id
-          const fingerprint = device.ed25519Pubkey
-            ? device.ed25519Pubkey.slice(0, 16) + '...' + device.ed25519Pubkey.slice(-8)
+          const ed25519Pubkey = device.ed25519Pubkey
+          const fingerprint = ed25519Pubkey
+            ? ed25519Pubkey.slice(0, 16) + '...' + ed25519Pubkey.slice(-8)
             : null
 
           return (
@@ -122,11 +123,11 @@ function DevicesPage() {
                     <span> &middot; {t('security.devices.lastSeen')} {new Date(device.lastSeenAt).toLocaleDateString()}</span>
                   )}
                 </div>
-                {fingerprint && (
+                {fingerprint && ed25519Pubkey && (
                   <button
                     type="button"
                     className="flex items-center gap-1 text-xs text-muted-foreground mt-1 font-mono hover:text-foreground"
-                    onClick={() => copyFingerprint(device.ed25519Pubkey!, device.id)}
+                    onClick={() => copyFingerprint(ed25519Pubkey, device.id)}
                   >
                     {copiedId === device.id ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
                     {fingerprint}

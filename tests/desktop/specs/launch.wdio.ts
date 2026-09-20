@@ -29,8 +29,8 @@ describe('App Launch', () => {
   it('should have Tauri internals available', async () => {
     // Verify Tauri IPC bridge is loaded in the webview
     const hasTauri = await browser.execute(() => {
-      return typeof (window as any).__TAURI_INTERNALS__ !== 'undefined'
-        && typeof (window as any).__TAURI_INTERNALS__.invoke === 'function'
+      return typeof window.__TAURI_INTERNALS__ !== 'undefined'
+        && typeof window.__TAURI_INTERNALS__.invoke === 'function'
     })
     expect(hasTauri).toBe(true)
   })

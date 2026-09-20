@@ -160,7 +160,7 @@ test.describe('Recovery Group - IPC Mock Verification', () => {
   async function waitForInvoke(page: import('@playwright/test').Page) {
     await page.goto('/login')
     await page.waitForFunction(
-      () => typeof (window as any)[Symbol.for('llamenos_test_invoke')] === 'function',
+      () => typeof (window as unknown as Record<symbol, unknown>)[Symbol.for('llamenos_test_invoke')] === 'function',
       { timeout: 15_000 },
     )
   }
@@ -169,7 +169,7 @@ test.describe('Recovery Group - IPC Mock Verification', () => {
     await waitForInvoke(page)
 
     const result = await page.evaluate(async () => {
-      const invoke = (window as any)[Symbol.for('llamenos_test_invoke')] as
+      const invoke = (window as unknown as Record<symbol, unknown>)[Symbol.for('llamenos_test_invoke')] as
         (cmd: string, args?: Record<string, unknown>) => Promise<unknown>
 
       // Use recovery_group_create instead of standalone shamir_split
@@ -210,7 +210,7 @@ test.describe('Recovery Group - IPC Mock Verification', () => {
     await waitForInvoke(page)
 
     const result = await page.evaluate(async () => {
-      const invoke = (window as any)[Symbol.for('llamenos_test_invoke')] as
+      const invoke = (window as unknown as Record<symbol, unknown>)[Symbol.for('llamenos_test_invoke')] as
         (cmd: string, args?: Record<string, unknown>) => Promise<unknown>
 
       const group = (await invoke('recovery_group_create', { total: 3, threshold: 2 })) as {
@@ -237,7 +237,7 @@ test.describe('Recovery Group - IPC Mock Verification', () => {
     await waitForInvoke(page)
 
     const result = await page.evaluate(async () => {
-      const invoke = (window as any)[Symbol.for('llamenos_test_invoke')] as
+      const invoke = (window as unknown as Record<symbol, unknown>)[Symbol.for('llamenos_test_invoke')] as
         (cmd: string, args?: Record<string, unknown>) => Promise<unknown>
 
       // Use recovery_group_create to get shares (shamir_split no longer exposed as IPC)
@@ -264,7 +264,7 @@ test.describe('Epic C - Key Isolation & Wipe Completeness', () => {
   async function waitForInvoke(page: import('@playwright/test').Page) {
     await page.goto('/login')
     await page.waitForFunction(
-      () => typeof (window as any)[Symbol.for('llamenos_test_invoke')] === 'function',
+      () => typeof (window as unknown as Record<symbol, unknown>)[Symbol.for('llamenos_test_invoke')] === 'function',
       { timeout: 15_000 },
     )
   }
@@ -273,7 +273,7 @@ test.describe('Epic C - Key Isolation & Wipe Completeness', () => {
     await waitForInvoke(page)
 
     const result = await page.evaluate(async () => {
-      const invoke = (window as any)[Symbol.for('llamenos_test_invoke')] as
+      const invoke = (window as unknown as Record<symbol, unknown>)[Symbol.for('llamenos_test_invoke')] as
         (cmd: string, args?: Record<string, unknown>) => Promise<unknown>
 
       const createResult = (await invoke('recovery_group_create', {
@@ -303,7 +303,7 @@ test.describe('Epic C - Key Isolation & Wipe Completeness', () => {
     await waitForInvoke(page)
 
     const result = await page.evaluate(async () => {
-      const invoke = (window as any)[Symbol.for('llamenos_test_invoke')] as
+      const invoke = (window as unknown as Record<symbol, unknown>)[Symbol.for('llamenos_test_invoke')] as
         (cmd: string, args?: Record<string, unknown>) => Promise<unknown>
 
       // Generate keys first

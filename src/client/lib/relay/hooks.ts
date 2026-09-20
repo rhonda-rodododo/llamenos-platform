@@ -40,6 +40,5 @@ export function useRelaySubscription(
       relay.unsubscribe(subId)
     }
     // Resubscribe when relay instance, hub, kinds, or enabled state changes
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [relay, hubId, kinds.join(','), enabled, state])
 }

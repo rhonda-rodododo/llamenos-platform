@@ -806,14 +806,14 @@ function base64urlToHex(b64url: string): string {
 }
 
 function hexToBase64url(hex: string): string {
-  const bytes = hex.match(/.{2}/g)!.map(b => String.fromCharCode(parseInt(b, 16))).join('')
+  const bytes = (hex.match(/.{2}/g) ?? []).map(b => String.fromCharCode(parseInt(b, 16))).join('')
   return btoa(bytes).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
 }
 
 // ── AES-256-GCM content encryption (WebCrypto) ─────────────────────
 
 export async function aesGcmEncrypt(plaintext: string, keyHex: string): Promise<string> {
-  const keyBytes = new Uint8Array(keyHex.match(/.{2}/g)!.map(b => parseInt(b, 16)))
+  const keyBytes = new Uint8Array((keyHex.match(/.{2}/g) ?? []).map(b => parseInt(b, 16)))
   const iv = crypto.getRandomValues(new Uint8Array(12))
   const cryptoKey = await crypto.subtle.importKey('raw', keyBytes, 'AES-GCM', false, ['encrypt'])
   const ct = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, cryptoKey, new TextEncoder().encode(plaintext)))
@@ -824,10 +824,10 @@ export async function aesGcmEncrypt(plaintext: string, keyHex: string): Promise<
 }
 
 export async function aesGcmDecrypt(ciphertextHex: string, keyHex: string): Promise<string> {
-  const data = new Uint8Array(ciphertextHex.match(/.{2}/g)!.map(b => parseInt(b, 16)))
+  const data = new Uint8Array((ciphertextHex.match(/.{2}/g) ?? []).map(b => parseInt(b, 16)))
   const iv = data.slice(0, 12)
   const ct = data.slice(12)
-  const keyBytes = new Uint8Array(keyHex.match(/.{2}/g)!.map(b => parseInt(b, 16)))
+  const keyBytes = new Uint8Array((keyHex.match(/.{2}/g) ?? []).map(b => parseInt(b, 16)))
   const cryptoKey = await crypto.subtle.importKey('raw', keyBytes, 'AES-GCM', false, ['decrypt'])
   const plaintext = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, cryptoKey, ct)
   return new TextDecoder().decode(plaintext)

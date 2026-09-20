@@ -21,6 +21,7 @@ interface Props {
 
 export function StepIdentity({ data, onChange, headingRef }: Props) {
   const { t } = useTranslation()
+  const hubUrlError = data.hubUrl ? validateHubUrl(data.hubUrl) : null
 
   return (
     <div className="space-y-6">
@@ -77,11 +78,11 @@ export function StepIdentity({ data, onChange, headingRef }: Props) {
             onChange={e => onChange({ hubUrl: e.target.value })}
             placeholder={t('setup.hubUrlPlaceholder')}
             aria-label="Hub URL"
-            aria-invalid={!!data.hubUrl && !!validateHubUrl(data.hubUrl)}
+            aria-invalid={!!hubUrlError}
           />
-          {data.hubUrl && validateHubUrl(data.hubUrl) && (
+          {hubUrlError && (
             <p role="alert" className="text-sm text-destructive">
-              {t(validateHubUrl(data.hubUrl)!)}
+              {t(hubUrlError)}
             </p>
           )}
         </div>

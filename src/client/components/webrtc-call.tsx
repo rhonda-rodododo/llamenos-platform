@@ -7,7 +7,6 @@ import {
   acceptCall as webrtcAccept,
   hangupCall as webrtcHangup,
   toggleMute,
-  isMuted as checkMuted,
   onStateChange,
   getState,
   type WebRtcState,

@@ -12,7 +12,7 @@ async function reloadWithMockUpdate(page: import('@playwright/test').Page, mockU
 
   // Set mock update immediately after reload, before the 5s scheduler delay
   await page.evaluate((update) => {
-    ;(window as any).__MOCK_UPDATE = update
+    window.__MOCK_UPDATE = update
   }, mockUpdate)
 
   // Re-enter PIN to get back to authenticated state
@@ -23,7 +23,7 @@ async function reloadWithMockUpdate(page: import('@playwright/test').Page, mockU
 
   // Re-set mock update after auth (in case auth navigation cleared it)
   await page.evaluate((update) => {
-    ;(window as any).__MOCK_UPDATE = update
+    window.__MOCK_UPDATE = update
   }, mockUpdate)
 }
 

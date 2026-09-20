@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { decryptMessage } from '@/lib/platform'
 import { getReportMessages, type Report, type ReportTypeDefinition } from '@/lib/api'
-import { useAuth } from '@/lib/auth'
 import { formatRelativeTime } from '@/lib/format'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
@@ -29,7 +28,6 @@ interface DecryptedMessage {
  */
 export function TriageReportContent({ report, reportType }: TriageReportContentProps) {
   const { t } = useTranslation()
-  const { publicKey } = useAuth()
   const [messages, setMessages] = useState<DecryptedMessage[]>([])
   const [loading, setLoading] = useState(true)
   const [decryptError, setDecryptError] = useState(false)
