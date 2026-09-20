@@ -8,6 +8,7 @@ import {
   resolveDispatchResult, statusForItemWith, type StatusItemDeps, type ResolveDispatchDeps,
   resolveAwaitingHumanWith, settleTargetFor,
   ensureClosesLine, ensureIssueLinkWith, type IssueLinkDeps,
+  findOpenPrFor, type OpenPrLookupDeps,
 } from '../../orchestrator/src/cli.js'
 import { renderDigest, computeBanner } from '../../orchestrator/src/digest.js'
 import { buildIssueCreateArgs, NEEDS_HUMAN_LABEL, type ProposedIssue } from '../../orchestrator/src/roles/planner.js'
@@ -16,6 +17,7 @@ import type { WorkItem } from '../../orchestrator/src/source.js'
 import type { SettleInput, TickResult } from '../../orchestrator/src/tick.js'
 import type { DependencyReport } from '../../orchestrator/src/dependency.js'
 import type { PrFacts } from '../../orchestrator/src/status.js'
+import type { Lane } from '../../orchestrator/src/config.js'
 
 const REPO_ROOT = join(import.meta.dirname, '..', '..')
 const DEP_OK: DependencyReport = { ok: true, problems: [], commit: 'abc123' }
@@ -642,5 +644,56 @@ describe('ensureIssueLinkWith', () => {
     const d = deps({ readPr: vi.fn(async () => undefined) })
     await ensureIssueLinkWith('42', d)
     expect(d.editBody).not.toHaveBeenCalled()
+  })
+})
+
+// Issues #705/#724/#729/#775/#784/#785: the pre-dispatch precondition that
+// stops a brand-new worker attempt from rediscovering a PR that is already
+// open. `findOpenPrFor` is the deps-injected core (same pattern as
+// `resolveDispatchResult` above) — the real `gh pr list` call lives in
+// `defaultOpenPrLookupDeps`, untested here on purpose, same as every other
+// `gh`-backed default in this file.
+describe('findOpenPrFor', () => {
+  const testLane: Lane = {
+    id: 'infra', mode: 'live', cap: 1, engine: 'claude',
+    requireLabel: 'agent-dispatchable', vetoLabels: ['needs-human'],
+    scope: { owned: ['deploy/'], notOwned: [] },
+  }
+  const testItem: WorkItem = { id: '775', title: 't', body: 'x'.repeat(300), url: 'u', labels: [] }
+  const lookupDeps = (findOpenPrOnBranch: OpenPrLookupDeps['findOpenPrOnBranch']): OpenPrLookupDeps =>
+    ({ findOpenPrOnBranch })
+
+  it('finds an open PR on the canonical fleet/<lane>/<item> branch', async () => {
+    const findOpenPrOnBranch = vi.fn(async (branch: string) => (branch === 'fleet/infra/775' ? '859' : undefined))
+    const pr = await findOpenPrFor(testLane, testItem, lookupDeps(findOpenPrOnBranch))
+    expect(pr).toBe('859')
+    expect(findOpenPrOnBranch).toHaveBeenCalledWith('fleet/infra/775')
+  })
+
+  // Some already-open PRs predate issue #812's canonical-branch fix and
+  // still live on the legacy `fleet-<lane>-<item>` spelling — the exact
+  // shape of PR #859 (issue 775) in the incident this fix targets.
+  it('falls back to the legacy fleet-<lane>-<item> spelling when the canonical branch has no open PR', async () => {
+    const findOpenPrOnBranch = vi.fn(async (branch: string) => (branch === 'fleet-infra-775' ? '859' : undefined))
+    const pr = await findOpenPrFor(testLane, testItem, lookupDeps(findOpenPrOnBranch))
+    expect(pr).toBe('859')
+    expect(findOpenPrOnBranch).toHaveBeenNthCalledWith(1, 'fleet/infra/775')
+    expect(findOpenPrOnBranch).toHaveBeenNthCalledWith(2, 'fleet-infra-775')
+  })
+
+  it('returns undefined when neither spelling has an open PR', async () => {
+    const pr = await findOpenPrFor(testLane, testItem, lookupDeps(async () => undefined))
+    expect(pr).toBeUndefined()
+  })
+
+  // MUTATION GUARD: swapping the `??` for something that only ever checks
+  // the canonical branch (i.e. dropping the legacy fallback entirely) makes
+  // this test fail — the fallback is not incidental, it is the reason this
+  // fix catches PRs opened before issue #812.
+  it('never queries the legacy spelling once the canonical branch already has an open PR', async () => {
+    const findOpenPrOnBranch = vi.fn(async (branch: string) => (branch === 'fleet/infra/775' ? '860' : undefined))
+    const pr = await findOpenPrFor(testLane, testItem, lookupDeps(findOpenPrOnBranch))
+    expect(pr).toBe('860')
+    expect(findOpenPrOnBranch).toHaveBeenCalledTimes(1)
   })
 })
