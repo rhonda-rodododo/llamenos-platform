@@ -59,13 +59,19 @@ export interface SettleInput {
    * keeps the item from being re-claimed on the next pass. An ordinary
    * mechanical or review REJECTED is still retried up to
    * `MAX_ATTEMPTS_PER_ITEM` (the worker may simply fix it next attempt), so
-   * exactly two cases set this now: a worker-reported SUCCESS that could not
-   * be run through the pipeline at all (missing branch/worktree) — see the
-   * `else` branch in `runLiveDispatch` — and a branch mismatch (issue #812:
+   * exactly three cases set this now: a worker-reported SUCCESS that could
+   * not be run through the pipeline at all (missing branch/worktree) — see
+   * the `else` branch in `runLiveDispatch` — a branch mismatch (issue #812:
    * the work landed on a branch other than `fleet/<lane>/<item>`), whatever
-   * the worker claimed. The former is the shape of issue #660/PR
-   * #662: a claimed success with an open, UNVERIFIED PR is far more
-   * dangerous left agent-dispatchable than a routine rejection is.
+   * the worker claimed, and an `UNVERIFIED` outcome (issue #870: the
+   * review loop ended `UNREADABLE` — the fleet's own verification pipeline,
+   * not the worker's diff, could not reach a verdict). The first is the
+   * shape of issue #660/PR #662: a claimed success with an open, unverified
+   * PR is far more dangerous left agent-dispatchable than a routine
+   * rejection is. The third is the shape of issue #870: re-dispatching a
+   * brand new worker attempt against a branch that may already hold correct,
+   * finished work wastes a worker on a problem this fleet never actually
+   * diagnosed.
    *
    * A PR that is verified, reviewed, and simply waiting — on a required
    * check, or on a code owner's approval — is NOT flagged here: it is
@@ -331,13 +337,46 @@ async function runLiveDispatch(
       } else {
         deps.log(`review: item ${item.id} pr ${pr} verdict=${loop.finalVerdict} rounds=${loop.rounds}`)
 
-        if (loop.finalVerdict !== 'PASS') {
+        if (loop.finalVerdict === 'FAIL') {
+          // A real reviewer read the diff and said no — the fleet's own
+          // verification pipeline worked exactly as designed and caught
+          // something. This is the shape `circuit.ts`'s consecutive-failure
+          // breaker exists to catch, so it counts toward that streak.
           await deps.commentOnIssue(
             item.id,
             `Review did not pass after ${loop.rounds} round(s) (final verdict: ${loop.finalVerdict}) — needs a human.`,
           )
           final = {
             ...base, outcome: 'REJECTED', branch, pr,
+            note: truncateNote(`rounds=${loop.rounds} ${buildGateTrace({
+              report: verifyReport, reviewVerdict: loop.finalVerdict, reviewText: loop.lastVerdictText,
+            })}`),
+          }
+        } else if (loop.finalVerdict === 'UNREADABLE') {
+          // Issue #870: UNREADABLE never means "the diff is bad" — it means
+          // this fleet's OWN verification pipeline (the reviewer engine, a
+          // tamper check, or — the fleet-infra-722 shape, see review.ts's
+          // `runReviewLoop` — the revise round losing contact with a worker
+          // that had already finished correctly) could not reach a verdict.
+          // Mechanical verification already passed by this point (the branch
+          // above returns before this one is ever reached), so the work
+          // itself has NOT been shown to be bad — recording REJECTED here
+          // would count a fleet-side verification gap as if a real reviewer
+          // had rejected the work, and three of those in a row would trip
+          // `circuit.ts`'s consecutive-failure breaker over nothing but the
+          // fleet's own plumbing (the exact incident this outcome exists to
+          // stop). `needsHuman: true`: a PR the fleet could not get a second
+          // opinion on should be looked at directly, not silently re-dispatched
+          // as a brand new worker attempt against a branch that likely
+          // already holds correct, finished work.
+          await deps.commentOnIssue(
+            item.id,
+            `The fleet could not get a verification verdict after ${loop.rounds} round(s) (${loop.finalVerdict}) — ` +
+            'this is a gap in the fleet\'s own verification, not a claim that the work is wrong. Needs a human look.',
+          )
+          needsHuman = true
+          final = {
+            ...base, outcome: 'UNVERIFIED', branch, pr,
             note: truncateNote(`rounds=${loop.rounds} ${buildGateTrace({
               report: verifyReport, reviewVerdict: loop.finalVerdict, reviewText: loop.lastVerdictText,
             })}`),

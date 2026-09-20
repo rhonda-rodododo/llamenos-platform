@@ -21,6 +21,16 @@ const HOUR = 3_600_000
  * conflict) — that is the system working as designed, and the per-item
  * attempt limit (see ledger.ts's failedAttemptsFor) already bounds it, so it
  * must not also feed a fleet-wide halt.
+ *
+ * UNVERIFIED is excluded for the same reason as QUOTA, not BLOCKED: issue
+ * #870 (see the `Outcome` doc comment in ledger.ts) is three workers that
+ * finished with a real terminal SUCCESS and a real PR, recorded FAILED only
+ * because THIS fleet's own launch/revise plumbing broke down talking to
+ * them. That is a verification gap, not a worker producing bad output — the
+ * exact distinction REJECTED already draws against BLOCKED above, just
+ * pointed at this fleet's own machinery instead of a worker's scope
+ * violation. Three verification gaps in a row must never read as "the fleet
+ * is misbehaving" the way three real REJECTEDs do.
  */
 const STREAK_FAILURES: ReadonlySet<Outcome> = new Set<Outcome>(['FAILED', 'TIMEOUT', 'REJECTED'])
 // SHADOW is excluded from both sets, like QUOTA — a shadow lane writes a
