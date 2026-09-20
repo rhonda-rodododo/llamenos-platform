@@ -61,12 +61,13 @@ import webauthnRoutes from '@worker/routes/webauthn'
 // Helpers
 // ---------------------------------------------------------------------------
 
-function createApp(pubkey = 'user-pk-1') {
+function createApp(pubkey = 'user-pk-1', permissions: string[] = []) {
   const app = new Hono<AppEnv>()
   const services = {
     identity: {
       getAllWebAuthnCredentials: vi.fn().mockResolvedValue({ credentials: [] }),
       getWebAuthnCredentials: vi.fn().mockResolvedValue({ credentials: [] }),
+      getWebAuthnSettings: vi.fn().mockResolvedValue({ requireForAdmins: false, requireForUsers: false }),
       storeWebAuthnChallenge: vi.fn().mockResolvedValue(undefined),
       getWebAuthnChallenge: vi.fn().mockResolvedValue({ challenge: 'test-challenge', pubkey: null, allowedCredIds: null }),
       updateWebAuthnCounter: vi.fn().mockResolvedValue(undefined),
@@ -83,6 +84,7 @@ function createApp(pubkey = 'user-pk-1') {
     c.set('services', services as never)
     c.set('pubkey', pubkey as never)
     c.set('user', { pubkey, name: 'Test User' } as never)
+    c.set('permissions', permissions as never)
     await next()
   })
 
@@ -328,6 +330,60 @@ describe('webauthn routes', () => {
       expect(args[1]).toBe('webauthnDeleted')
       expect(args[2]).toBe('user-pk-1')
       expect(args[3]).toEqual(expect.objectContaining({ credId: 'cred-123' }))
+    })
+
+    it('rejects deleting an admin\'s last credential when requireForAdmins is on (#680)', async () => {
+      const { app, services } = createApp('admin-pk-1', ['settings:manage'])
+      services.identity.getWebAuthnSettings.mockResolvedValue({ requireForAdmins: true, requireForUsers: false })
+      services.identity.getWebAuthnCredentials.mockResolvedValue({
+        credentials: [{ id: 'cred-123', publicKey: 'pk', counter: 0, label: 'Only Key', backedUp: true, createdAt: '2026-01-01', lastUsedAt: '2026-01-01', transports: [] }],
+      })
+
+      const res = await app.request('/webauthn/credentials/cred-123', { method: 'DELETE' }, defaultEnv)
+      expect(res.status).toBe(409)
+      const body = await res.json()
+      expect(body.code).toBe('WEBAUTHN_CREDENTIAL_REQUIRED')
+      expect(services.identity.deleteWebAuthnCredential).not.toHaveBeenCalled()
+      expect(mockAudit).not.toHaveBeenCalled()
+    })
+
+    it('allows an admin to delete a credential when another one remains, even with requireForAdmins on', async () => {
+      const { app, services } = createApp('admin-pk-1', ['settings:manage'])
+      services.identity.getWebAuthnSettings.mockResolvedValue({ requireForAdmins: true, requireForUsers: false })
+      services.identity.getWebAuthnCredentials.mockResolvedValue({
+        credentials: [
+          { id: 'cred-123', publicKey: 'pk', counter: 0, label: 'Old Key', backedUp: true, createdAt: '2026-01-01', lastUsedAt: '2026-01-01', transports: [] },
+          { id: 'cred-456', publicKey: 'pk2', counter: 0, label: 'New Key', backedUp: true, createdAt: '2026-01-02', lastUsedAt: '2026-01-02', transports: [] },
+        ],
+      })
+
+      const res = await app.request('/webauthn/credentials/cred-123', { method: 'DELETE' }, defaultEnv)
+      expect(res.status).toBe(200)
+      expect(services.identity.deleteWebAuthnCredential).toHaveBeenCalledWith('admin-pk-1', 'cred-123')
+    })
+
+    it('allows deleting a non-admin\'s last credential regardless of requireForAdmins', async () => {
+      const { app, services } = createApp('user-pk-1', [])
+      services.identity.getWebAuthnSettings.mockResolvedValue({ requireForAdmins: true, requireForUsers: false })
+      services.identity.getWebAuthnCredentials.mockResolvedValue({
+        credentials: [{ id: 'cred-123', publicKey: 'pk', counter: 0, label: 'Only Key', backedUp: true, createdAt: '2026-01-01', lastUsedAt: '2026-01-01', transports: [] }],
+      })
+
+      const res = await app.request('/webauthn/credentials/cred-123', { method: 'DELETE' }, defaultEnv)
+      expect(res.status).toBe(200)
+      expect(services.identity.deleteWebAuthnCredential).toHaveBeenCalledWith('user-pk-1', 'cred-123')
+    })
+
+    it('allows an admin to delete their last credential when requireForAdmins is off', async () => {
+      const { app, services } = createApp('admin-pk-1', ['settings:manage'])
+      services.identity.getWebAuthnSettings.mockResolvedValue({ requireForAdmins: false, requireForUsers: false })
+      services.identity.getWebAuthnCredentials.mockResolvedValue({
+        credentials: [{ id: 'cred-123', publicKey: 'pk', counter: 0, label: 'Only Key', backedUp: true, createdAt: '2026-01-01', lastUsedAt: '2026-01-01', transports: [] }],
+      })
+
+      const res = await app.request('/webauthn/credentials/cred-123', { method: 'DELETE' }, defaultEnv)
+      expect(res.status).toBe(200)
+      expect(services.identity.deleteWebAuthnCredential).toHaveBeenCalledWith('admin-pk-1', 'cred-123')
     })
   })
 })

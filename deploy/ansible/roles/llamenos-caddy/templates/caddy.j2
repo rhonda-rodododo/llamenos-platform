@@ -53,3 +53,15 @@
     import security_headers
 }
 {% endif %}
+
+{% if llamenos_ntfy_enabled | default(false) | bool and ntfy_domain | default("") | length > 0 %}
+# ntfy/UnifiedPush push broker (issue #717) — reached by the Android app to
+# subscribe (anonymous, read-only, keyed by an unguessable topic name) and
+# used as this box's own reference for where the backend publishes to.
+# Caddy proxies WebSocket upgrades automatically; no extra config needed.
+{{ ntfy_domain }} {
+    reverse_proxy ntfy:80
+    tls {{ acme_email }}
+    import security_headers
+}
+{% endif %}

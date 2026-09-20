@@ -319,34 +319,68 @@ describe('rail: every lane starts off', () => {
 })
 
 /**
- * `fleet/review`'s non-author engine is opencode, and until 2026-09-15 its
- * provider (`kimi-for-coding`) and model (`kimi-for-coding/k3-256k`) were
- * both string literals baked into the workflow file — twice, once for
- * `auth.json`'s key and once for the smoke-test's `--model` flag. When that
- * provider's weekly quota ran out, the ONLY way to switch providers was a PR
- * editing a required, code-owned workflow file — which cannot itself go
- * green while the current review engine has no quota. This rail asserts the
- * property that makes a provider switch an operator action instead: the job
- * reads `vars.FLEET_REVIEW_PROVIDER` / `vars.FLEET_REVIEW_MODEL` (with safe
- * defaults matching today's engine, so an unconfigured repo behaves exactly
- * as before), the `auth.json` key comes from that variable rather than a
- * literal, and the smoke step can name why the engine failed.
+ * #812: `fleet/review` retired `opencode`/Kimi as the reviewer engine
+ * entirely and moved to a `claude` SESSION running on a dedicated
+ * self-hosted runner (`llamenos-review-box`), on the operator's own Max
+ * subscription rather than a metered, weekly-quota'd key. Most of the old
+ * engine's failures were infrastructure (turn-budget exhaustion, quota,
+ * UNREADABLE verdicts from a 2-3-turn cap opencode's own CLI couldn't even
+ * enforce) rather than genuine misses — a session with real tools reviews
+ * better than a thin per-call API hit.
  *
- * `fleet/review` moved out of `ci.yml` into its own `fleet-review.yml` in the
- * PR that also fixed its fail-open trigger bug — see the "runs once, at
- * merge time" rail below for that history. This rail reads `fleet-review.yml`
- * now, not `ci.yml`.
+ * Reconciling this with #891 (2026-09-19, "fail loud on unconfigured
+ * fleet/review engine, never a dead default"): that fix was about
+ * `vars.FLEET_REVIEW_PROVIDER` — a SWAPPABLE provider id that had already
+ * gone stale twice, silently, with a `|| 'kimi-for-coding'` literal masking
+ * the day it was retired. `#812`'s redesign removes the entire class of bug
+ * #891 fixed rather than re-solving it: there is no provider variable left
+ * to go stale, because `claude` is the only reviewer engine
+ * (`reviewerBinaryFor` hard-fails for anything else — see its doc comment in
+ * review.ts). `FLEET_REVIEW_MODEL` keeps a literal default (`'sonnet'`), but
+ * that is not the same failure shape: `'sonnet'` is a live, always-valid
+ * model tier that a claude session can actually run, not a retired id
+ * silently substituted for one that used to work. A bad value in
+ * `FLEET_REVIEW_MODEL` (typo'd, or a leftover opencode-shaped id like
+ * `kimi-code-plan-global/k3-256k` from before this PR) is still caught
+ * LOUD, before the real review ever runs: `claude` itself refuses an
+ * unrecognized `--model`, and the smoke step's `classify()` (backed by
+ * `classifyEngineFailure` in review.ts) names that failure
+ * `engine-misconfigured`, never a silent pass. See
+ * fleet-review-smoke-step.test.ts for the behavioural rail on that
+ * classification.
+ *
+ * This rail asserts what survived the switch and what changed on purpose:
+ *   - the model is STILL a repo variable, never a hardcoded literal — the
+ *     same "a provider/model change is an operator action, not a code
+ *     change" property #812's own predecessor rail asserted, just for
+ *     `FLEET_REVIEW_MODEL` alone now (`FLEET_REVIEW_PROVIDER` is gone: there
+ *     is exactly one provider, an already-authenticated `claude` CLI, not a
+ *     key-holding `auth.json` keyed by provider name);
+ *   - the job runs on `[self-hosted, fleet-review]`, never a GitHub-hosted
+ *     runner — that label is what actually reaches `llamenos-review-box`;
+ *   - a self-hosted runner processing a PR event is dangerous enough that a
+ *     fork guard is MANDATORY and must be the job's literal first step —
+ *     never installed as an afterthought after a checkout has already run;
+ *   - the smoke step still classifies its own failure as engine-quota /
+ *     engine-auth / engine-unavailable, and the "Install"/"Authenticate"
+ *     steps that used to fetch and configure the opencode binary are GONE
+ *     (claude is pre-installed and pre-authenticated on the runner itself);
+ *   - `--dangerously-skip-permissions` is never passed to the reviewer.
  *
  * A grep over the workflow YAML's raw text, deliberately — like the
  * `--admin`/`--force` rail above, there is no runtime behaviour to invoke
  * here (this is CI-only shell, never imported by orchestrator code), so the
  * argv/config text IS the thing to assert.
  */
-describe('rail: the review engine provider is a repo variable, never a hardcoded literal', () => {
+describe('rail: fleet/review runs as a claude session on a self-hosted runner, with a mandatory fork guard', () => {
   const FLEET_REVIEW_YML_PATH = join(process.cwd(), '.github', 'workflows', 'fleet-review.yml')
 
+  function fleetReviewYamlText(): string {
+    return readFileSync(FLEET_REVIEW_YML_PATH, 'utf8')
+  }
+
   function fleetReviewJobText(): string {
-    const text = readFileSync(FLEET_REVIEW_YML_PATH, 'utf8')
+    const text = fleetReviewYamlText()
     // From the `fleet-review:` job key to the next top-level (2-space
     // indented) job key, if any (this file has exactly one job today, so
     // this normally runs to EOF) — scoped rather than trusting "whole file
@@ -363,48 +397,153 @@ describe('rail: the review engine provider is a repo variable, never a hardcoded
     expect(fleetReviewJobText().length).toBeGreaterThan(500)
   })
 
-  it('reads FLEET_REVIEW_PROVIDER from vars with the kimi-for-coding default', () => {
+  it('runs on the self-hosted fleet-review runner, never a GitHub-hosted one', () => {
+    const block = fleetReviewJobText()
+    expect(block).toMatch(/\n {4}runs-on:\s*\[\s*self-hosted\s*,\s*fleet-review\s*\]/)
+    expect(block).not.toMatch(/\n {4}runs-on:\s*ubuntu-latest/)
+  })
+
+  it('reads FLEET_REVIEW_MODEL from vars with a sonnet default', () => {
     expect(fleetReviewJobText()).toMatch(
-      /FLEET_REVIEW_PROVIDER:\s*\$\{\{\s*vars\.FLEET_REVIEW_PROVIDER\s*\|\|\s*'kimi-for-coding'\s*\}\}/,
+      /FLEET_REVIEW_MODEL:\s*\$\{\{\s*vars\.FLEET_REVIEW_MODEL\s*\|\|\s*'sonnet'\s*\}\}/,
     )
   })
 
-  it('reads FLEET_REVIEW_MODEL from vars with the kimi-for-coding/k3-256k default', () => {
-    expect(fleetReviewJobText()).toMatch(
-      /FLEET_REVIEW_MODEL:\s*\$\{\{\s*vars\.FLEET_REVIEW_MODEL\s*\|\|\s*'kimi-for-coding\/k3-256k'\s*\}\}/,
-    )
+  // Scoped to the actual YAML env-key DECLARATION, not the job's prose —
+  // the job's own comments legitimately still explain, in words, that
+  // `FLEET_REVIEW_PROVIDER` was removed (and why), which would otherwise
+  // trip a bare substring-absence check on its own explanation.
+  it('no longer declares a FLEET_REVIEW_PROVIDER env key — there is exactly one provider now', () => {
+    expect(fleetReviewJobText()).not.toMatch(/\n\s+FLEET_REVIEW_PROVIDER:\s*\$\{\{/)
   })
 
-  it('derives the auth.json key from the provider variable, not a literal', () => {
-    const text = fleetReviewJobText()
-    // The dynamic-key jq construction: `--arg p "$FLEET_REVIEW_PROVIDER"`
-    // feeding a `{($p): ...}` filter. Reverting to a hardcoded provider name
-    // here (`jq -n --arg k "$FLEET_REVIEW_API_KEY" '{"kimi-for-coding":...}'`)
-    // is exactly the regression this asserts against: the auth file would
-    // silently stop matching whatever `vars.FLEET_REVIEW_PROVIDER` was set to.
-    expect(text).toMatch(/--arg p "\$FLEET_REVIEW_PROVIDER"/)
-    expect(text).toMatch(/\{\(\$p\):\s*\{"type":"api","key":\$k\}\}/)
-    expect(text, 'auth.json is keyed by a hardcoded provider literal again')
-      .not.toMatch(/\{"kimi-for-coding":\s*\{"type":"api"/)
+  // #891's invariant, carried forward for the one variable left that could
+  // still go silently wrong: a bad `FLEET_REVIEW_MODEL` must fail LOUD
+  // (`engine-misconfigured`, asserted below and in
+  // fleet-review-smoke-step.test.ts), never a silent pass. There is
+  // deliberately no separate "Require review engine configuration" step any
+  // more — see the doc comment above this describe block for why an
+  // absent `FLEET_REVIEW_MODEL` is not the same failure shape #891 fixed.
+  it('has no separate "Require review engine configuration" step — an absent FLEET_REVIEW_MODEL is not a missing-provider incident any more', () => {
+    expect(fleetReviewJobText()).not.toMatch(/Require review engine configuration/)
   })
 
-  it('passes the model variable, not a literal, to the smoke-test --model flag', () => {
-    const text = fleetReviewJobText()
-    expect(text).toMatch(/opencode run --pure --model "\$FLEET_REVIEW_MODEL"/)
-    expect(text, 'smoke test pins a literal model again instead of the variable')
-      .not.toMatch(/opencode run --pure --model kimi-for-coding\/k3-256k/)
+  // Scoped to actual step headers / real paths, not prose — the job's own
+  // comments legitimately still name these steps and paths in the past
+  // tense, explaining that #812 removed them.
+  it('has no step that installs or downloads an opencode binary', () => {
+    const block = fleetReviewJobText()
+    expect(block).not.toContain('opencode-linux-x64.tar.gz')
+    expect(block).not.toMatch(/\n {6}- name: Install the non-author review engine\n/)
   })
 
-  it('classifies a smoke-test failure as engine-quota, engine-auth, or engine-unavailable', () => {
+  it('has no step that writes an opencode auth.json — claude authenticates via the runner\'s own login state', () => {
+    const block = fleetReviewJobText()
+    expect(block).not.toMatch(/\n {6}- name: Authenticate the review engine\n/)
+    expect(block).not.toContain('$HOME/.local/share/opencode')
+  })
+
+  // #866: the binary AND the model are both resolved dynamically, via
+  // `reviewerInvocationFor` (review.ts) — the SAME function
+  // `invokeVerifierEngine` (the real review) calls — never a literal typed
+  // into this workflow file. A literal here is exactly what let the smoke
+  // test "pass" while the real review, running the BASE checkout's own
+  // (possibly different) resolution, silently disagreed with it.
+  it('resolves the reviewer binary/model dynamically via reviewerInvocationFor, never a literal pinned in the invocation', () => {
     const text = fleetReviewJobText()
-    for (const cause of ['engine-quota', 'engine-auth', 'engine-unavailable']) {
+    expect(text).toMatch(/\| "\$rev_binary" --print --permission-mode plan --model "\$rev_model"/)
+    expect(text, 'smoke test does not import reviewerInvocationFor from review.ts')
+      .toMatch(/import \{ reviewerInvocationFor \} from "\.\/orchestrator\/src\/review\.ts"/)
+    expect(text, 'smoke test pins a literal model again instead of resolving one')
+      .not.toMatch(/--model "?sonnet"?\b/)
+    expect(text, 'smoke test pins a literal claude binary again instead of resolving one')
+      .not.toMatch(/\|\s*claude --print --permission-mode plan/)
+  })
+
+  // Scoped to the smoke-test step's own run: block — the job's surrounding
+  // comments legitimately still say "opencode" in past tense (explaining
+  // what #812 replaced), which a whole-job substring-absence check would
+  // wrongly trip on its own historical explanation.
+  it('smoke-tests claude, never opencode', () => {
+    const block = fleetReviewJobText()
+    const stepIdx = block.indexOf('\n      - name: Smoke-test the review engine\n')
+    expect(stepIdx, 'smoke-test step not found').toBeGreaterThan(-1)
+    const nextStepIdx = block.slice(stepIdx + 1).search(/\n {6}- name:/)
+    const stepBlock = nextStepIdx === -1 ? block.slice(stepIdx) : block.slice(stepIdx, stepIdx + 1 + nextStepIdx)
+    const runIdx = stepBlock.indexOf('\n        run: |\n')
+    expect(runIdx, 'smoke-test run: block not found').toBeGreaterThan(-1)
+    const runBlock = stepBlock.slice(runIdx)
+    expect(runBlock).toContain('claude')
+    expect(runBlock).not.toMatch(/\bopencode\b/)
+  })
+
+  it('classifies a smoke-test failure as engine-quota, engine-auth, engine-misconfigured, or engine-unavailable', () => {
+    const text = fleetReviewJobText()
+    for (const cause of ['engine-quota', 'engine-auth', 'engine-misconfigured', 'engine-unavailable']) {
       expect(text, `${cause} classification missing from the smoke-test step`).toContain(cause)
     }
   })
 
-  it('review.ts reads the opencode model from FLEET_REVIEW_MODEL, not a bare literal', () => {
+  it('never passes --dangerously-skip-permissions to the reviewer', () => {
+    expect(fleetReviewYamlText()).not.toContain('--dangerously-skip-permissions')
+  })
+
+  it('review.ts reads the reviewer model from FLEET_REVIEW_MODEL, defaulting to sonnet, not a bare literal', () => {
     const text = readFileSync(join(process.cwd(), 'orchestrator', 'src', 'review.ts'), 'utf8')
-    expect(text).toMatch(/opencode:\s*\{\s*binary:\s*'opencode',\s*model:\s*process\.env\['FLEET_REVIEW_MODEL'\]\s*\|\|\s*DEFAULT_OPENCODE_MODEL\s*\}/)
+    expect(text).toMatch(/const REVIEWER_MODEL = process\.env\['FLEET_REVIEW_MODEL'\] \|\| 'sonnet'/)
+  })
+
+  it('review.ts no longer references an opencode binary or an OPENCODE_* env var anywhere', () => {
+    const text = readFileSync(join(process.cwd(), 'orchestrator', 'src', 'review.ts'), 'utf8')
+    expect(text).not.toMatch(/binary:\s*'opencode'/)
+    expect(text).not.toContain('OPENCODE_CONFIG_DIR')
+    expect(text).not.toContain('OPENCODE_DISABLE_PROJECT_CONFIG')
+  })
+
+  // The mandatory fork guard: a self-hosted runner must never process a
+  // fork PR. Must be the job's literal FIRST step — before the checkout,
+  // before the head export, before anything that could execute or even
+  // just download something on the operator's own machine.
+  it('the job\'s first step refuses a fork PR (self-hosted runner guard)', () => {
+    const block = fleetReviewJobText()
+    const stepsIdx = block.indexOf('\n    steps:\n')
+    expect(stepsIdx, 'steps: key not found').toBeGreaterThan(-1)
+    const afterSteps = block.slice(stepsIdx)
+    const firstStepMatch = afterSteps.match(/\n {6}- name: (.+)\n/)
+    expect(firstStepMatch, 'no first step found').not.toBeNull()
+    expect(firstStepMatch?.[1]).toMatch(/fork/i)
+  })
+
+  it('the fork guard compares the PR head repo against this repo and fails closed on a mismatch', () => {
+    const block = fleetReviewJobText()
+    const guardIdx = block.search(/\n {6}- name: .*fork.*\n/i)
+    expect(guardIdx, 'fork guard step not found').toBeGreaterThan(-1)
+    const nextStepIdx = block.slice(guardIdx + 1).search(/\n {6}- name:/)
+    const guardBlock = nextStepIdx === -1 ? block.slice(guardIdx) : block.slice(guardIdx, guardIdx + 1 + nextStepIdx)
+    expect(guardBlock).toMatch(/head\.repo\.full_name/)
+    expect(guardBlock).toMatch(/github\.repository/)
+    expect(guardBlock).toContain('exit 1')
+  })
+
+  it('the fork guard is never itself gated by a step-level if: — it must always evaluate', () => {
+    const block = fleetReviewJobText()
+    const guardIdx = block.search(/\n {6}- name: .*fork.*\n/i)
+    expect(guardIdx).toBeGreaterThan(-1)
+    const nextStepIdx = block.slice(guardIdx + 1).search(/\n {6}- name:/)
+    const guardBlock = nextStepIdx === -1 ? block.slice(guardIdx) : block.slice(guardIdx, guardIdx + 1 + nextStepIdx)
+    expect(guardBlock).not.toMatch(/\n {8}if:/)
+  })
+
+  // The job-level timeout must always exceed the reviewer's own high-impact
+  // wall-clock budget (review.ts's HIGH_IMPACT_TIMEOUT_MS) — otherwise the
+  // JOB itself would kill an in-budget review before the engine's own
+  // timeout ever got a chance to.
+  it('the job timeout-minutes stays comfortably above the high-impact review budget (20 min)', () => {
+    const block = fleetReviewJobText()
+    const m = block.match(/\n {4}timeout-minutes:\s*(\d+)/)
+    expect(m, 'timeout-minutes not found').not.toBeNull()
+    const minutes = Number(m?.[1])
+    expect(minutes).toBeGreaterThan(20)
   })
 })
 
@@ -698,21 +837,45 @@ describe('rail: fleet/review runs once per review label, not on every push', () 
   })
 
   // The load-bearing assertion for the new design: EVERY step that can
-  // spend a model call — installing the engine, authenticating it, the
-  // smoke test (which itself makes a real provider call), and the real
-  // review — is gated on `steps.gate.outputs.outcome == 'run-engine'`.
-  // Dropping this `if:` from any one of them is branch (a)/(c) calling the
-  // engine anyway — exactly the "cheap and non-destructive" property the
-  // cache-hit/not-requested branches exist to guarantee.
+  // spend a model call — the smoke test (which itself makes a real claude
+  // call) and the real review — is gated on
+  // `steps.gate.outputs.outcome == 'run-engine'`. Dropping this `if:` from
+  // either is branch (a)/(c) calling the engine anyway — exactly the "cheap
+  // and non-destructive" property the cache-hit/not-requested branches
+  // exist to guarantee. #812 removed the separate "Install the non-author
+  // review engine" and "Authenticate the review engine" steps entirely —
+  // `claude` is pre-installed and pre-authenticated on the self-hosted
+  // runner, so there is nothing left to install or authenticate here.
   it.each([
-    'Install the non-author review engine',
-    'Authenticate the review engine',
     'Smoke-test the review engine',
+    'Check the base provides reviewerInvocationFor',
     'Check the base provides the gate',
     'Review',
   ])('the "%s" step only runs when the gate said run-engine', (stepName) => {
     const block = jobBlock(fleetReviewYaml(), 'fleet-review')
     expect(stepIf(block, stepName)).toBe("steps.gate.outputs.outcome == 'run-engine'")
+  })
+
+  // #866's own bootstrap: `reviewerInvocationFor` (review.ts) is this PR's
+  // own new export, and the smoke test two steps down imports it from the
+  // BASE checkout (the gate always judges from base — see the file header).
+  // Without this check, a base that predates the export crashes the smoke
+  // step with bun's own uncaught `SyntaxError: Export named
+  // 'reviewerInvocationFor' not found` — exactly the opaque-crash shape
+  // "Check the base provides the gate" already exists to replace with a
+  // named, actionable failure for `review-ci` itself. This asserts the same
+  // treatment exists for the narrower, PR-introduced symbol.
+  it('the base-provides-reviewerInvocationFor guard runs before the smoke test and names the exact bootstrap condition', () => {
+    const block = jobBlock(fleetReviewYaml(), 'fleet-review')
+    const guardIdx = block.indexOf('- name: Check the base provides reviewerInvocationFor')
+    const smokeIdx = block.indexOf('- name: Smoke-test the review engine')
+    expect(guardIdx, 'guard step not found').toBeGreaterThan(-1)
+    expect(smokeIdx, 'smoke step not found').toBeGreaterThan(-1)
+    expect(guardIdx).toBeLessThan(smokeIdx)
+    const guardBlock = block.slice(guardIdx, smokeIdx)
+    expect(guardBlock).toContain("grep -q '^export function reviewerInvocationFor' orchestrator/src/review.ts")
+    expect(guardBlock).toContain('base-missing-reviewer-invocation-for')
+    expect(guardBlock).toContain('merge')
   })
 
   // Branch (c)'s fail-closed message, verbatim — an operator or agent
@@ -1091,32 +1254,40 @@ describe('rail: every ruleset-15885614-required context reports on merge_group, 
 })
 
 /**
- * The review engine's own turn/timeout budget (review.ts) — cut from a
- * 20-turn/25-minute high-impact allowance to a single pass, because that
- * allowance was enough for one review to explore the export at length
- * rather than read the diff and file list it was already handed (both are
- * now in the prompt — see `buildReviewPrompt`), which burned the same
- * provider quota per call that moving off `pull_request` (the rail above)
- * fixed per PR. Pinned to the actual exported numbers, not a description of
- * them: a PR that quietly raises `HIGH_IMPACT_MAX_TURNS` back toward its old
- * value must fail THIS test, not just read wrong in a comment.
+ * The review engine's own turn/timeout budget (review.ts). #812's original
+ * `DEFAULT_MAX_TURNS = 2` / `HIGH_IMPACT_MAX_TURNS = 3` (5-minute /
+ * 8-minute wall clock) was sized for a THIN API CALL against a metered,
+ * weekly-quota'd provider — a 20-turn/25-minute allowance was enough for one
+ * review to explore the export at length rather than read the diff and file
+ * list it was already handed, which burned quota faster per call than
+ * moving off every-push saved per PR.
+ *
+ * The reviewer is now a full `claude` SESSION on a dedicated self-hosted
+ * runner, on the operator's own Max subscription — the provider-quota
+ * pressure that justified a 2-3-turn budget is gone, and a session that can
+ * actually use its tools reviews better than one starved for turns. The
+ * budget widened accordingly: 10 turns / 10-minute wall clock by default,
+ * 20 turns / 20-minute wall clock for a high-impact diff. Pinned to the
+ * actual exported numbers, not a description of them: a PR that quietly
+ * raises or lowers these must fail THIS test, not just read wrong in a
+ * comment. `fleet-review.yml`'s own `timeout-minutes` must stay above
+ * `HIGH_IMPACT_TIMEOUT_MS`'s 20 minutes — asserted in the self-hosted-runner
+ * rail above.
  */
-describe('rail: the reviewer gets a single pass, not an investigation', () => {
-  it('caps turns at a small, single-pass budget', () => {
-    expect(DEFAULT_MAX_TURNS).toBe(2)
-    expect(HIGH_IMPACT_MAX_TURNS).toBe(3)
-    // High impact may get a LITTLE more room, never a return to "explore the
-    // export" scale — this is the inequality a mutation raising the cap back
-    // toward 20 would still violate even if it forgot to update the exact
-    // values above.
+describe('rail: the reviewer gets a full session\'s budget, not a thin API call\'s', () => {
+  it('caps turns at the full-session budget (10 default / 20 high-impact)', () => {
+    expect(DEFAULT_MAX_TURNS).toBe(10)
+    expect(HIGH_IMPACT_MAX_TURNS).toBe(20)
+    // High impact always gets AT LEAST as much room as the default —
+    // pinned as an inequality too, so a mutation that flips the two values
+    // relative to each other still fails even if it kept both numbers
+    // individually "reasonable".
     expect(HIGH_IMPACT_MAX_TURNS).toBeGreaterThanOrEqual(DEFAULT_MAX_TURNS)
-    expect(HIGH_IMPACT_MAX_TURNS).toBeLessThanOrEqual(3)
   })
 
-  it('drops the high-impact timeout from 25 minutes to about 8', () => {
-    expect(DEFAULT_TIMEOUT_MS).toBe(5 * 60_000)
-    expect(HIGH_IMPACT_TIMEOUT_MS).toBe(8 * 60_000)
-    expect(HIGH_IMPACT_TIMEOUT_MS).toBeLessThanOrEqual(10 * 60_000)
+  it('sets the wall-clock budget to 10 minutes default / 20 minutes high-impact', () => {
+    expect(DEFAULT_TIMEOUT_MS).toBe(10 * 60_000)
+    expect(HIGH_IMPACT_TIMEOUT_MS).toBe(20 * 60_000)
     expect(HIGH_IMPACT_TIMEOUT_MS).toBeGreaterThanOrEqual(DEFAULT_TIMEOUT_MS)
   })
 })

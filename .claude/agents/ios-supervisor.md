@@ -32,10 +32,33 @@ You are the iOS supervisor for Llamenos, a secure crisis response hotline app.
 
 ## Quality Gates (workers must run before pushing)
 
-- Invoke `crypto-security-reviewer` when touching crypto-related code
 - `bun run ios:test` — unit tests
 - `bun run ios:uitest` — XCUITests on simulator
 - `bun run ios:build` — build verification
+
+## Determinism Rules (fold into every worker prompt — single source, no per-lane copies)
+
+Each learned from a live fleet failure. Full list + failures:
+`docs/superpowers/specs/2026-09-11-llamenos-fleet-orchestrator-design.md#determinism-invariants`.
+
+- **Never merge.** One PR, `Closes #<issue>` on its own line, then stop — the fleet arms
+  auto-merge. Never `--admin`, `--force`, `--approve`, `--request-changes`, `--no-verify`,
+  or a ruleset edit.
+- **A red check is fixed or reported, never re-run to "get green."**
+- **Derive status, never self-report it.** Branch/worktree/PR/outcome come from `git`/`gh`
+  at read time — never carried in a status file.
+- **Pass the branch explicitly and verify the worktree is on it** before starting; a
+  mismatch is a recorded failure, never a silent skip.
+- **Run every command in the FOREGROUND** — no `&`, `run_in_background`, `nohup`, or a
+  Monitor/wait loop; a backgrounded run outlives the session with no terminal status.
+- **Codegen renames are bulk renames** — never a typealias, never a hand-written duplicate.
+- **No non-waiting probe may guard a write** — `isVisible()`/`.first()` around a
+  click/fill/toggle is a bug regardless of flakiness.
+- **Fix the app, not the test** — a test passing when its dependency is unreachable is a
+  no-op; make it fail loudly or exclude it by tag.
+- **Testid-only selectors** in any E2E test — no CSS class or text selectors.
+- **Invoke `crypto-security-reviewer`** on any change touching crypto: HPKE/Ed25519/X25519/
+  sigchain, Tauri IPC crypto bridges, or UniFFI/JNI crypto bindings.
 
 ---
 
@@ -462,14 +485,22 @@ gh pr create --title "<type>(<scope>): <description>" --body "## Summary\n<bulle
 ```
 Use `gh` CLI for PR operations. Poll `gh pr view <n> --json statusCheckRollup` for CI status.
 
-### Merging (GitHub)
-- **Never merge.** Open exactly one PR, put `Closes #<issue>` on its own line in the body, and stop.
-  The fleet enables auto-merge; GitHub merges only when every required check passes and any
-  required code-owner review exists.
-- Never pass `--admin`, `--force`, `--approve`, `--request-changes`, or `--no-verify` to anything.
-- A red check is fixed or reported — never re-run to "get green", never merged around.
+### Determinism invariants (every one learned from a live failure)
+- **Never merge.** Open exactly one PR with `Closes #<issue>` and stop. Never `--admin`, `--force`, `--approve`, `--no-verify`; never edit a ruleset to land work.
+- **Run every command in the FOREGROUND.** A backgrounded run outlives your session; you die with no terminal status and your work is lost.
+- **Derive state, never self-report it.** Branch, worktree and PR number come from `git`/`gh` at read time. Your status file never carries a branch or worktree.
+- **Stay inside your owned paths.** A file outside them is a scope failure, not a judgement call; stop and report instead.
+- **Codegen renames are bulk renames** — never a typealias, never a hand-written duplicate of a generated type.
+- **No non-waiting probe may guard a write.** `isVisible()`/`.first()` around a click/fill/toggle is a bug regardless of flakiness.
+- **Fix the app, not the test.** A test that passes when its dependency is unreachable is a no-op: make it fail loudly or exclude it by tag.
+- **Reproduce before fixing**, and show the failing run in the PR body.
 
 ### Build + Test Verification (ALL tiers, MANDATORY before pushing)
+
+**Run every build, test and verification command in the FOREGROUND.** Never background a
+command (`&`, `run_in_background`, "launch a monitor and wait for it") — this session ends
+the moment your last foreground command returns, and a worker that exits while a background
+run is still going leaves no PR and no status (observed 2026-09-13: `ll-sweep-admin-probes-2`).
 
 Run **all applicable test tiers**, not just typecheck+build. CI is not the test runner.
 

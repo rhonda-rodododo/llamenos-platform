@@ -1,7 +1,7 @@
 import { execFile, spawn } from 'node:child_process'
 import { promisify } from 'node:util'
-import { mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises'
-import { homedir, tmpdir } from 'node:os'
+import { mkdtemp, readdir, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { EngineId, Lane } from './config.js'
 import type { VerifyInput, VerifyReport } from './verify.js'
@@ -131,18 +131,41 @@ blocks the merge exactly as a FAIL would. A confused non-answer must never be \
 mistaken for an approval.`
 
 /**
- * `EngineId` has exactly two values, so "a different engine" and "the other
- * one" are the same statement — but written as a lookup rather than a
- * negation so a third engine, if one is ever added, fails to compile here
- * instead of silently reviewing itself.
+ * The engine every `fleet/review` verdict now comes from — always `claude`,
+ * regardless of `authorEngine`. This is an operator decision (#812), not an
+ * oversight: `fleet/review` moved off a thin per-call API hit to a full
+ * Claude Code SESSION running on a dedicated self-hosted runner
+ * (`llamenos-review-box`) with the operator's own Max subscription and real
+ * tools (read, grep, the whole export), because a session that can actually
+ * explore the diff reviews better than a 2-3-turn API call ever could — see
+ * `fleet-review.yml`'s header for the evidence (most of the old opencode
+ * engine's failures were infrastructure: turn-budget exhaustion, quota,
+ * UNREADABLE verdicts, not genuine misses).
+ *
+ * THE HONEST COST: when `authorEngine` is `claude` (every configured lane's
+ * default — see `LANES` in config.ts), the reviewer is now the SAME MODEL
+ * FAMILY as the worker that wrote the diff. It is still a genuinely
+ * different process — a separate session with no shared context, on a
+ * separate machine, that never sees the author's reasoning or scratch
+ * state — but it is no longer an independent VENDOR the way `opencode`
+ * (Kimi) was. A model does not review its own blind spots as well as a
+ * different model would. The mitigation is operational, not code: run the
+ * reviewer on a different MODEL TIER than the lanes use (e.g. `opus` here
+ * while lanes stay on `sonnet`) once budget allows — `FLEET_REVIEW_MODEL`
+ * (below) is exactly the dial for that, so raising the tier later is a repo
+ * variable, not a code change. For a lane whose `authorEngine` is
+ * `opencode` (a Kimi-for-Coding lane, per `LaneOverride`), `claude` remains
+ * genuinely non-author on every axis.
+ *
+ * `EngineId` keeps its `opencode` value for AUTHOR engines (a lane may still
+ * dispatch its WORKER through opencode/Kimi — see `engines.ts`/`config.ts`);
+ * only the REVIEWER side retired it. `authorEngine` stays a parameter,
+ * rather than this function losing it entirely, so a future third reviewer
+ * engine is one line here, not a signature change at every call site.
  */
-const OTHER_ENGINE: Record<EngineId, EngineId> = {
-  claude: 'opencode',
-  opencode: 'claude',
-}
-
 export function verifierFor(authorEngine: EngineId): EngineId {
-  return OTHER_ENGINE[authorEngine]
+  void authorEngine
+  return 'claude'
 }
 
 /**
@@ -163,8 +186,10 @@ const VERDICT_LINE_RE = /^VERDICT: (?:(PASS)$|(FAIL)\b)/
 /**
  * Enforces VERIFIER_BRIEF's contract — "end your response with exactly one
  * line, and nothing after it" — by judging ONLY the final non-empty line of
- * the reviewer's ASSISTANT TEXT (see `opencodeAssistantText` for how that is
- * separated from tool and plugin output).
+ * the reviewer's ASSISTANT TEXT (see `decodeEngineOutput`: `claude --print`
+ * prints only the final assistant message, so `stdout` already IS that text,
+ * with nothing to separate it from — unlike the retired `opencode` reviewer,
+ * whose `--format json` event stream needed its own tool-output filter).
  *
  * A verdict found anywhere else is not a verdict. A reviewer that walks
  * through the diff before deciding quotes it, and this repository's own
@@ -188,210 +213,189 @@ export function parseVerdict(output: string): 'PASS' | 'FAIL' | 'UNREADABLE' {
 }
 
 /**
- * Which binary and model each engine resolves to for a one-shot, read-only
- * review invocation — independent of `dispatch-one.sh`'s own model aliasing
- * (engines.ts's `dispatch()` is for a long-running worker session with a
- * worktree, a tmux session, and a status file; a reviewer is none of those,
- * it is a single read and a single verdict).
+ * The binary and model the (now sole) reviewer engine resolves to for a
+ * one-shot, read-only review invocation — independent of `dispatch-one.sh`'s
+ * own model aliasing (engines.ts's `dispatch()` is for a long-running worker
+ * session with a worktree, a tmux session, and a status file; a reviewer is
+ * none of those — see `invokeVerifierEngine`).
  *
- * This id has now gone stale TWICE, and the second time is the reason this
- * comment no longer just names a known-good id and trusts it. First,
- * `kimi-for-coding/k2p6` (and separately `kimi-for-coding/kimi-k2-thinking`)
- * disappeared from opencode's model registry on 2026-09-12 — asked for it
- * directly and the provider returned an opaque `Unexpected server error`.
- * That, plus the invalid `--format text` below, meant the non-author review
- * had never once returned a verdict: every call failed and was recorded
- * UNREADABLE, which correctly blocked but looked exactly like "the engine
- * was unreachable". `kimi-for-coding/k3-256k` replaced it and was verified
- * against the registry at the time.
- *
- * Second, on 2026-09-19, the whole `kimi-for-coding` PROVIDER id was
- * retired in favor of `kimi-code-plan-global` (same subscription, same key,
- * new id — `curl -sL https://models.dev/api.json | jq keys` stopped listing
- * it). `kimi-for-coding/k3-256k` failed with the IDENTICAL opaque
- * `UnknownError: "Unexpected server error"` as a real quota/outage failure —
- * there is no reliable way to tell the two apart from that error text alone,
- * which is why the previous fix (a string swap with a confident comment)
- * took a full cycle of log archaeology to even locate. `DEFAULT_OPENCODE_MODEL`
- * below is now `kimi-code-plan-global/k3-256k`, re-verified the same way:
- * a raw call against the pinned opencode binary with this id and the same
- * key succeeded where the old id failed 100% of the time.
- *
- * A hardcoded id will go stale a third time; trusting a comment's word for
- * "known-good" is exactly what let the second staleness hide inside an
- * opaque, generic error. `checkOpencodeModelKnown` (below) is the actual
- * fix: `invokeVerifierEngine` checks the configured id against opencode's
- * OWN local registry cache before ever spawning the engine, so an id that
- * has quietly stopped existing is reported as `engine-misconfigured` —
- * naming the bad id — instead of collapsing into the same UNREADABLE an
- * ordinary transient outage produces.
- *
- * The opencode model is read from `FLEET_REVIEW_MODEL` (env), falling back to
- * that default when unset (e.g. a local `bun orchestrator/src/cli.ts` run
- * outside CI). `.github/workflows/ci.yml`'s `fleet-review` job sets this from
- * `vars.FLEET_REVIEW_MODEL` with the same default, and its own
- * "Authenticate the review engine" step keys `~/.local/share/opencode/
- * auth.json` off the matching `vars.FLEET_REVIEW_PROVIDER` — so switching the
- * whole non-author reviewer to a different provider (a different quota, a
- * different vendor) is two repo variables and one secret rotation, never a
- * code change here. See "Switching the review engine provider" in
- * docs/superpowers/specs/2026-09-11-llamenos-fleet-orchestrator-design.md.
+ * `sonnet` is the default — matching the lanes' own default author model, an
+ * intentional starting point rather than a coincidence: it keeps the switch
+ * to a self-hosted Claude Code session cost-neutral on day one, with the
+ * model-TIER mitigation for reviewing-your-own-vendor (see `verifierFor`'s
+ * doc comment) left as an operator dial, not baked in here. The model is
+ * read from `FLEET_REVIEW_MODEL` (env), falling back to `sonnet` when unset
+ * (e.g. a local `bun orchestrator/src/cli.ts` run outside CI).
+ * `.github/workflows/fleet-review.yml`'s `fleet-review` job sets this from
+ * `vars.FLEET_REVIEW_MODEL` with the same default — so raising the
+ * reviewer's tier (e.g. to `opus`) is one repo variable, never a code
+ * change here.
  */
-export const DEFAULT_OPENCODE_MODEL = 'kimi-code-plan-global/k3-256k'
-
-const VERIFIER_ENGINE: Record<EngineId, { binary: string; model: string }> = {
-  claude: { binary: 'claude', model: 'sonnet' },
-  opencode: { binary: 'opencode', model: process.env['FLEET_REVIEW_MODEL'] || DEFAULT_OPENCODE_MODEL },
-}
+const REVIEWER_MODEL = process.env['FLEET_REVIEW_MODEL'] || 'sonnet'
 
 /**
- * Distinguishes WHY an engine run did not `reach` a verdict — the rail this
- * whole fix exists to add. Before this, `EngineRun.reached === false` meant
- * one opaque thing no matter the cause, so a bad `provider/model` id and a
- * genuine outage/quota exhaustion produced the identical UNREADABLE, and
- * telling them apart took reading logs by hand (see the comment above
- * `DEFAULT_OPENCODE_MODEL`).
+ * Distinguishes WHY an engine run did not `reach` a verdict. Before this
+ * type existed, `EngineRun.reached === false` meant one opaque thing no
+ * matter the cause — a bad engine configuration and a genuine
+ * outage/timeout produced the identical UNREADABLE, and telling them apart
+ * took reading logs by hand.
  *
- *   - `'engine-misconfigured'`: the configured id is not one opencode's own
- *     registry resolves to ANYTHING — this is a defect in configuration
- *     (this file's default, or the `FLEET_REVIEW_MODEL` repo variable) that
- *     retrying will never fix on its own.
- *   - `'engine-unavailable'`: the id resolves, but the call still failed —
- *     a crash, a timeout, a missing binary, or a real provider-side error.
- *     This is the transient case retrying (or waiting out a quota window)
- *     can plausibly fix.
+ *   - `'engine-misconfigured'`: the reviewer's own configuration is invalid
+ *     in a way retrying will never fix on its own. Originally added for the
+ *     retired `opencode` reviewer, whose `provider/model` id went stale
+ *     twice in one week (see this file's git history, and #876) and needed
+ *     a pre-flight registry check to name the bad id instead of collapsing
+ *     into the same opaque UNREADABLE a real outage produces. #876's own
+ *     check only ever matched a well-formed `provider/model` id that
+ *     opencode's registry didn't recognise — a bare model name with no
+ *     slash at all (exactly what `FLEET_REVIEW_MODEL` held during #866's own
+ *     bootstrap window: `sonnet`, a `claude` model shorthand, handed to the
+ *     BASE's then-still-`opencode` reviewer) came back `'indeterminate'` and
+ *     was silently invoked anyway, producing the exact opaque
+ *     `review unavailable: {"name":"UnknownError",...}` this kind exists to
+ *     prevent. `classifyEngineFailure` (below) is the general form of that
+ *     fix: it reads `claude`'s OWN "unrecognized model" error text — stable
+ *     across releases, verified against the installed binary — and reaches
+ *     this branch whenever `claude --model <bad-id>` itself refuses to run,
+ *     REGARDLESS of what shape the bad id has. No longer unreachable.
+ *   - `'engine-unavailable'`: the reviewer was reachable in principle, but
+ *     the call still failed — a crash, a timeout, a missing binary, or a
+ *     real error from `claude` itself that is not a model-id complaint.
+ *     This is the transient case retrying can plausibly fix.
  */
 export type EngineFailureKind = 'engine-misconfigured' | 'engine-unavailable'
 
 /**
- * Where opencode itself caches the models.dev registry it already fetches —
- * `$XDG_CACHE_HOME/opencode/models.json`, or `~/.cache/opencode/models.json`
- * when that's unset (confirmed against the installed 1.18.31 binary: `opencode
- * models` and `opencode run`'s own model resolution both read this file).
- * Reading it is a single local file read of a cache opencode maintains for
- * its own purposes — never a second client for models.dev, and never an
- * extra network call on the hot path of a review (the thing the fix for
- * this bug is explicitly told not to add).
+ * `claude`'s own, stable error text for a `--model` id its build does not
+ * recognise (verified against the installed binary: `claude --model
+ * <bogus>` exits 1, printing "There's an issue with the selected model…" to
+ * stdout and "…isn't described by this version's model catalog… [claude-
+ * code:unrecognized_model]" to stderr, before any assistant text). This is a
+ * configuration defect — the id is wrong, not the network or the account —
+ * so it is `engine-misconfigured`, never `engine-unavailable`, regardless of
+ * what the bad id looks like (unlike #876's opencode-only, provider/model-
+ * shaped check, this has no "well-formed but unknown" precondition to miss).
+ * Heuristic, not authoritative: `claude` does not expose a structured error
+ * code here, the same caveat the workflow's own smoke-test `classify()`
+ * (fleet-review.yml) already carries for quota/auth text.
  */
-export function opencodeModelsCachePath(): string {
-  const base = process.env['XDG_CACHE_HOME'] || join(homedir(), '.cache')
-  return join(base, 'opencode', 'models.json')
-}
-
-/**
- * Splits `provider/model` on the FIRST slash only. Several providers nest a
- * slash inside the model id itself — e.g. `cloudflare-ai-gateway/anthropic/
- * claude-opus-5` is provider `cloudflare-ai-gateway`, model `anthropic/
- * claude-opus-5` — so a plain `split('/')` would cut a valid id in the
- * wrong place and misreport it as unknown.
- */
-function splitProviderModel(id: string): { provider: string; model: string } | undefined {
-  const idx = id.indexOf('/')
-  if (idx <= 0 || idx === id.length - 1) return undefined
-  return { provider: id.slice(0, idx), model: id.slice(idx + 1) }
-}
-
-/**
- * Checks a configured `provider/model` id against opencode's own local
- * registry cache (`opencodeModelsCachePath`) — three-way, not boolean,
- * because the absence of a verdict matters as much as the verdict itself:
- *
- *   - `'known'`: the id resolves. Proceed normally.
- *   - `'unknown'`: the cache loaded and parsed fine, and the id is
- *     definitively NOT in it — either the provider itself is gone (this
- *     bug: `kimi-for-coding` no longer exists at all) or the provider
- *     exists but that model id doesn't. This is what `invokeVerifierEngine`
- *     turns into `engine-misconfigured`, having actually NAMED the bad id
- *     rather than guessed at one.
- *   - `'indeterminate'`: the cache file is missing, unreadable, or not the
- *     shape this function expects — e.g. a box that has never run opencode
- *     before. Silence here is deliberate: a cold cache would otherwise
- *     produce a confident, FALSE `engine-misconfigured` for a perfectly
- *     valid id, which is worse than the ambiguity this whole change exists
- *     to remove. Callers treat `'indeterminate'` exactly like `'known'` —
- *     fall through to actually invoking the engine, and let a real failure,
- *     if any, be classified as the ordinary `engine-unavailable`.
- */
-export async function checkOpencodeModelKnown(modelId: string): Promise<'known' | 'unknown' | 'indeterminate'> {
-  const parts = splitProviderModel(modelId)
-  if (parts === undefined) return 'indeterminate'
-
-  let raw: string
-  try {
-    raw = await readFile(opencodeModelsCachePath(), 'utf8')
-  } catch {
-    return 'indeterminate'
+export function classifyEngineFailure(text: string): EngineFailureKind {
+  if (/unrecognized_model|isn'?t described by this version'?s model catalog|issue with the selected model/i.test(text)) {
+    return 'engine-misconfigured'
   }
+  return 'engine-unavailable'
+}
 
-  let registry: unknown
-  try {
-    registry = JSON.parse(raw)
-  } catch {
-    return 'indeterminate'
+/** The binary and model a `ReviewerCommand` invocation actually runs — see
+ *  `reviewerInvocationFor`, the one function both the smoke test and the
+ *  real review call to get this. */
+export interface ReviewerInvocation { readonly engine: EngineId; readonly binary: string; readonly model: string }
+
+/**
+ * The ONE place that maps a resolved reviewer `EngineId` to a runnable
+ * binary. Throws for anything it does not know how to invoke — a resolved
+ * engine with no wired invocation must be a loud, immediate failure here,
+ * never a silent fallback to whatever the caller assumed the binary was.
+ * This is what makes "the smoke test and the real review agree on the
+ * engine" a property of the CODE rather than a coincidence of two
+ * hand-kept literals: there is exactly one function that can name a binary
+ * at all, and it refuses outright for anything besides `claude`.
+ *
+ * Exported (rather than kept file-private, like the rest of
+ * `reviewerInvocationFor`'s helpers) specifically so the hard-fail contract
+ * is directly testable: `verifierFor` cannot itself be driven to return
+ * anything but `'claude'` today, so a test exercising `reviewerInvocationFor`
+ * alone could never observe this function refusing a second engine. See the
+ * "MUTATION" test in review.test.ts, which calls this directly with
+ * `'opencode'` and asserts the throw — proving a resolved engine can never
+ * silently acquire an invocation nobody wired for it.
+ */
+export function reviewerBinaryFor(engine: EngineId): string {
+  if (engine !== 'claude') {
+    throw new Error(
+      `reviewerInvocationFor: engine "${engine}" has no wired reviewer invocation — only "claude" is ` +
+      'supported since #812 retired the opencode reviewer; this is a hard failure, never a silent fallback',
+    )
   }
-  if (typeof registry !== 'object' || registry === null) return 'indeterminate'
-
-  const providerEntry = (registry as Record<string, unknown>)[parts.provider]
-  // The provider key itself is simply absent — a definitive, registry-level
-  // "no such provider", which is exactly this bug (`kimi-for-coding` was
-  // retired outright). Not indeterminate: the registry answered.
-  if (providerEntry === undefined) return 'unknown'
-  if (typeof providerEntry !== 'object' || providerEntry === null) return 'indeterminate'
-
-  const models = (providerEntry as Record<string, unknown>)['models']
-  if (typeof models !== 'object' || models === null) return 'indeterminate'
-
-  return parts.model in (models as Record<string, unknown>) ? 'known' : 'unknown'
+  return 'claude'
 }
 
 /**
- * A single pass, not an investigation. `fleet/review` moved to running once
- * per PR (on `merge_group`, at #812) instead of on every push, which fixed
- * the call-volume side of the provider's weekly quota — but a 20-turn /
- * 25-minute allowance per call was still enough for one review to explore
- * the export at length rather than read the diff it was already handed, and
- * that burned the same quota faster per call than the old per-push trigger
- * burned it per PR. `buildReviewPrompt` now lists every changed file
- * directly in the prompt (previously it only pointed at the export
- * directory and left the model to enumerate it), which is what makes a
- * 2–3-turn budget survivable: there is nothing left to discover that isn't
- * already in the prompt, only individual files worth opening for context.
+ * THE single source for what the reviewer actually runs — binary AND model
+ * together, so nothing downstream can mix a binary resolved one way with a
+ * model resolved another. `invokeVerifierEngine` (the real review) calls
+ * this directly, and so does `fleet-review.yml`'s "Smoke-test the review
+ * engine" step — via a `bun -e` import of this exact function, the same
+ * mechanism that step already used for `parseVerdict`, run from the trusted
+ * BASE checkout the real review also runs from (see the file header of
+ * fleet-review.yml on why that checkout is the one that matters). One
+ * function, imported twice from the same file, cannot resolve two different
+ * answers to "what does the reviewer run" the way two independently
+ * hardcoded literals could.
  *
- * A high-impact diff still gets one more turn and a longer clock than a
- * routine one — not room to explore, just room to open the specific files
- * `report.impactReasons` already named. A reviewer that cannot reach a
- * verdict in this budget returns UNREADABLE (`toSecondOpinion`), which fails
- * the check. That is not a bug to raise the budget away: an "I couldn't tell
- * you in the time allowed" is itself the correct, fail-closed answer, and
- * raising the cap back up is how the quota problem this exists to fix comes
- * back.
+ * This is the direct structural fix for #866's own failure mode: before it,
+ * the smoke step's shell script hardcoded `claude` directly in the workflow
+ * YAML, while the real review resolved its engine from `verifierFor` /
+ * `VERIFIER_ENGINE` — two independent decisions that happened to agree only
+ * because nobody had changed one without the other YET. They diverged the
+ * instant one of them changed (this PR's own fix to `verifierFor`) without
+ * the other picking it up (the trusted BASE the review job actually runs
+ * from, which only sees this PR's fix once it MERGES — see the file header
+ * of fleet-review.yml on why the gate always judges from base, never from
+ * the commit it judges). "Hardcode the same value in two places" was never
+ * a fix, only a coincidence with an expiry date; calling this one function
+ * from both places is what removes the expiry date.
+ */
+export function reviewerInvocationFor(authorEngine: EngineId): ReviewerInvocation {
+  const engine = verifierFor(authorEngine)
+  return { engine, binary: reviewerBinaryFor(engine), model: REVIEWER_MODEL }
+}
+
+/**
+ * A full session's budget, not a thin API call's. Originally cut to
+ * `DEFAULT_MAX_TURNS = 2` / `HIGH_IMPACT_MAX_TURNS = 3` (5-minute /
+ * 8-minute wall clock) at #812, when the reviewer was `opencode` calling a
+ * metered, weekly-quota'd provider on every push — a 20-turn / 25-minute
+ * allowance was enough for one review to explore the export at length
+ * rather than read the diff it was already handed, and that burned quota
+ * faster per call than the trigger fix (moving off every-push) saved per PR.
+ *
+ * The reviewer is now a `claude` session on a dedicated self-hosted runner,
+ * on the operator's own Max subscription rather than a metered/quota'd key
+ * — the provider-quota pressure that justified a 2-3-turn budget is gone.
+ * What is NOT gone is the reason `buildReviewPrompt` lists every changed
+ * file directly in the prompt: a reviewer should still spend its turns
+ * READING what it was already handed, not rediscovering the export from
+ * scratch. The budget below is therefore "room for a real pass" — opening
+ * every file `report.impactReasons` names, tracing a call site, re-reading
+ * a diff hunk twice — not "room to explore the whole tree".
+ *
+ * A reviewer that cannot reach a verdict in this budget still returns
+ * UNREADABLE (`toSecondOpinion`), which fails the check exactly as before:
+ * a wider budget changes how much room the reviewer gets, never what an
+ * exhausted budget means.
  *
  * Exported so `tests/orchestrator/guards.test.ts` pins the actual numbers,
  * not a description of them — a rail that reads prose can't catch a PR that
- * quietly raises `HIGH_IMPACT_MAX_TURNS` back toward its old value.
+ * quietly raises these back toward "explore the export" scale.
  *
- * Only `claude`'s branch of `invokeVerifierEngine` can actually enforce a
- * turn count (`--max-turns`) — verified against `opencode run --help` on the
- * pinned engine version, which has no equivalent flag at all. Today's
- * reviewer is always `opencode` (VERIFIER_FOR maps every configured lane's
- * `claude` author to it), so `HIGH_IMPACT_MAX_TURNS`/`DEFAULT_MAX_TURNS`
- * currently bind only the dormant `claude`-as-reviewer path (used if a lane
- * ever authors with `opencode` instead). For the live path, the real lever
- * is `HIGH_IMPACT_TIMEOUT_MS`/`DEFAULT_TIMEOUT_MS` — a hard wall-clock kill
- * enforced by `execFileAsync`'s `timeout` regardless of engine — plus the
- * file list now in the prompt removing the REASON to take many turns in the
- * first place. A live-event-stream turn cap for `opencode` (counting and
- * killing on tool-call events) is a real follow-up, deliberately not done
- * here: this file's own history is to verify an engine's actual behavior
- * empirically before relying on it (see the `k2p6` / provider-rename /
- * `--format text` comments above), and the Kimi-for-Coding quota this whole
- * change exists to fix was exhausted while writing it, which is exactly the
- * state that makes guessing at an unverified event schema the wrong trade.
+ * `claude`'s `--max-turns` flag is what actually enforces
+ * `DEFAULT_MAX_TURNS`/`HIGH_IMPACT_MAX_TURNS` (verified when this path was
+ * first built at #812 — `opencode run --help` on the pinned 1.18.30 binary
+ * had no equivalent flag at all, which is part of why that engine's own
+ * budget only ever bound wall-clock, never turns). `DEFAULT_TIMEOUT_MS` /
+ * `HIGH_IMPACT_TIMEOUT_MS` remain the hard backstop regardless — enforced by
+ * `execFileAsync`'s `timeout` option, independent of whatever the turn count
+ * does — because a session can still spend a long time on a FEW turns (one
+ * slow tool call, one large file) even inside a small turn budget.
+ * `fleet-review.yml`'s job-level `timeout-minutes` must stay comfortably
+ * above `HIGH_IMPACT_TIMEOUT_MS` so the job itself is never what kills a
+ * review that was still within its own budget.
  */
-export const DEFAULT_MAX_TURNS = 2
-export const HIGH_IMPACT_MAX_TURNS = 3
-export const DEFAULT_TIMEOUT_MS = 5 * 60_000
-export const HIGH_IMPACT_TIMEOUT_MS = 8 * 60_000
+export const DEFAULT_MAX_TURNS = 10
+export const HIGH_IMPACT_MAX_TURNS = 20
+export const DEFAULT_TIMEOUT_MS = 10 * 60_000
+export const HIGH_IMPACT_TIMEOUT_MS = 20 * 60_000
 
 /**
  * The export's path is handed to the reviewer HERE, as data inside the
@@ -434,9 +438,12 @@ function buildReviewPrompt(pr: string, diff: string, report: VerifyReport, expor
  * state.
  *
  * Fix-round finding "W1" narrowed what that first fix actually buys. Once
- * `opencode` was confirmed to authenticate via `~/.local/share/opencode/
- * auth.json` rather than an env var, it became clear that `HOME` has to be
- * in the verifier's environment for it to authenticate at all (see
+ * it was confirmed that the reviewer authenticates from state under `HOME`
+ * (originally `opencode`'s `~/.local/share/opencode/auth.json`; today
+ * `claude`'s own login state on the self-hosted runner — see
+ * `VERIFIER_ENV_ALLOWLIST`'s doc comment — the mechanism differs but the
+ * conclusion does not) rather than an env var, it became clear that `HOME`
+ * has to be in the verifier's environment for it to authenticate at all (see
  * `VERIFIER_ENV_ALLOWLIST` below) — and a process with `HOME` can read
  * `~/.config/gh/hosts.yml` and `~/.ssh` directly as FILES, with no
  * dependency on `GH_TOKEN` or `SSH_AUTH_SOCK` being set. A model with shell
@@ -601,14 +608,22 @@ async function exportReviewSnapshot(worktree: string, headSha: string): Promise<
  * through silently.
  *
  * Read this list for what it honestly is, not more: `HOME` and `PATH` are
- * here because both engines NEED them to run at all — `claude` reads its
- * own login state from under `HOME`, and `opencode` reads
- * `~/.local/share/opencode/auth.json` (confirmed; there is no
- * `OPENCODE_API_KEY` env var — an earlier version of this list invented
- * one). `ZHIPU_API_KEY` is the provider key `dispatch-one.sh` actually uses
- * for the zai/GLM provider opencode calls into. `ANTHROPIC_API_KEY` is kept
- * for a claude verifier that authenticates that way instead of via its
- * `HOME` login state.
+ * here because the reviewer (always `claude` — see `verifierFor`) NEEDS them
+ * to run at all. `HOME` is load-bearing, not incidental: on
+ * `llamenos-review-box` (the self-hosted runner this job runs on — see
+ * `fleet-review.yml`), `claude` is already logged in under the operator's
+ * own account, and that login state is what `HOME` gives the reviewer
+ * access to — it is the ENTIRE authentication mechanism for this job. No
+ * `FLEET_REVIEW_API_KEY` or `ANTHROPIC_API_KEY` value is forwarded into this
+ * env on purpose: setting `ANTHROPIC_API_KEY` here would make `claude`
+ * prefer metered per-token billing over the already-authenticated
+ * subscription session, which is exactly the cost the self-hosted runner
+ * was stood up to avoid (see the "Operator decision" comment in
+ * `fleet-review.yml`'s header). `ANTHROPIC_API_KEY` stays in this allowlist
+ * only as an escape hatch for a future non-self-hosted reviewer that
+ * authenticates that way instead of via `HOME` login state — it is passed
+ * through IF the orchestrator process happens to have it set, never
+ * populated by this job today.
  *
  * This allowlist does NOT and CANNOT make the verifier's environment safe
  * on its own: `HOME` alone is enough for it to read `~/.config/gh/
@@ -622,7 +637,6 @@ async function exportReviewSnapshot(worktree: string, headSha: string): Promise<
 const VERIFIER_ENV_ALLOWLIST: readonly string[] = [
   'PATH', 'HOME', 'LANG', 'LC_ALL', 'TMPDIR', 'TMP', 'TEMP',
   'ANTHROPIC_API_KEY',
-  'ZHIPU_API_KEY',
 ]
 
 function verifierEnv(): NodeJS.ProcessEnv {
@@ -634,87 +648,10 @@ function verifierEnv(): NodeJS.ProcessEnv {
   return env
 }
 
-/**
- * The ONLY configuration the opencode reviewer loads, written by this
- * (base-controlled) code into a fresh directory handed over as
- * `OPENCODE_CONFIG_DIR`.
- *
- * `permission` MUST be the object form. The array form
- * (`[{ permission, action }]`) is rejected by opencode 1.18.30 with
- * `Configuration is invalid … Expected PermissionActionConfig | object |
- * undefined` and exit 1 — which would turn every review into UNREADABLE.
- * Both shapes were run through `opencode debug config` on the pinned binary.
- *
- * `external_directory` is what lets the reviewer read the export at all: its
- * project root is an empty directory, so the export is "outside the project"
- * to opencode. Everything outside is denied except the export itself — on the
- * pinned binary a read of `$HOME/.local/share/opencode/auth.json` (the review
- * key) under this config came back "The user has specified a rule which
- * prevents you from using this specific tool call".
- */
-export function reviewerOpencodeConfig(readableDir: string): {
-  $schema: string
-  permission: Record<string, string | Record<string, string>>
-} {
-  return {
-    $schema: 'https://opencode.ai/config.json',
-    permission: {
-      bash: 'deny',
-      edit: 'deny',
-      webfetch: 'deny',
-      websearch: 'deny',
-      external_directory: { '*': 'deny', [`${readableDir}/**`]: 'allow' },
-    },
-  }
-}
-
-interface OpencodeTextEvent { type: 'text'; part: { type: 'text'; text: string; synthetic?: boolean } }
-interface OpencodeErrorEvent { type: 'error'; error?: unknown }
-
-function isOpencodeTextEvent(e: unknown): e is OpencodeTextEvent {
-  if (typeof e !== 'object' || e === null) return false
-  const ev = e as { type?: unknown; part?: { type?: unknown; text?: unknown; synthetic?: unknown } }
-  return ev.type === 'text' && ev.part?.type === 'text' && typeof ev.part.text === 'string' && ev.part.synthetic !== true
-}
-
-function isOpencodeErrorEvent(e: unknown): e is OpencodeErrorEvent {
-  return typeof e === 'object' && e !== null && (e as { type?: unknown }).type === 'error'
-}
-
-/**
- * Reads `opencode run --format json` output and keeps ONLY the model's own
- * assistant text parts (`{"type":"text","part":{"type":"text","text":…}}`),
- * in order. Tool calls and their outputs (`tool_use` — which include the
- * contents of every file the reviewer read, so every `VERDICT: PASS` written
- * into a PR file), step markers, and any line that is not a JSON event at all
- * (a stray `process.stdout.write` from code that should never have run) are
- * discarded. The verdict is parsed from this text and nothing else.
- *
- * `errors` carries opencode's own `error` events, for the job log only —
- * they can explain an UNREADABLE verdict but can never supply one.
- */
-export function opencodeAssistantText(stdout: string): { text: string; errors: string[] } {
-  const texts: string[] = []
-  const errors: string[] = []
-  for (const raw of stdout.split('\n')) {
-    const line = raw.trim()
-    if (!line.startsWith('{')) continue
-    let event: unknown
-    try {
-      event = JSON.parse(line)
-    } catch {
-      continue
-    }
-    if (isOpencodeTextEvent(event)) texts.push(event.part.text)
-    else if (isOpencodeErrorEvent(event)) errors.push(JSON.stringify(event.error ?? event).slice(0, 1000))
-  }
-  return { text: texts.join('\n'), errors }
-}
-
 interface EngineRun {
   /** False for a crash, a timeout, a non-zero exit or a missing binary
-   *  (which now includes a configured model id that opencode's own registry
-   *  does not resolve — see `failureKind`). */
+   *  (which now includes a `--model` id `claude` itself refuses to run —
+   *  see `classifyEngineFailure` and `failureKind`). */
   reached: boolean
   /** The model's own words — the only text a verdict may be read from. */
   assistantText: string
@@ -724,120 +661,83 @@ interface EngineRun {
   failureKind?: EngineFailureKind
 }
 
-function decodeEngineOutput(engine: EngineId, stdout: string, stderr: string): Omit<EngineRun, 'reached'> {
-  const stderrTail = stderr.trim().slice(-2000)
-  if (engine === 'claude') {
-    // `claude --print` (text output) prints only the final assistant
-    // message; tool output is never interleaved into stdout.
-    return { assistantText: stdout, diagnostics: stderrTail }
-  }
-  const { text, errors } = opencodeAssistantText(stdout)
-  return { assistantText: text, diagnostics: [...errors, stderrTail].filter((s) => s.length > 0).join('\n') }
+/**
+ * `claude --print` (text output, the only mode this reviewer ever runs in —
+ * see `invokeVerifierEngine`) prints only the final assistant message; tool
+ * output is never interleaved into stdout, so there is no event stream to
+ * filter here the way an `opencode --format json` reviewer once needed
+ * (`opencodeAssistantText`, removed with opencode itself at #812 — see
+ * `verifierFor`). `stdout` IS the assistant text, in full.
+ */
+function decodeEngineOutput(stdout: string, stderr: string): Omit<EngineRun, 'reached'> {
+  return { assistantText: stdout, diagnostics: stderr.trim().slice(-2000) }
 }
 
 /**
- * Invokes the verifier engine directly by argv — no shell, matching every
- * other subprocess call in this fleet — with the prompt piped over stdin
- * rather than passed as an argv element, so its length is never bounded by
- * the OS argv limit and it can never be mistaken for a CLI flag.
+ * Invokes the reviewer (always `claude` — see `verifierFor`) directly by
+ * argv — no shell, matching every other subprocess call in this fleet —
+ * with the prompt piped over stdin rather than passed as an argv element,
+ * so its length is never bounded by the OS argv limit and it can never be
+ * mistaken for a CLI flag.
  *
  * THE PROJECT ROOT IS AN EMPTY DIRECTORY THIS FUNCTION CREATES — NEVER THE
  * EXPORT. An agent CLI treats its working directory as a project and loads
- * what it finds there. This used to run opencode with `--dir <export>`, so
- * the PR under review WAS the project: a PR-committed `.opencode/tool/x.ts` or
- * `.opencode/plugin/x.ts` was imported and run in-process, and an
- * `opencode.json` `mcp` entry was spawned as a command — on the reviewer
- * runner, next to the review key, before the model said a word. Reproduced
- * against the pinned 1.18.30 binary under `--pure`: all three executed, and a
- * tool module printing `VERDICT: PASS` at import time became the verdict. The
- * export's path now reaches the engine only as text inside the prompt
- * (`buildReviewPrompt`), plus the one read grant each engine needs to open it.
+ * what it finds there. The now-retired `opencode` reviewer (#812) used to run
+ * with `--dir <export>`, so the PR under review WAS the project: a
+ * PR-committed `.opencode/tool/x.ts` or `.opencode/plugin/x.ts` was imported
+ * and run in-process, and an `opencode.json` `mcp` entry was spawned as a
+ * command — on the reviewer runner, next to the review key, before the model
+ * said a word. `claude` never had that failure mode (its own project root
+ * was already this empty scratch directory before opencode was retired — see
+ * the `--add-dir` grant below), but the invariant is stated as unconditional
+ * on purpose: the export's path reaches the engine only as TEXT inside the
+ * prompt (`buildReviewPrompt`), plus the one read grant it needs to open it,
+ * regardless of which engine is asking.
  *
  * Layered on top:
  *   - the export has had `REVIEWER_CONTROL_NAMES` and symlinks stripped
- *     before this is called — on its own sufficient against the
- *     reproduction, because there is nothing left to load;
- *   - `--format json`, and the verdict is read from assistant text parts
- *     only (`opencodeAssistantText`), so output from anything that did run
- *     can never be the verdict;
- *   - opencode's settings come from `OPENCODE_CONFIG_DIR` — a fresh directory
- *     holding `reviewerOpencodeConfig` and nothing else — with
- *     `OPENCODE_DISABLE_PROJECT_CONFIG=1`. That flag is PARTIAL and is not
- *     relied on: on 1.18.30, run with the poisoned export as its root, it
- *     stopped the `mcp` entry and the `.opencode/tool` module but the
- *     `.opencode/plugin` module STILL RAN. It is kept because it costs
- *     nothing, never because it contains anything.
+ *     before this is called — on its own sufficient against a
+ *     project-root-poisoning reproduction, because there is nothing left to
+ *     load;
+ *   - `--permission-mode plan`: the reviewer can read and reason but cannot
+ *     edit files or run destructive commands;
+ *   - `--add-dir` grants read access to the export directory specifically —
+ *     nowhere else on disk — and never makes it the working directory.
  *
- * Claude gets `--permission-mode plan`: it can read and reason but cannot
- * edit files or run destructive commands, and `--add-dir` grants it the
- * export to read. `--dangerously-skip-permissions` (used for workers in
- * engines.ts / dispatch-one.sh) is deliberately NOT passed here — that flag is
- * what lets a worker write without being asked, which is exactly what a
- * reviewer must never be able to do. Neither engine is ever pointed at the
- * author's real worktree — see the V1 fix note above `gitState`.
+ * `--dangerously-skip-permissions` (used for WORKERS in engines.ts /
+ * dispatch-one.sh) is deliberately NEVER passed here — that flag is what
+ * lets a worker write without being asked, which is exactly what a reviewer
+ * must never be able to do. `--permission-mode plan` already forbids edits
+ * and destructive commands, and the reviewer's own read tools (Read, Grep)
+ * need no interactive approval under `--print`, so nothing here needs the
+ * skip-permissions escape hatch to run non-interactively. The reviewer is
+ * never pointed at the author's real worktree either — see the V1 fix note
+ * above `gitState`.
  */
 async function invokeVerifierEngine(input: {
-  engine: EngineId
+  authorEngine: EngineId
   exportDir: string
   prompt: string
   maxTurns: number
   timeoutMs: number
 }): Promise<EngineRun> {
-  const cfg = VERIFIER_ENGINE[input.engine]
-
-  // The registry check this whole fix adds: for `opencode`, resolve the
-  // configured `provider/model` against opencode's OWN local cache BEFORE
-  // spawning anything. An id the registry does not know about is reported
-  // as `engine-misconfigured`, naming it, instead of being spawned anyway
-  // and collapsing into the same opaque UNREADABLE a real outage produces
-  // (see the comment above `DEFAULT_OPENCODE_MODEL`). `'indeterminate'` is
-  // treated exactly like `'known'` — see `checkOpencodeModelKnown` for why
-  // a cold cache must never masquerade as a confirmed misconfiguration.
-  if (input.engine === 'opencode') {
-    const known = await checkOpencodeModelKnown(cfg.model)
-    if (known === 'unknown') {
-      return {
-        reached: false,
-        assistantText: '',
-        diagnostics:
-          `ENGINE MISCONFIGURED: opencode model id '${cfg.model}' is not present in opencode's local ` +
-          `model registry (${opencodeModelsCachePath()}). This is a configuration defect in the ` +
-          "reviewer's model id (this file's DEFAULT_OPENCODE_MODEL, or the FLEET_REVIEW_MODEL repo " +
-          "variable) — not a transient engine failure, and retrying will not fix it. Run `opencode " +
-          'models` for the current list of valid ids.',
-        failureKind: 'engine-misconfigured',
-      }
-    }
-  }
-
+  // `reviewerInvocationFor` — never a literal `'claude'`/`REVIEWER_MODEL`
+  // pair inlined here — is what ties this call to the exact same resolution
+  // the smoke test proves works (see that function's doc comment for why
+  // the two hardcoded literals this replaced were never actually a fix).
+  const { binary, model } = reviewerInvocationFor(input.authorEngine)
   const projectRoot = await mkdtemp(join(tmpdir(), 'llamenos-fleet-reviewer-root-'))
-  const scratch = [projectRoot]
   try {
     const env = verifierEnv()
-    let args: string[]
-    if (input.engine === 'claude') {
-      args = ['--print', '--permission-mode', 'plan', '--model', cfg.model, '--max-turns', String(input.maxTurns),
-        '--add-dir', input.exportDir]
-    } else {
-      const configDir = await mkdtemp(join(tmpdir(), 'llamenos-fleet-reviewer-config-'))
-      scratch.push(configDir)
-      await writeFile(join(configDir, 'opencode.json'), JSON.stringify(reviewerOpencodeConfig(input.exportDir), null, 2))
-      env['OPENCODE_CONFIG_DIR'] = configDir
-      env['OPENCODE_DISABLE_PROJECT_CONFIG'] = '1'
-      // `--format text` was not a valid choice (opencode accepts only
-      // `default` or `json`); `json` is required here, not just accepted — it
-      // is what lets assistant text be told apart from tool output. The prompt
-      // goes on stdin — verified against opencode 1.18.30, which accepts it
-      // there as well as positionally.
-      args = ['run', '--pure', '--model', cfg.model, '--format', 'json', '--dir', projectRoot]
-    }
+    const args = ['--print', '--permission-mode', 'plan', '--model', model,
+      '--max-turns', String(input.maxTurns), '--add-dir', input.exportDir]
 
     try {
       // execFile (unlike execFileSync) has no `input` option — the prompt must
       // be written to the child's own stdin instead. `promisify(execFile)`
       // still returns a `PromiseWithChild`, so `.child` is available
       // synchronously before the promise settles.
-      const call = execFileAsync(cfg.binary, args, {
+      const call = execFileAsync(binary, args, {
         cwd: projectRoot,
         env,
         timeout: input.timeoutMs,
@@ -845,17 +745,21 @@ async function invokeVerifierEngine(input: {
       })
       call.child?.stdin?.end(input.prompt)
       const { stdout, stderr } = await call
-      return { reached: true, ...decodeEngineOutput(input.engine, stdout, stderr ?? '') }
+      return { reached: true, ...decodeEngineOutput(stdout, stderr ?? '') }
     } catch (e) {
-      // A crash, a timeout, or a missing binary. An unreachable reviewer is
-      // not a pass — keep whatever partial output exists (often none) for the
-      // log, and let the caller record this explicitly as UNREADABLE rather
-      // than silently falling through parseVerdict's own "no VERDICT line" path.
+      // A crash, a timeout, a missing binary, or (see `classifyEngineFailure`)
+      // a model id the binary refuses to run at all. An unreachable reviewer
+      // is not a pass — keep whatever partial output exists (often none) for
+      // the log, and let the caller record this explicitly as UNREADABLE
+      // rather than silently falling through parseVerdict's own "no VERDICT
+      // line" path.
       const err = e as { stdout?: string; stderr?: string }
-      return { reached: false, failureKind: 'engine-unavailable', ...decodeEngineOutput(input.engine, err.stdout ?? '', err.stderr ?? '') }
+      const decoded = decodeEngineOutput(err.stdout ?? '', err.stderr ?? '')
+      const failureKind = classifyEngineFailure(`${decoded.assistantText}\n${decoded.diagnostics}`)
+      return { reached: false, failureKind, ...decoded }
     }
   } finally {
-    for (const dir of scratch) await rm(dir, { recursive: true, force: true })
+    await rm(projectRoot, { recursive: true, force: true })
   }
 }
 
@@ -932,7 +836,10 @@ export async function secondOpinion(input: SecondOpinionInput): Promise<SecondOp
     )
   }
 
-  const engine = verifierFor(input.authorEngine)
+  // `authorEngine` no longer selects which binary runs (see `verifierFor`'s
+  // doc comment — the reviewer is always `claude` now) but the parameter
+  // stays on `SecondOpinionInput` so a future second reviewer engine is a
+  // change to `verifierFor` alone, not to every call site of this function.
   const highImpact = input.report.impact === 'high'
   const turns = { maxTurns: highImpact ? HIGH_IMPACT_MAX_TURNS : DEFAULT_MAX_TURNS,
     timeoutMs: highImpact ? HIGH_IMPACT_TIMEOUT_MS : DEFAULT_TIMEOUT_MS }
@@ -948,7 +855,7 @@ export async function secondOpinion(input: SecondOpinionInput): Promise<SecondOp
   if (input.snapshotDir !== undefined) {
     await stripReviewerControlFiles(input.snapshotDir)
     const prompt = buildReviewPrompt(input.pr, input.diff, input.report, input.snapshotDir)
-    return toSecondOpinion(await invokeVerifierEngine({ engine, exportDir: input.snapshotDir, prompt, ...turns }))
+    return toSecondOpinion(await invokeVerifierEngine({ authorEngine: input.authorEngine, exportDir: input.snapshotDir, prompt, ...turns }))
   }
 
   const worktree = input.worktree as string
@@ -956,7 +863,7 @@ export async function secondOpinion(input: SecondOpinionInput): Promise<SecondOp
   const snapshot = await exportReviewSnapshot(worktree, before.head)
   try {
     const prompt = buildReviewPrompt(input.pr, input.diff, input.report, snapshot.dir)
-    const result = await invokeVerifierEngine({ engine, exportDir: snapshot.dir, prompt, ...turns })
+    const result = await invokeVerifierEngine({ authorEngine: input.authorEngine, exportDir: snapshot.dir, prompt, ...turns })
 
     // Detective layer (see the honest accounting in the comment above
     // `gitState`): with GitHub's per-SHA required statuses as the actual

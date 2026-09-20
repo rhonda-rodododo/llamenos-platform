@@ -71,18 +71,37 @@ export const UNSCOPED_LANE: Lane = {
   id: '(no lane — not a fleet branch)',
   mode: 'off',
   cap: 0,
-  // The fleet's workers are `claude`, so this keeps the reviewer on the other
-  // engine for a human PR too — `verifierFor` is what makes the review
-  // non-author, and it must not quietly become same-engine here.
+  // `verifierFor` (review.ts) resolves the reviewer to `claude` regardless
+  // of this value now (#812 retired the "other engine" bijection along with
+  // opencode) — this field stays `claude` only because `Lane.engine` still
+  // means "who authored this", and a human PR has no fleet author at all.
   engine: 'claude',
   requireLabel: '',
   vetoLabels: [],
   scope: { owned: [], notOwned: [] },
 }
 
-/** The CI secret carrying the non-author reviewer's provider key. Absent
- *  FAILS the job — never skips, never passes: a review that could not run is
- *  not a review that passed. */
+/**
+ * The CI secret this job's `FLEET_REVIEW_API_KEY` env var reads from — kept
+ * as a required repo secret for two reasons that have nothing to do with
+ * authenticating the reviewer itself (see `VERIFIER_ENV_ALLOWLIST`'s doc
+ * comment in review.ts: `claude` authenticates via the self-hosted runner's
+ * own logged-in session under `HOME`, not this key):
+ *   1. it is still the operator's explicit "review is enabled for this
+ *      repo" toggle — the same UX as before #812, so absence still FAILS
+ *      the job rather than skipping or passing it;
+ *   2. `fleet-review.yml`'s job needing an explicit `secrets.*` reference is
+ *      what keeps CodeQL's cache-poisoning query treating this job as
+ *      privileged (`isPrivileged()`) and therefore out of scope for that
+ *      specific query — see the "the job that executes the judged commit's
+ *      code cannot be reached by a cache-write event" rail in
+ *      guards.test.ts for the mechanism. Dropping this secret reference
+ *      would put `fleet/review` back in scope for that query, since its
+ *      trigger includes `workflow_dispatch` (one of the events with
+ *      default-branch cache-write access) and its steps run `bun`
+ *      (a poisonable command by CodeQL's own model) — an unrelated
+ *      regression this secret reference exists to keep closed.
+ */
 export const REVIEW_KEY_ENV = 'FLEET_REVIEW_API_KEY'
 
 /** `ok` becomes the job's exit code; `summary` is printed, and is the whole
@@ -122,6 +141,21 @@ export function fleetBranchFor(laneId: string, itemId: string): string {
 
 export function laneIdFromBranch(branch: string): string | undefined {
   return FLEET_BRANCH_RE.exec(branch)?.[1]
+}
+
+/**
+ * The pre-#812 branch spelling (`fleet-<lane>-<item>`, same grammar the
+ * worker NAME and tmux session use — see `nameFor` in cli.ts). Some PRs
+ * opened before #812's fix still live on it. Issues
+ * #705/#724/#729/#775/#784/#785 each burned three worker attempts
+ * rediscovering a PR that was already open and simply waiting on the review
+ * gate; a pre-dispatch "does an open PR already exist" check that only
+ * looked at the canonical `fleet/<lane>/<item>` grammar would miss every one
+ * of them. Never used to WRITE a branch — only to check whether one already
+ * has an open PR before dispatching a brand new worker attempt.
+ */
+export function legacyFleetBranchFor(laneId: string, itemId: string): string {
+  return `fleet-${laneId}-${itemId}`
 }
 
 export function itemIdFromBranch(branch: string): string | undefined {
@@ -327,9 +361,20 @@ export async function runReviewCi(deps: ReviewCiDeps): Promise<CiVerdict> {
 
   // UNREADABLE and FAIL both fail the job, but they are different facts and
   // the summary says which: "the reviewer could not be run" is not "the
-  // reviewer found a problem".
+  // reviewer found a problem". Within UNREADABLE, `failureKind` draws one
+  // more distinction that used to be lost here: `'engine-misconfigured'`
+  // (a `--model`/engine id the reviewer refuses outright) is a
+  // MISCONFIGURATION — a defect retrying will never fix — not an
+  // AVAILABILITY problem, which is what "unavailable" implies to a human
+  // reading the check. #866 hit exactly this: the engine was reachable and
+  // ran, and still produced an opaque `review unavailable: {"name":
+  // "UnknownError",...}` for what was, underneath, a bad model id — the
+  // wrong diagnostic sent whoever read it looking for an outage that was
+  // never happening. `'engine-unavailable'` (or no failureKind at all, e.g.
+  // a thrown tamper-detection error below) keeps the original wording.
+  const unreadablePrefix = result.failureKind === 'engine-misconfigured' ? 'review misconfigured' : 'review unavailable'
   const summary = result.verdict === 'UNREADABLE'
-    ? `review unavailable: ${verdictSummary(result.text)}`
+    ? `${unreadablePrefix}: ${verdictSummary(result.text)}`
     : verdictSummary(result.text)
   const verdict: CiVerdict = { ok: result.verdict === 'PASS', summary: `${summary}\n\n${result.text}` }
 
