@@ -33,6 +33,7 @@ function baseDeps(over: Partial<TickDeps> = {}): TickDeps {
     resumedAt: () => 0,
     listItems: async () => ({ ok: true as const, items: [item()] }),
     readLabels: async () => ['agent-dispatchable', 'lane:ios'],
+    findOpenPr: async () => undefined,
     dispatch: vi.fn(async (): Promise<DispatchOutcome> =>
       ({ outcome: 'SUCCESS', branch: 'fleet/ios/1', pr: '42', worktree: '/wt/ios-1' })),
     verifyMechanical: vi.fn(async () => passingVerify),

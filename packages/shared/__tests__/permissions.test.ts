@@ -9,6 +9,13 @@ import {
   PERMISSION_GROUP_LABELS,
 } from '../permissions'
 
+/** Look up a default role by slug, failing loudly (rather than via a non-null assertion) if it's missing. */
+function getDefaultRole(slug: string) {
+  const role = DEFAULT_ROLES.find(r => r.slug === slug)
+  if (!role) throw new Error(`Default role not found: ${slug}`)
+  return role
+}
+
 describe('users:manage-devices permission', () => {
   test('exists in PERMISSION_CATALOG', () => {
     expect('users:manage-devices' in PERMISSION_CATALOG).toBe(true)
@@ -58,7 +65,7 @@ describe('EP03: teams and tags permissions', () => {
   })
 
   test('hub-admin default role includes teams and tags permissions', () => {
-    const hubAdmin = DEFAULT_ROLES.find(r => r.slug === 'hub-admin')!
+    const hubAdmin = getDefaultRole('hub-admin')
     expect(permissionGranted(hubAdmin.permissions, 'teams:read')).toBe(true)
     expect(permissionGranted(hubAdmin.permissions, 'teams:manage')).toBe(true)
     expect(permissionGranted(hubAdmin.permissions, 'tags:view')).toBe(true)
@@ -67,7 +74,7 @@ describe('EP03: teams and tags permissions', () => {
   })
 
   test('volunteer default role has teams:read and tags:view', () => {
-    const volunteer = DEFAULT_ROLES.find(r => r.slug === 'volunteer')!
+    const volunteer = getDefaultRole('volunteer')
     expect(permissionGranted(volunteer.permissions, 'teams:read')).toBe(true)
     expect(permissionGranted(volunteer.permissions, 'tags:view')).toBe(true)
     expect(permissionGranted(volunteer.permissions, 'teams:manage')).toBe(false)
@@ -75,7 +82,7 @@ describe('EP03: teams and tags permissions', () => {
   })
 
   test('reviewer default role has teams:read and tags:view', () => {
-    const reviewer = DEFAULT_ROLES.find(r => r.slug === 'reviewer')!
+    const reviewer = getDefaultRole('reviewer')
     expect(permissionGranted(reviewer.permissions, 'teams:read')).toBe(true)
     expect(permissionGranted(reviewer.permissions, 'tags:view')).toBe(true)
   })

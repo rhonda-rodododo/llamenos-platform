@@ -66,9 +66,12 @@ uniffi = { version = "0.31", optional = true }
 # constant-time advisories (RUSTSEC-2026-0212, -0207, -0208) affecting every
 # shipped iOS/Android build when compiled in unconditionally. Gated so mobile
 # and server builds exclude it unless a consumer opts in.
-openmls = { version = "0.8", features = ["openmls_rust_crypto"], optional = true }
-openmls_rust_crypto = { version = "0.5", optional = true }
-openmls_basic_credential = { version = "0.5", optional = true }
+# openmls 0.9 -> openmls_rust_crypto 0.6 -> hpke-rs 0.7 pins the patched
+# libcrux releases (libcrux-sha3 =0.0.10, libcrux-traits =0.0.8 ->
+# libcrux-secrets =0.0.6), resolving those advisories for `mls` opt-in builds.
+openmls = { version = "0.9", features = ["openmls_rust_crypto"], optional = true }
+openmls_rust_crypto = { version = "0.6", optional = true }
+openmls_basic_credential = { version = "0.6", optional = true }
 
 # BIP-340 Schnorr / secp256k1 (for sign_prehash / verify_prehash)
 k256 = { version = "0.13", features = ["schnorr"] }
