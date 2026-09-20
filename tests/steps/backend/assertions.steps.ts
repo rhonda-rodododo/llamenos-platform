@@ -6,7 +6,7 @@
  */
 import { expect } from '@playwright/test'
 import { Then } from './fixtures'
-import { getSharedState, setLastResponse } from './shared-state'
+import { getSharedState } from './shared-state'
 
 Then('the response status should be {int}', async ({ world }, expectedStatus: number) => {
   expect(getSharedState(world).lastResponse).toBeDefined()

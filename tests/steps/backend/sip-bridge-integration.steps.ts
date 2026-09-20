@@ -140,24 +140,25 @@ When('the call is answered and recording starts', async ({ request, world }) => 
 })
 
 When('the SIP bridge health endpoint is requested', async ({ request, world }) => {
-  const sipBridgeUrl = process.env.SIP_BRIDGE_URL || 'http://localhost:3000'
-  // Try the dedicated SIP bridge health endpoint; fall back to the app health endpoint
-  let healthStatus = 404
+  // This scenario is tagged @backend @telephony and requires the sip-bridge sidecar
+  // (docker compose --profile asterisk) to be up and healthy. Query it directly —
+  // never fall back to the app's own health endpoint, which stays green regardless
+  // of sip-bridge/asterisk availability and would mask a registry pull failure or a
+  // real sip-bridge regression as a passing test. If the sidecar is unreachable this
+  // step throws so the scenario fails rather than silently passing. Environments that
+  // intentionally omit the telephony sidecar must exclude this scenario via
+  // `--grep-invert @telephony` rather than rely on a vacuous pass here.
+  const sipBridgeUrl = process.env.SIP_BRIDGE_URL || 'http://localhost:3001'
+  let healthStatus: number
   try {
     const res = await request.get(`${sipBridgeUrl}/health`)
     healthStatus = res.status()
-  } catch {
-    // SIP bridge sidecar not running — healthStatus stays 404, falls through to app health
-  }
-  // Graceful skip: if sip-bridge is unreachable (404) or unhealthy (>= 400),
-  // fall back to app health so the test passes when the sidecar is unavailable
-  if (healthStatus >= 400) {
-    try {
-      const res = await request.get('http://localhost:3000/api/health/ready')
-      healthStatus = res.status() === 503 ? 200 : res.status()
-    } catch {
-      healthStatus = 503
-    }
+  } catch (err) {
+    throw new Error(
+      `sip-bridge sidecar unavailable at ${sipBridgeUrl}/health — this scenario is tagged ` +
+        '@telephony and requires the sidecar (docker compose --profile asterisk) to be up ' +
+        `and healthy; it cannot be verified without it. Underlying error: ${err instanceof Error ? err.message : String(err)}`,
+    )
   }
   const sipState = getSipState(world) ?? ({ callerNumber: '' } as SipBridgeState)
   if (!getSipState(world)) {
