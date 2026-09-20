@@ -64,6 +64,7 @@ llamenos_rustfs_image: rustfs/rustfs:latest
 llamenos_whisper_image: fedirz/faster-whisper-server:0.4.0-cpu@sha256:f77aaf85e2e811aae96a60b04c85ff7cb0e0f2be6729c6fd7600340842412539 # see #722
 llamenos_asterisk_image: andrius/asterisk@sha256:e30df5ec1b512827bf3cffc49b8000b07376a05c950736d028348eba80035015 # 20.x
 llamenos_signal_image: bbernhard/signal-cli-rest-api:0.92@sha256:702db336aa1a87611595e66755c9ccf65b24c25589857301eabef1d46056b3c5
+llamenos_ntfy_image: binwiederhier/ntfy:v2.11.0@sha256:4a7d0f0adc6d5d9fc36e64ab55ef676e76e124a2bdd50ce115b6d9c1c7430294
 
 # ─── Application ─────────────────────────────────────────────────
 # Directory on the host where app files are stored
@@ -161,13 +162,15 @@ apns_key_p8: "" # PEM-formatted auth key contents
 apns_key_id: ""
 apns_team_id: ""
 
-# ntfy/UnifiedPush (Android push). Requires a self-hosted ntfy instance
-# reachable from the app container (standing that service up is #717 —
-# not yet automated by this playbook). Leave llamenos_ntfy_enabled: false
-# until that instance exists.
+# ntfy/UnifiedPush (Android push). Set llamenos_ntfy_enabled: true to stand
+# up a self-hosted ntfy broker (roles/llamenos-ntfy) via this playbook.
 llamenos_ntfy_enabled: false
 ntfy_url: "http://ntfy:80" # Compose service name:port, not a public URL
-ntfy_auth_token: "" # Optional bearer token for the ntfy instance
+ntfy_domain: "push.hotline.example.org" # Public hostname — required when enabled
+# Leave empty — roles/llamenos-ntfy mints a real bearer token on first
+# deploy and overrides this value for the rest of the run (ntfy does not
+# accept an operator-chosen token, unlike every other secret in this file).
+ntfy_auth_token: ""
 
 # ─── Crash Reporting (Epic 293) ──────────────────────────────────
 # GlitchTip/Sentry-compatible DSN for client-side crash reporting.
