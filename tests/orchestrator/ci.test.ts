@@ -250,12 +250,39 @@ describe('fleet/review in CI', () => {
 
   // "The reviewer could not be run" and "the reviewer found a problem" both
   // fail the job, but they are different facts and the summary says which.
-  it('fails and says the review was UNAVAILABLE when the verdict is UNREADABLE', async () => {
+  it('fails and says the review was UNAVAILABLE when the verdict is UNREADABLE with no failureKind (or an engine-unavailable one)', async () => {
     const v = await runReviewCi(deps({
       secondOpinion: vi.fn(async () => ({ verdict: 'UNREADABLE' as const, text: '(reviewer engine was unreachable)' })),
     }))
     expect(v.ok).toBe(false)
     expect(v.summary).toContain('review unavailable: (reviewer engine was unreachable)')
+
+    const v2 = await runReviewCi(deps({
+      secondOpinion: vi.fn(async () => ({
+        verdict: 'UNREADABLE' as const, text: '(reviewer engine was unreachable)', failureKind: 'engine-unavailable' as const,
+      })),
+    }))
+    expect(v2.ok).toBe(false)
+    expect(v2.summary).toContain('review unavailable: (reviewer engine was unreachable)')
+  })
+
+  // #866: an unresolvable `--model`/engine id is a MISCONFIGURATION, never
+  // an "unavailability" — the exact diagnostic that read as an opaque
+  // outage on #866's own live incident (a bare model shorthand handed to
+  // the wrong engine) when it was, underneath, a fixable configuration
+  // defect. `runReviewCi` must say so, not fold this into the same
+  // "unavailable" wording every other UNREADABLE reason gets.
+  it('fails and says the review is MISCONFIGURED, not merely unavailable, when the verdict carries failureKind engine-misconfigured', async () => {
+    const v = await runReviewCi(deps({
+      secondOpinion: vi.fn(async () => ({
+        verdict: 'UNREADABLE' as const,
+        text: 'VERDICT: unreadable — bad model id',
+        failureKind: 'engine-misconfigured' as const,
+      })),
+    }))
+    expect(v.ok).toBe(false)
+    expect(v.summary).toContain('review misconfigured: VERDICT: unreadable — bad model id')
+    expect(v.summary).not.toContain('review unavailable:')
   })
 
   it('fails and says UNAVAILABLE when secondOpinion throws (a tamper detection, a crashed engine)', async () => {
