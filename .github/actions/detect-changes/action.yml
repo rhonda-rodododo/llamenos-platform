@@ -1,0 +1,135 @@
+name: 'Detect Changed Platforms'
+description: >
+  Diffs the checked-out ref against the PR base (pull_request), the queue base
+  (merge_group), or HEAD^ (push/workflow_dispatch), then classifies the
+  changed files into per-platform booleans. This is the single source of
+  truth for path-based CI scoping — ci.yml's `changes` job and ios-e2e.yml's
+  `changes` job both call this instead of each keeping their own copy of the
+  path lists (see #664; before this, ci.yml's android regex, ios-e2e.yml's
+  own regex, and desktop-e2e.yml's workflow-level `paths:` filter were three
+  independently-drifting copies of "what does platform X depend on").
+  Requires the caller to have already run actions/checkout in this job, with
+  fetch-depth deep enough to reach the diff base — fetch-depth: 0 is safest
+  and is what both callers use.
+
+outputs:
+  app:
+    description: 'true unless every changed file is docs/site-only'
+    value: ${{ steps.filter.outputs.app }}
+  docs_only:
+    description: 'true if every changed file is docs/site-only (*.md or site/**)'
+    value: ${{ steps.filter.outputs.docs_only }}
+  ansible:
+    description: 'true if deploy/ansible/** changed'
+    value: ${{ steps.filter.outputs.ansible }}
+  ios:
+    description: 'true if apps/ios/** or a shared dependency changed'
+    value: ${{ steps.filter.outputs.ios }}
+  android:
+    description: 'true if apps/android/** or a shared dependency changed'
+    value: ${{ steps.filter.outputs.android }}
+  desktop:
+    description: 'true if apps/desktop/**, src/client/**, tests/**, or a shared dependency changed'
+    value: ${{ steps.filter.outputs.desktop }}
+  backend:
+    description: 'true if apps/worker/**, sip-bridge/**, signal-notifier/**, deploy/docker/**, or a shared dependency changed'
+    value: ${{ steps.filter.outputs.backend }}
+  crypto:
+    description: 'true if packages/crypto/** or a shared dependency changed'
+    value: ${{ steps.filter.outputs.crypto }}
+  orchestrator:
+    description: 'true if orchestrator/**, tests/orchestrator/**, or a shared dependency changed'
+    value: ${{ steps.filter.outputs.orchestrator }}
+
+runs:
+  using: composite
+  steps:
+    - id: filter
+      shell: bash
+      run: |
+        # ── Pick the diff base ──────────────────────────────────────────
+        # PR runs diff against the PR's actual base commit, not HEAD^ (which,
+        # on a multi-commit PR, only covers the most recent commit and misses
+        # everything else the PR touched — see #664). merge_group uses the
+        # queue's own base for the same reason lint already does (see that
+        # job's "Determine changed files" step in ci.yml). push and
+        # workflow_dispatch keep the original HEAD^ single-commit fallback.
+        if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+          BASE="${{ github.event.pull_request.base.sha }}"
+        elif [[ "${{ github.event_name }}" == "merge_group" ]]; then
+          BASE="${{ github.event.merge_group.base_sha }}"
+        else
+          BASE="HEAD^"
+        fi
+
+        # Fall back to a single-commit diff if the computed base isn't
+        # reachable in this checkout (shallow history, force-push, first
+        # commit on a branch).
+        if [[ -z "$BASE" ]] || ! git cat-file -e "$BASE" 2>/dev/null; then
+          BASE="HEAD^"
+        fi
+
+        CHANGED=$(git diff --name-only "$BASE" HEAD 2>/dev/null || git diff --name-only HEAD)
+        echo "Diffing against: $BASE"
+        echo "Changed files:"
+        echo "$CHANGED"
+
+        DOCS_ONLY="true"
+        ANSIBLE_CHANGED="false"
+        SHARED_DEPS="false"
+        IOS_OWN="false"
+        ANDROID_OWN="false"
+        DESKTOP_OWN="false"
+        BACKEND_OWN="false"
+        CRYPTO_OWN="false"
+        ORCHESTRATOR_OWN="false"
+
+        # Files that transitively affect every platform: the shared crypto
+        # crate (compiled into every app via native/WASM/UniFFI), protocol
+        # schemas (codegen'd into every platform's types), shared TS types,
+        # i18n, and the JS/TS toolchain itself. `.github/actions/` is
+        # included because every platform job either calls
+        # bootstrap-backend or (for iOS) this action — a change to a
+        # composite action is a change to every job that uses it.
+        SHARED_DEPS_REGEX='^packages/crypto/|^packages/protocol/|^packages/shared/|^packages/i18n/|^package\.json$|^bun\.lock$|^\.mise\.toml$|^\.github/workflows/ci\.yml$|^\.github/actions/|^scripts/|^tsconfig.*\.json$|^vitest.*\.config\.ts$'
+
+        while IFS= read -r file; do
+          [[ -z "$file" ]] && continue
+          if ! echo "$file" | grep -qE '\.md$|^site/'; then
+            DOCS_ONLY="false"
+            echo "Non-docs file changed: $file"
+          fi
+          if echo "$file" | grep -qE '^deploy/ansible/'; then
+            ANSIBLE_CHANGED="true"
+            echo "Ansible file changed: $file"
+          fi
+          if echo "$file" | grep -qE "$SHARED_DEPS_REGEX"; then
+            SHARED_DEPS="true"
+            echo "Shared-dependency file changed: $file"
+          fi
+          echo "$file" | grep -qE '^apps/ios/' && IOS_OWN="true"
+          echo "$file" | grep -qE '^apps/android/' && ANDROID_OWN="true"
+          echo "$file" | grep -qE '^apps/desktop/|^src/client/|^tests/' && DESKTOP_OWN="true"
+          echo "$file" | grep -qE '^apps/worker/|^sip-bridge/|^signal-notifier/|^deploy/docker/' && BACKEND_OWN="true"
+          echo "$file" | grep -qE '^packages/crypto/' && CRYPTO_OWN="true"
+          echo "$file" | grep -qE '^orchestrator/|^tests/orchestrator/' && ORCHESTRATOR_OWN="true"
+        done <<< "$CHANGED"
+
+        ios="false"; [[ "$SHARED_DEPS" == "true" || "$IOS_OWN" == "true" ]] && ios="true"
+        android="false"; [[ "$SHARED_DEPS" == "true" || "$ANDROID_OWN" == "true" ]] && android="true"
+        desktop="false"; [[ "$SHARED_DEPS" == "true" || "$DESKTOP_OWN" == "true" ]] && desktop="true"
+        backend="false"; [[ "$SHARED_DEPS" == "true" || "$BACKEND_OWN" == "true" ]] && backend="true"
+        crypto="false"; [[ "$SHARED_DEPS" == "true" || "$CRYPTO_OWN" == "true" ]] && crypto="true"
+        orchestrator="false"; [[ "$SHARED_DEPS" == "true" || "$ORCHESTRATOR_OWN" == "true" ]] && orchestrator="true"
+
+        {
+          echo "app=$([ "$DOCS_ONLY" = "false" ] && echo true || echo false)"
+          echo "docs_only=$DOCS_ONLY"
+          echo "ansible=$ANSIBLE_CHANGED"
+          echo "ios=$ios"
+          echo "android=$android"
+          echo "desktop=$desktop"
+          echo "backend=$backend"
+          echo "crypto=$crypto"
+          echo "orchestrator=$orchestrator"
+        } >> "$GITHUB_OUTPUT"

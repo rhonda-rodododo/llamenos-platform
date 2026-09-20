@@ -1,7 +1,12 @@
 # Continuous Integration
 #
 # On push to main or desktop, and on pull requests:
-#   1. Detect changed files — skip tests for docs-only changes
+#   1. Detect changed files — skip tests for docs-only changes, and
+#      path-scope every platform-specific job (ios/android/desktop/backend/
+#      crypto) to the platforms the PR actually touches — see the `changes`
+#      job and .github/actions/detect-changes/ (#664). A job whose platform
+#      didn't change is *skipped*, not absent, so it still satisfies
+#      `ci-status` and any required-check gate.
 #   2. Build & validate (codegen, typecheck, vite build, esbuild)
 #   3. Crypto tests (Rust)
 #   4. E2E + Backend BDD tests against Docker Compose backend
@@ -78,46 +83,25 @@ jobs:
       app: ${{ steps.filter.outputs.app }}
       docs_only: ${{ steps.filter.outputs.docs_only }}
       ansible: ${{ steps.filter.outputs.ansible }}
+      ios: ${{ steps.filter.outputs.ios }}
       android: ${{ steps.filter.outputs.android }}
+      desktop: ${{ steps.filter.outputs.desktop }}
+      backend: ${{ steps.filter.outputs.backend }}
+      crypto: ${{ steps.filter.outputs.crypto }}
+      orchestrator: ${{ steps.filter.outputs.orchestrator }}
 
     steps:
+      # fetch-depth: 0 (full history) so the PR base / merge_group base
+      # computed by detect-changes is always reachable — same reason `lint`'s
+      # checkout below uses it.
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
-          fetch-depth: 2
+          fetch-depth: 0
 
-      - name: Detect changes
+      - name: Detect changed platforms
         id: filter
-        run: |
-          CHANGED=$(git diff --name-only HEAD^ HEAD 2>/dev/null || git diff --name-only HEAD)
-          echo "Changed files:"
-          echo "$CHANGED"
-
-          DOCS_ONLY="true"
-          ANSIBLE_CHANGED="false"
-          ANDROID_CHANGED="false"
-          while IFS= read -r file; do
-            [[ -z "$file" ]] && continue
-            if ! echo "$file" | grep -qE "\.md$|^site/"; then
-              DOCS_ONLY="false"
-              echo "Non-docs file changed: $file"
-            fi
-            if echo "$file" | grep -qE "^deploy/ansible/"; then
-              ANSIBLE_CHANGED="true"
-              echo "Ansible file changed: $file"
-            fi
-            if echo "$file" | grep -qE "^apps/android/|^packages/crypto/|^packages/protocol/|^packages/i18n/|^apps/worker/|^packages/shared/"; then
-              ANDROID_CHANGED="true"
-              echo "Android-relevant file changed: $file"
-            fi
-          done <<< "$CHANGED"
-
-          {
-            echo "app=$([ "$DOCS_ONLY" = "false" ] && echo true || echo false)"
-            echo "docs_only=$DOCS_ONLY"
-            echo "ansible=$ANSIBLE_CHANGED"
-            echo "android=$ANDROID_CHANGED"
-          } >> "$GITHUB_OUTPUT"
+        uses: ./.github/actions/detect-changes
 
   # ─── Guard: No Generated Files In Git ────────────────────
   no-generated-files-in-git:
@@ -224,8 +208,14 @@ jobs:
           echo "  Key ID: $KEY_ID"
 
   # ─── Build & Validate ──────────────────────────────────────
+  # Produces the `app-build` artifact consumed by `e2e` and `desktop-e2e`
+  # below, so it is gated on the same platforms they are — desktop or
+  # backend (a full-stack E2E run needs both the frontend and the API it
+  # talks to). iOS/Android build their own artifacts independently and never
+  # download this one.
   build:
     needs: changes
+    if: needs.changes.outputs.desktop == 'true' || needs.changes.outputs.backend == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -286,7 +276,7 @@ jobs:
   # ─── Crypto Tests (Rust) ────────────────────────────────────
   crypto-tests:
     needs: changes
-    if: needs.changes.outputs.docs_only != 'true'
+    if: needs.changes.outputs.docs_only != 'true' && needs.changes.outputs.crypto == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -356,9 +346,12 @@ jobs:
           bun audit --audit-level=high "${IGNORE_ARGS[@]}"
 
   # ─── E2E + Backend BDD Tests (Docker Compose) ──────────────
+  # Full-stack (desktop UI via Vite build + live backend via Docker Compose),
+  # so it's gated on either half changing — a backend route regression can
+  # break these scenarios exactly as easily as a desktop UI change can.
   e2e:
     needs: [changes, build]
-    if: needs.changes.outputs.docs_only != 'true'
+    if: needs.changes.outputs.docs_only != 'true' && (needs.changes.outputs.desktop == 'true' || needs.changes.outputs.backend == 'true')
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -504,10 +497,149 @@ jobs:
             test-results/
           retention-days: 7
 
+  # ─── Desktop E2E (chromium project, non-BDD specs) ──────────
+  # Folded in from the former desktop-e2e.yml (#664): that workflow's
+  # `pull_request` trigger carried a workflow-level `paths:` filter, which is
+  # incompatible with ever becoming a required check — a required check
+  # whose *workflow* never triggers on a given PR never reports, and the PR
+  # is unmergeable. Moving the job here, gated by `if:` instead, makes it
+  # *skipped* (not absent) on a PR that doesn't touch desktop, which
+  # `ci-status` already treats as passing.
+  #
+  # BDD-tagged specs already run in `e2e` above — this only runs the
+  # chromium (non-BDD) project to avoid duplicating that coverage. Reuses
+  # `build`'s `app-build` artifact instead of rebuilding (the former
+  # standalone workflow had its own near-identical build job).
+  desktop-e2e:
+    needs: [changes, build]
+    if: needs.changes.outputs.docs_only != 'true' && needs.changes.outputs.desktop == 'true'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@4bc047ad259df6fc24a6c9b0f9a0cb08cf17fbe5 # v2.0.2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Download build artifact
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: app-build
+          path: dist
+
+      - name: Cache Rust build artifacts
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            packages/crypto/target
+          key: rust-crypto-${{ runner.os }}-${{ hashFiles('packages/crypto/Cargo.lock') }}
+          restore-keys: |
+            rust-crypto-${{ runner.os }}-
+
+      - name: Get Playwright version
+        id: playwright-version
+        run: echo "version=$(bunx playwright --version | awk '{print $2}')" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Playwright browsers
+        id: playwright-cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright-version.outputs.version }}
+          restore-keys: |
+            playwright-${{ runner.os }}-
+
+      - name: Install Playwright browsers
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: bunx playwright install --with-deps chromium
+
+      - name: Install Playwright deps (cached)
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: bunx playwright install-deps chromium
+
+      - name: Bootstrap backend
+        uses: ./.github/actions/bootstrap-backend
+        with:
+          admin_pubkey: ${{ env.TEST_ADMIN_PUBKEY }}
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@67ef31d5b988238dd797d409d6f9574278e20537 # stable
+        with:
+          toolchain: stable
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+        with:
+          workspaces: packages/crypto
+
+      - name: Generate interop test vectors
+        run: cargo test --manifest-path packages/crypto/Cargo.toml --test interop
+
+      - name: Generate BDD test files
+        run: bunx bddgen
+
+      - name: Start Vite preview server
+        run: |
+          bunx vite preview --port 8788 --strictPort &
+          PREVIEW_PID=$!
+          echo "preview_pid=$PREVIEW_PID" >> "$GITHUB_ENV"
+          for _i in $(seq 1 30); do
+            if bun -e "try{await fetch('http://localhost:8788');process.exit(0)}catch{process.exit(1)}" 2>/dev/null; then
+              echo "Preview server ready"
+              break
+            fi
+            sleep 1
+          done
+
+      - name: Run desktop E2E tests
+        # BDD tests already run in ci.yml's e2e job on every PR.
+        # This project only runs the chromium (non-BDD spec) tests to avoid duplication.
+        run: bunx playwright test --project=bootstrap --project=chromium
+        env:
+          CI: "true"
+          PLAYWRIGHT_TEST: "true"
+          PLAYWRIGHT_BASE_URL: "http://localhost:8788"
+          E2E_TEST_SECRET: "test-reset-secret"
+          DEV_RESET_SECRET: "test-reset-secret"
+          TEST_HUB_URL: "http://localhost:3000"
+
+      - name: Stop Vite preview server
+        if: always()
+        run: kill "$preview_pid" 2>/dev/null || true
+
+      - name: Tear down Docker Compose
+        if: always()
+        run: |
+          docker compose --env-file .env \
+            -f deploy/docker/docker-compose.yml \
+            -f deploy/docker/docker-compose.test.yml \
+            down -v || true
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: desktop-e2e-results
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
+
   # ─── Backend BDD Tests ─────────────────────────────────────
   backend-bdd:
     needs: [changes]
-    if: needs.changes.outputs.docs_only != 'true'
+    if: needs.changes.outputs.docs_only != 'true' && needs.changes.outputs.backend == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -592,9 +724,12 @@ jobs:
           retention-days: 7
 
   # ─── Backend Unit Tests ────────────────────────────────────
+  # Also runs the fleet orchestrator's own safety-rail suite (see the step
+  # below) — gated on `orchestrator` too so an orchestrator/-only PR still
+  # exercises it without spending a run on apps/worker's unit tests.
   backend-unit:
     needs: changes
-    if: needs.changes.outputs.docs_only != 'true'
+    if: needs.changes.outputs.docs_only != 'true' && (needs.changes.outputs.backend == 'true' || needs.changes.outputs.orchestrator == 'true')
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -690,7 +825,7 @@ jobs:
 
   desktop-unit:
     needs: changes
-    if: needs.changes.outputs.docs_only != 'true'
+    if: needs.changes.outputs.docs_only != 'true' && needs.changes.outputs.desktop == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -724,7 +859,7 @@ jobs:
   # ─── Android Build & Test ───────────────────────────────────
   android-build-test:
     needs: changes
-    if: needs.changes.outputs.docs_only != 'true'
+    if: needs.changes.outputs.docs_only != 'true' && needs.changes.outputs.android == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -1022,7 +1157,7 @@ jobs:
 
   ios-build-test:
     needs: changes
-    if: needs.changes.outputs.docs_only != 'true'
+    if: needs.changes.outputs.docs_only != 'true' && needs.changes.outputs.ios == 'true'
     runs-on: macos-latest
     permissions:
       contents: read
@@ -1317,7 +1452,7 @@ jobs:
   # ─── Migration Drift Check ────────────────────────────────────
   migration-drift:
     needs: changes
-    if: needs.changes.outputs.docs_only != 'true'
+    if: needs.changes.outputs.docs_only != 'true' && needs.changes.outputs.backend == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -1460,7 +1595,7 @@ jobs:
   # one refused.
 
   ci-status:
-    needs: [no-generated-files-in-git, verify-updater-config, build, audit, lint, crypto-tests, backend-bdd, backend-unit, desktop-unit, android-build-test, android-e2e, e2e, ios-build-test, crypto-guardrails, migration-drift, ansible-validate, docs-guard]
+    needs: [no-generated-files-in-git, verify-updater-config, build, audit, lint, crypto-tests, backend-bdd, backend-unit, desktop-unit, android-build-test, android-e2e, e2e, desktop-e2e, ios-build-test, crypto-guardrails, migration-drift, ansible-validate, docs-guard]
     if: always()
     runs-on: ubuntu-latest
     permissions:
@@ -1483,6 +1618,7 @@ jobs:
           check_job "lint" "${{ needs.lint.result }}"
           check_job "crypto-tests" "${{ needs.crypto-tests.result }}"
           check_job "e2e" "${{ needs.e2e.result }}"
+          check_job "desktop-e2e" "${{ needs.desktop-e2e.result }}"
           check_job "backend-bdd" "${{ needs.backend-bdd.result }}"
           check_job "backend-unit" "${{ needs.backend-unit.result }}"
           check_job "desktop-unit" "${{ needs.desktop-unit.result }}"

@@ -40,36 +40,28 @@ jobs:
     if: "github.event_name != 'push' || !startsWith(github.event.head_commit.message, 'chore(release):')"
 
     outputs:
-      ios_related: ${{ steps.filter.outputs.ios_related }}
+      ios: ${{ steps.filter.outputs.ios }}
 
     steps:
+      # fetch-depth: 0 — see the identical comment on ci.yml's `changes` job
+      # checkout; the shared detect-changes action needs the diff base
+      # reachable locally.
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
-          fetch-depth: 2
+          fetch-depth: 0
 
-      - name: Detect changes
+      # Shared with ci.yml's `changes` job — see #664. Do not hand-roll a
+      # second copy of the iOS path list here; that drift is exactly what
+      # #664 fixed.
+      - name: Detect changed platforms
         id: filter
-        run: |
-          CHANGED=$(git diff --name-only HEAD^ HEAD 2>/dev/null || git diff --name-only HEAD)
-          echo "Changed files:"
-          echo "$CHANGED"
-
-          IOS_RELATED="false"
-          while IFS= read -r file; do
-            [[ -z "$file" ]] && continue
-            if echo "$file" | grep -qE "^apps/ios/|^packages/crypto/|^packages/protocol/|^packages/i18n/|^apps/worker/|^packages/shared/"; then
-              IOS_RELATED="true"
-              echo "iOS-related file changed: $file"
-            fi
-          done <<< "$CHANGED"
-
-          echo "ios_related=$IOS_RELATED" >> "$GITHUB_OUTPUT"
+        uses: ./.github/actions/detect-changes
 
   # ─── Build App + Backend Once ──────────────────────────────────
   ios-e2e-build:
     needs: changes
-    if: needs.changes.outputs.ios_related == 'true'
+    if: needs.changes.outputs.ios == 'true'
     runs-on: macos-latest
     permissions:
       contents: read
@@ -208,7 +200,7 @@ jobs:
   # ─── Run E2E Tests (4 Shards) ─────────────────────────────────
   ios-e2e:
     needs: [changes, ios-e2e-build]
-    if: needs.changes.outputs.ios_related == 'true'
+    if: needs.changes.outputs.ios == 'true'
     runs-on: macos-latest
     permissions:
       contents: read
