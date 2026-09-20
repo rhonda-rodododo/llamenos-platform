@@ -157,6 +157,7 @@ function CallHistoryPage() {
             <div>
               <label className="mb-1 block text-xs text-muted-foreground">{t('callHistory.from')}</label>
               <Input
+                data-testid="call-date-from"
                 type="date"
                 value={dateFromInput}
                 onChange={e => setDateFromInput(e.target.value)}
@@ -166,6 +167,7 @@ function CallHistoryPage() {
             <div>
               <label className="mb-1 block text-xs text-muted-foreground">{t('callHistory.to')}</label>
               <Input
+                data-testid="call-date-to"
                 type="date"
                 value={dateToInput}
                 onChange={e => setDateToInput(e.target.value)}

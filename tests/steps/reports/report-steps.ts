@@ -341,9 +341,9 @@ Then('the report type tabs should include template-defined types', async ({ page
 })
 
 Then('the report type selector should be visible', async ({ page }) => {
-  const selector = page.getByTestId('report-type-select')
-    .or(page.getByTestId('report-type-picker'))
-  await expect(selector.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
+  // `report-type-picker` and `report-type-option` (below) don't exist anywhere in
+  // src/client — ReportForm.tsx renders exactly one selector, `report-type-select`.
+  await expect(page.getByTestId('report-type-select')).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 Then('the report type selector should list template-defined types', async ({ page }) => {
@@ -355,8 +355,8 @@ Then('the report type selector should list template-defined types', async ({ pag
   await expect(selector).toBeVisible({ timeout: Timeouts.ELEMENT })
   await selector.click()
   const options = page.locator('[role="option"]')
-  const count = await options.count()
-  expect(count).toBeGreaterThanOrEqual(1)
+  await expect(options.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
+  expect(await options.count()).toBeGreaterThanOrEqual(1)
   await page.keyboard.press('Escape')
 })
 
