@@ -472,6 +472,106 @@ const POLL_INTERVAL_MS = 5_000
  *  notice the timeout, write a terminal status, and flush it to disk. */
 const POLL_GRACE_MS = 30_000
 
+export interface LaunchOutcomeInput {
+  /**
+   * Set when the initial `execFileAsync(DISPATCH_SCRIPT, ...)` call in
+   * `dispatch()` itself threw or timed out. NEVER trusted as authoritative
+   * on its own — see the long comment on `dispatch()` for why: dispatch-one.sh
+   * starts the worker in a DETACHED tmux session and does only a little more
+   * setup before this call returns, and under concurrent dispatches
+   * contending for one box's CPU/disk that setup can outrun even this call's
+   * own 60s timeout while the session it already started keeps running to
+   * completion entirely independently of this process.
+   *
+   * Issue #870, live: `fleet-backend-705` and `fleet-desktop-775` were
+   * dispatched within 3 seconds of each other and of `fleet-infra-722` (same
+   * tick, three lanes at once) and both this call's own error text
+   * (`"Command failed: …/dispatch-one.sh --branch fleet/backend/705 …"`) and
+   * their worker's own `.status` file (`status: SUCCESS`, a real PR) exist
+   * for the exact same run — the launch call, not the worker, was what timed
+   * out.
+   */
+  launchError?: string
+  /** The LAST status-file snapshot the poll loop in `dispatch()` observed,
+   *  whatever it was — `undefined` only if a status file never appeared at
+   *  all in the whole poll window. */
+  status: Record<string, string> | undefined
+  /** The launcher's DISPATCHED seed — see `dispatch()`'s own comment on why
+   *  `branch`/`worktree` are read from here as a fallback. */
+  seed: Record<string, string> | undefined
+  depCommit: string | undefined
+  /** The worker's raw log text, if one exists — passed in rather than read
+   *  here so this function stays a pure decision, not a file read. */
+  workerLog: string | undefined
+}
+
+/**
+ * The pure decision `dispatch()` (below) delegates to once it has finished
+ * polling: what outcome, note, branch/worktree/pr, and (on a FAILED reclassified
+ * to QUOTA) reset hint to report. Extracted specifically so issue #870's fix —
+ * a `launchError` must NEVER by itself downgrade a real terminal status the
+ * worker already wrote — is testable against the real fixture text of that
+ * incident without spinning up a real `dispatch-one.sh`, tmux, or a 90-minute
+ * poll loop.
+ *
+ * `launchError` is recorded in the note, for a human's benefit, but never
+ * changes `outcome`: the status file (or its absence) is the only thing that
+ * does. A launch call that failed AND left no status file still resolves to
+ * FAILED exactly as it always did (`rawStatus` falls back to `'DISPATCHED'`,
+ * which `statusToOutcome` maps to `FAILED`) — this function changes nothing
+ * about that path, it only stops the launch error from overriding a real
+ * terminal status when one exists.
+ */
+export function resolveLaunchOutcome(input: LaunchOutcomeInput): DispatchResult {
+  const rawStatus = input.status?.['status'] ?? 'DISPATCHED' // never observed a status file: treat as never-started
+  let outcome = statusToOutcome(rawStatus)
+
+  // Record the dependency's HEAD commit in the note so a run's behaviour can
+  // always be traced back to the exact version of dispatch-one.sh that
+  // produced it — the version pin this repo cannot otherwise express for a
+  // dependency it does not vendor (see dependency.ts).
+  const workerNote = input.status?.['notes']
+  let note = `dep:${input.depCommit ?? 'unknown'}${workerNote ? ` ${workerNote}` : ''}`
+
+  if (input.launchError !== undefined) {
+    // Issue #870: logged for a human, NEVER used to override `outcome` — see
+    // this function's own doc comment and `LaunchOutcomeInput.launchError`'s.
+    note = `launch-call warning (worker may be running independently of this call): ${input.launchError} | ${note}`
+  }
+
+  // Issue #817: `dispatch-one.sh` has no quota-detection of its own, so a
+  // real provider rate limit always shows up here as a plain FAILED — worse,
+  // for an opencode/kimi worker (see `readWorkerLog`'s comment) the launcher
+  // footer's own summary can be an EMPTY final message, discarding the one
+  // piece of evidence a human would need to tell "the fleet is broken" from
+  // "the account ran out of quota" apart. Read the worker's raw log directly
+  // and reclassify — only ever FAILED -> QUOTA, never any other outcome: a
+  // worker that reported BLOCKED or SUCCESS made a deliberate claim this
+  // fleet must not silently override on a coincidental log match.
+  let quotaResetHint: string | undefined
+  let quotaResetAt: number | undefined
+  if (outcome === 'FAILED' && input.workerLog !== undefined) {
+    const detection = detectQuotaFromLog(input.workerLog)
+    if (detection.isQuota) {
+      outcome = 'QUOTA'
+      quotaResetHint = detection.resetHint
+      quotaResetAt = detection.resetAt
+      note = `${note} | quota reset: ${quotaResetHint ?? 'unknown'}`
+    }
+  }
+
+  const pr = input.status?.['pr']
+  return {
+    outcome,
+    branch: input.status?.['branch'] ?? input.seed?.['branch'],
+    pr: pr !== undefined && pr !== 'none' ? pr : undefined,
+    note,
+    worktree: input.status?.['worktree'] ?? input.seed?.['worktree'],
+    quotaResetHint,
+    quotaResetAt,
+  }
+}
+
 /**
  * Spawns the worker via `dispatch-one.sh` and waits for it to reach a
  * terminal status.
@@ -503,7 +603,28 @@ export async function dispatch(req: DispatchRequest): Promise<DispatchResult> {
   // it. This execFile call is therefore bounded by a short timeout of its
   // own; the long wait below is for the worker's actual progress, tracked
   // through the status file, not through this child process.
-  await execFileAsync(DISPATCH_SCRIPT, args, { timeout: 60_000, maxBuffer: 8 * 1024 * 1024 })
+  //
+  // Issue #870: this call's OWN error — a timeout or a non-zero exit — is
+  // caught here rather than left to propagate. The detached tmux session
+  // `dispatch-one.sh` starts (or fails to start) is unaffected by whether
+  // THIS wrapper call finishes inside its own 60s allowance, and under
+  // concurrent dispatches (three lanes launched within milliseconds of each
+  // other, all contending for the same box) it provably did not: two of
+  // three workers dispatched at once in the live incident finished with a
+  // real terminal SUCCESS and a real PR while this call's own promise had
+  // already rejected. Rethrowing here turned "the fleet's own supervising
+  // call was slow" into "record this successful worker as a hard FAILED" —
+  // the poll loop immediately below is the exact same ground-truth check a
+  // launch that genuinely never started already has to survive (no status
+  // file ever appears -> `'DISPATCHED'` -> FAILED, via `resolveLaunchOutcome`,
+  // unchanged), so there is nothing this catch needs to do beyond not
+  // rethrowing.
+  let launchError: string | undefined
+  try {
+    await execFileAsync(DISPATCH_SCRIPT, args, { timeout: 60_000, maxBuffer: 8 * 1024 * 1024 })
+  } catch (e) {
+    launchError = e instanceof Error ? e.message : String(e)
+  }
 
   // The launcher's DISPATCHED seed is the one status write that carries
   // `branch` and `worktree` — the worker's own terminal write never does
@@ -522,49 +643,12 @@ export async function dispatch(req: DispatchRequest): Promise<DispatchResult> {
     await sleep(POLL_INTERVAL_MS)
   }
 
-  const rawStatus = status?.['status'] ?? 'DISPATCHED' // never observed a status file: treat as never-started
-  let outcome = statusToOutcome(rawStatus)
-
-  // Record the dependency's HEAD commit in the note so a run's behaviour can
-  // always be traced back to the exact version of dispatch-one.sh that
-  // produced it — the version pin this repo cannot otherwise express for a
-  // dependency it does not vendor (see dependency.ts).
   const dep = checkDispatchDependency()
-  const workerNote = status?.['notes']
-  let note = `dep:${dep.commit ?? 'unknown'}${workerNote ? ` ${workerNote}` : ''}`
-
-  // Issue #817: `dispatch-one.sh` has no quota-detection of its own, so a
-  // real provider rate limit always shows up here as a plain FAILED — worse,
-  // for an opencode/kimi worker (see `readWorkerLog`'s comment) the launcher
-  // footer's own summary can be an EMPTY final message, discarding the one
-  // piece of evidence a human would need to tell "the fleet is broken" from
-  // "the account ran out of quota" apart. Read the worker's raw log directly
-  // and reclassify — only ever FAILED -> QUOTA, never any other outcome: a
-  // worker that reported BLOCKED or SUCCESS made a deliberate claim this
-  // fleet must not silently override on a coincidental log match.
-  let quotaResetHint: string | undefined
-  let quotaResetAt: number | undefined
-  if (outcome === 'FAILED') {
-    const logText = readWorkerLog(req.name)
-    if (logText !== undefined) {
-      const detection = detectQuotaFromLog(logText)
-      if (detection.isQuota) {
-        outcome = 'QUOTA'
-        quotaResetHint = detection.resetHint
-        quotaResetAt = detection.resetAt
-        note = `${note} | quota reset: ${quotaResetHint ?? 'unknown'}`
-      }
-    }
-  }
-
-  const pr = status?.['pr']
-  return {
-    outcome,
-    branch: status?.['branch'] ?? seed?.['branch'],
-    pr: pr !== undefined && pr !== 'none' ? pr : undefined,
-    note,
-    worktree: status?.['worktree'] ?? seed?.['worktree'],
-    quotaResetHint,
-    quotaResetAt,
-  }
+  return resolveLaunchOutcome({
+    launchError,
+    status,
+    seed,
+    depCommit: dep.commit,
+    workerLog: readWorkerLog(req.name),
+  })
 }

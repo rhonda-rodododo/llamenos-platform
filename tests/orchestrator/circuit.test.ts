@@ -64,6 +64,23 @@ describe('failureBreaker', () => {
     const rows = [r('BLOCKED', 1), r('BLOCKED', 2), r('BLOCKED', 3)]
     expect(failureBreaker(rows, LIMITS, 0)).toBeUndefined()
   })
+
+  // Issue #870: three real SUCCESS workers (fleet-backend-705,
+  // fleet-desktop-775, fleet-infra-722) were recorded FAILED and tripped
+  // this exact breaker — "3 consecutive failures since last success" — over
+  // nothing but the fleet's own launch/revise plumbing losing contact with
+  // workers that had already finished correctly. UNVERIFIED exists so that
+  // never happens again: a mutation that added it back to `STREAK_FAILURES`
+  // would make this fail.
+  it('does not count UNVERIFIED toward the failure streak — the fleet-backend-705/desktop-775/infra-722 incident', () => {
+    const rows = [r('UNVERIFIED', 1), r('UNVERIFIED', 2), r('UNVERIFIED', 3)]
+    expect(failureBreaker(rows, LIMITS, 0)).toBeUndefined()
+  })
+
+  it('an UNVERIFIED row does not reset the streak either — it is simply invisible to it, like QUOTA', () => {
+    const rows = [r('FAILED', 1), r('FAILED', 2), r('UNVERIFIED', 3), r('FAILED', 4)]
+    expect(failureBreaker(rows, LIMITS, 0)).toMatch(/consecutive/i)
+  })
 })
 
 describe('inQuotaCooldown', () => {
