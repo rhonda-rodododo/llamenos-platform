@@ -124,6 +124,21 @@ export function laneIdFromBranch(branch: string): string | undefined {
   return FLEET_BRANCH_RE.exec(branch)?.[1]
 }
 
+/**
+ * The pre-#812 branch spelling (`fleet-<lane>-<item>`, same grammar the
+ * worker NAME and tmux session use — see `nameFor` in cli.ts). Some PRs
+ * opened before #812's fix still live on it. Issues
+ * #705/#724/#729/#775/#784/#785 each burned three worker attempts
+ * rediscovering a PR that was already open and simply waiting on the review
+ * gate; a pre-dispatch "does an open PR already exist" check that only
+ * looked at the canonical `fleet/<lane>/<item>` grammar would miss every one
+ * of them. Never used to WRITE a branch — only to check whether one already
+ * has an open PR before dispatching a brand new worker attempt.
+ */
+export function legacyFleetBranchFor(laneId: string, itemId: string): string {
+  return `fleet-${laneId}-${itemId}`
+}
+
 export function itemIdFromBranch(branch: string): string | undefined {
   return FLEET_BRANCH_RE.exec(branch)?.[2]
 }

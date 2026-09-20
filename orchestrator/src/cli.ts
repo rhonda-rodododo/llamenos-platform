@@ -18,7 +18,8 @@ import { secondOpinion, postReview } from './review.js'
 import { artifactReviewCache } from './review-cache.js'
 import {
   runVerifyCi, runReviewCi, decideReviewGate, ciContextFromEnv, ciDiff,
-  REVIEW_JOB, REVIEW_KEY_ENV, VERIFY_JOB, itemIdFromBranch, fleetBranchFor, type CiContext, type CiVerdict,
+  REVIEW_JOB, REVIEW_KEY_ENV, VERIFY_JOB, itemIdFromBranch, fleetBranchFor, legacyFleetBranchFor,
+  type CiContext, type CiVerdict,
 } from './ci.js'
 import {
   settle as settleWorktree,
@@ -350,6 +351,41 @@ function defaultResolveDispatchDeps(): ResolveDispatchDeps {
   }
 }
 
+export interface OpenPrLookupDeps {
+  /** `undefined` on "no open PR" AND on a `gh` read failure — see
+   *  `findOpenPrFor`'s own doc comment for why collapsing those two is the
+   *  right default here. */
+  findOpenPrOnBranch(branch: string): Promise<string | undefined>
+}
+
+/**
+ * Checks BOTH branch spellings an item's PR could be on — the canonical
+ * `fleet/<lane>/<item>` grammar first, then the legacy `fleet-<lane>-<item>`
+ * spelling (`legacyFleetBranchFor`, ci.ts) some already-open PRs from before
+ * issue #812's fix still use — and returns the first open PR found. Exported
+ * and deps-injected, same pattern as `resolveDispatchResult` above, so the
+ * "check both spellings, canonical first" behaviour is unit-tested without a
+ * real `gh` in sight.
+ */
+export async function findOpenPrFor(lane: Lane, item: WorkItem, deps: OpenPrLookupDeps): Promise<string | undefined> {
+  const canonical = fleetBranchFor(lane.id, item.id)
+  const legacy = legacyFleetBranchFor(lane.id, item.id)
+  return (await deps.findOpenPrOnBranch(canonical)) ?? (await deps.findOpenPrOnBranch(legacy))
+}
+
+function defaultOpenPrLookupDeps(): OpenPrLookupDeps {
+  return {
+    findOpenPrOnBranch: async (branch) => {
+      const rows = await ghJson<{ number: number }[]>(['pr', 'list', '--head', branch, '--state', 'open', '--json', 'number'])
+      return rows !== undefined && rows.length > 0 ? String(rows[0]?.number) : undefined
+    },
+  }
+}
+
+async function findOpenPr(lane: Lane, item: WorkItem): Promise<string | undefined> {
+  return findOpenPrFor(lane, item, defaultOpenPrLookupDeps())
+}
+
 async function realDispatch(item: WorkItem, lane: Lane): Promise<DispatchOutcome> {
   const branch = fleetBranchFor(lane.id, item.id)
   const baseBrief = buildBrief(item, lane, branch)
@@ -582,6 +618,7 @@ async function runTick(): Promise<number> {
     resumedAt: readResumedAt,
     listItems: (lane) => new GitHubSource(lane.requireLabel).list(),
     readLabels: (id) => new GitHubSource('').labels(id),
+    findOpenPr,
     dispatch: realDispatch,
     verifyMechanical,
     prDiff,
