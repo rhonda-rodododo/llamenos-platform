@@ -98,6 +98,24 @@ export interface TickDeps {
   resumedAt(): number
   listItems(lane: Lane): Promise<ListResult>
   readLabels(id: string): Promise<string[] | undefined>
+  /**
+   * The pure precondition (see `select.ts`'s `pr-already-open` doc comment):
+   * asks GitHub, immediately before every live dispatch, whether an open PR
+   * already exists for this item's branch — checking both the canonical
+   * `fleet/<lane>/<item>` grammar and the legacy `fleet-<lane>-<item>`
+   * spelling still in the wild (see `legacyFleetBranchFor`, ci.ts). Returns
+   * the PR number when one is open, `undefined` otherwise — including on a
+   * `gh` read failure, which is deliberately treated as "no open PR found"
+   * rather than blocking dispatch: the cost of getting a transient `gh`
+   * outage wrong here is exactly the status quo this check improves on,
+   * never worse. Applied with NO judgement about attempt count, lane, or
+   * prior outcome classification — issues
+   * #705/#724/#729/#775/#784/#785 each burned three worker attempts
+   * rediscovering a PR that was already open and simply waiting on the
+   * review gate, and this is the one gate that stops that regardless of
+   * whatever else misclassified the prior attempts.
+   */
+  findOpenPr(lane: Lane, item: WorkItem): Promise<string | undefined>
   dispatch(item: WorkItem, lane: Lane): Promise<DispatchOutcome>
   /** Mechanical gates: scope, never-write, diff-targeted tests. Injected so
    *  `tick` stays testable without a real worktree or a real `bunx vitest`. */
@@ -628,6 +646,21 @@ export async function tick(deps: TickDeps): Promise<TickResult> {
           deps.record({ ...base, outcome: 'SHADOW', note: `would dispatch to ${lane.id}; scope=${lane.scope.owned.join(',')}` })
           shadowed++
           taken++
+          continue
+        }
+
+        // The pure precondition, checked before anything else that could
+        // dispatch: an item whose branch already has an open PR is waiting
+        // on GitHub, not on a worker. See `findOpenPr`'s own doc comment
+        // above for why this runs regardless of attempt count or prior
+        // outcome — it is what stops issues
+        // #705/#724/#729/#775/#784/#785's failure mode (three wasted worker
+        // attempts each, rediscovering a PR that was already open) even if
+        // whatever misclassified those prior attempts is never found.
+        const openPr = await deps.findOpenPr(lane, item)
+        if (openPr !== undefined) {
+          deps.log(`item ${item.id} rejected before dispatch: pr-already-open (pr ${openPr})`)
+          allRejections.push({ id: item.id, reason: 'pr-already-open' })
           continue
         }
 
