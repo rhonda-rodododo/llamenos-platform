@@ -38,6 +38,7 @@ import { FLEET_DIR, LOG_FILE, HALT_REASON_FILE, DISPATCH_SCRIPT, FLEET_ENV_FILE 
 import { REPO, gh, ghJson } from './gh.js'
 import { proposeIssues, buildIssueCreateArgs, type ProposedIssue } from './roles/planner.js'
 import { updateBranchFromMain, type UpdateBranchInput, type UpdateBranchResult } from './roles/integrator.js'
+import { armStandardAutoMergeAtOpen } from './automerge.js'
 
 const execFileAsync = promisify(execFile)
 
@@ -389,6 +390,17 @@ async function realDispatch(item: WorkItem, lane: Lane): Promise<DispatchOutcome
       log(`issue link: failed for PR ${resolved.pr}: ${errMsg(e)}`)
     }
   }
+
+  // Standard auto-merge, requested in the same step the PR is discovered —
+  // see automerge.ts's module comment for why this is safe and why it is
+  // separate from tick.ts's own arm site (which re-requests it after this
+  // fleet's own verification and review pass, since a later push to the
+  // branch invalidates the per-SHA required checks GitHub already had).
+  await armStandardAutoMergeAtOpen(
+    { pr: resolved.pr, headRefName: branch, branchMismatch: resolved.branchMismatch },
+    { enableAutoMerge, log },
+  )
+
   return resolved
 }
 
