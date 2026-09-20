@@ -57,7 +57,22 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-    if: "!startsWith(github.event.head_commit.message, 'chore(release):')"
+    # Scoped to `push` only (see #812). `head_commit` only exists on a push
+    # payload — on `pull_request`/`merge_group` it is null, so the intended
+    # guard silently evaluated to "run" there rather than skip. That is only
+    # a happy accident: it means an ordinary PR runs full CI regardless of
+    # title, but it ALSO means a release PR (title `chore(release): v...`,
+    # opened by knope) exercised the guard's `push`-only intent by luck, not
+    # by construction — the day this expression's null-coercion behavior
+    # changes, or the job gains a second `push`-shaped trigger, the same
+    # bug reappears from the other direction. Original intent (see
+    # `git log -S`, commit 60b1e6c69): skip the (at the time synchronous,
+    # since-removed) `audit`/`version` work on the automated release commit
+    # landing on main via `push` — never meant to touch `pull_request` at
+    # all, since knope's release PR did not exist yet when this guard was
+    # written. Pinning `github.event_name != 'push'` makes that scope
+    # explicit instead of relying on an absent field coercing to falsy.
+    if: "github.event_name != 'push' || !startsWith(github.event.head_commit.message, 'chore(release):')"
 
     outputs:
       app: ${{ steps.filter.outputs.app }}
@@ -372,7 +387,7 @@ jobs:
 
       - name: Cache Playwright browsers
         id: playwright-cache
-        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ steps.playwright-version.outputs.version }}
@@ -516,7 +531,7 @@ jobs:
 
       - name: Cache Playwright browsers
         id: playwright-cache
-        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ steps.playwright-version.outputs.version }}
@@ -803,7 +818,7 @@ jobs:
       # creation fails (no key generation possible).
       - name: Cache native crypto .so
         id: crypto-cache
-        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: apps/android/app/src/debug/jniLibs/x86_64/libllamenos_core.so
           key: android-crypto-x86_64-test-kdf-${{ runner.os }}-${{ hashFiles('packages/crypto/src/**/*.rs', 'packages/crypto/Cargo.toml', 'packages/crypto/Cargo.lock') }}
@@ -855,7 +870,7 @@ jobs:
 
       - name: Cache AVD snapshot
         id: avd-cache
-        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
             ~/.android/avd/*
@@ -1030,7 +1045,7 @@ jobs:
       # Key includes all Rust sources + Cargo manifests + the build script.
       - name: Cache crypto XCFramework + bindings
         id: xcframework-cache
-        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
             apps/ios/LlamenosCoreFFI.xcframework
@@ -1076,7 +1091,7 @@ jobs:
 
       # Cache DerivedData for incremental Swift builds
       - name: Cache DerivedData
-        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: /tmp/llamenos-build
           key: deriveddata-ios-${{ runner.os }}-${{ hashFiles('apps/ios/**/*.swift', 'apps/ios/project.yml') }}
@@ -1356,7 +1371,7 @@ jobs:
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
 
       - name: Log in to Docker Hub
         uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0

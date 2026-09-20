@@ -166,7 +166,7 @@ Client A (Freiwilligen-Aktion)
     | Verschluesselt Event-Inhalt mit Hub-Schluessel
     | Signiert als WebSocket-Event (Schnorr)
     v
-WebSocket-Relay (WebSocket relay / Nosflare)
+WebSocket-Relay
     |
     | Sendet an Abonnenten
     v

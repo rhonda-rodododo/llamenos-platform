@@ -39,7 +39,7 @@ sudo lsof -i :9000
 
 ### Strfry relay không kết nối
 
-WebSocket relay (WebSocket relay) là dịch vụ cốt lõi, không tùy chọn:
+WebSocket relay là dịch vụ cốt lõi, không tùy chọn:
 
 ```bash
 docker compose logs WebSocket relay
