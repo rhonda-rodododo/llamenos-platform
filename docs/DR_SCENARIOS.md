@@ -226,8 +226,8 @@ This document covers five disaster recovery scenarios for Llamenos self-hosted d
 
 4. **Rotate `SERVER_SECRET`** (always rotate this during a key compromise).
    ```bash
-   NEW_SERVER_SECRET=$(openssl rand -hex 32)
-   sed -i "s|^SERVER_SECRET=.*|SERVER_SECRET=${NEW_SERVER_SECRET}|" .env
+   NEW_NOSTR_SECRET=$(openssl rand -hex 32)
+   sed -i "s|^SERVER_SECRET=.*|SERVER_SECRET=${NEW_NOSTR_SECRET}|" .env
    ```
 
 5. **Rotate HMAC secret** to invalidate all active sessions.
