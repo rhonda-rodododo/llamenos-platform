@@ -404,6 +404,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - add E2E tests for device linking and fix /link-device public path
 
 
+## 0.19.15 (2026-09-20)
+
+### Fixes
+
+- move docker-stable's buildx cache off the shared Actions quota (#911)
+- stop tauri:build/tauri:dev from passing an unsupported positional path, pin @tauri-apps/cli (#915)
+
 ## 0.19.14 (2026-09-20)
 
 ### Features
