@@ -4,6 +4,7 @@ import type { Outcome, RunRecord } from './ledger.js'
 import type { LaneMode } from './config.js'
 import type { Rejection } from './select.js'
 import type { DependencyReport } from './dependency.js'
+import { isQuotaHaltReason, parseQuotaResumeAt } from './circuit.js'
 
 export interface LaneStatus {
   id: string
@@ -87,7 +88,8 @@ export function outcomeHistogram(runs: RunRecord[]): HistogramEntry<Outcome>[] {
     .sort((a, b) => b.count - a.count || a.reason.localeCompare(b.reason))
 }
 
-const OUTCOMES_MEANING_A_PR_WAS_LEFT_FOR_A_HUMAN: ReadonlySet<Outcome> = new Set<Outcome>(['SUCCESS', 'BLOCKED'])
+const OUTCOMES_MEANING_A_PR_WAS_LEFT_FOR_A_HUMAN: ReadonlySet<Outcome> =
+  new Set<Outcome>(['SUCCESS', 'BLOCKED', 'UNVERIFIED'])
 
 /**
  * G1: this is a CANDIDATE list from the ledger alone, not the final answer —
@@ -98,7 +100,10 @@ const OUTCOMES_MEANING_A_PR_WAS_LEFT_FOR_A_HUMAN: ReadonlySet<Outcome> = new Set
  * after this fleet's redesign SUCCESS no longer implies "merged" — see
  * ledger.ts's module comment — it can mean a clean auto-merge OR a claimed
  * success this fleet could not verify and left for a human (tick.ts's
- * `needsHuman` handoff). Distinguishing those two requires a LIVE `gh` query
+ * `needsHuman` handoff). UNVERIFIED (issue #870) is the same idea again: a
+ * PR this fleet's own plumbing failed to confirm one way or the other, left
+ * open for exactly this "waiting on a human" section to surface it.
+ * Distinguishing those two requires a LIVE `gh` query
  * per candidate (is the PR still open and unmerged?), which this pure,
  * I/O-free function cannot do — `runDigest` (cli.ts) does that query and
  * passes the FILTERED result to `renderDigest` as `DigestInput.awaitingHuman`
@@ -215,6 +220,22 @@ export interface Banner {
  */
 export function computeBanner(input: DigestInput): Banner {
   if (input.halted) {
+    // Issue #817: a quota-shaped halt is self-healing — `tick()` clears it on
+    // its own once the embedded reset time passes (see tick.ts's own halt
+    // handling) — so it must never read to an operator as the same kind of
+    // stop as a human-declared halt or a tripped consecutive-failure
+    // breaker, both of which sit there until a person runs `resume`.
+    // Rendered `degraded`, not `halted`, specifically so this banner never
+    // tells someone to run the one command (`resume`) that is not what this
+    // condition needs.
+    if (isQuotaHaltReason(input.haltReason)) {
+      const resumeAt = input.haltReason !== undefined ? parseQuotaResumeAt(input.haltReason) : undefined
+      const until = resumeAt !== undefined ? new Date(resumeAt).toISOString() : 'unknown'
+      return {
+        level: 'degraded',
+        text: ['# ⚠️ FLEET DEGRADED', `degraded — engine quota exhausted until ${until}`].join('\n'),
+      }
+    }
     return {
       level: 'halted',
       text: [
