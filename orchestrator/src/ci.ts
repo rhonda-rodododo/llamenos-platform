@@ -2,7 +2,8 @@ import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import type { Lane } from './config.js'
 import type { VerifyInput, VerifyReport } from './verify.js'
-import type { SecondOpinionInput, SecondOpinionResult } from './review.js'
+import { finalLine, type SecondOpinionInput, type SecondOpinionResult } from './review.js'
+import { diffHash, type CachedVerdict, type ReviewCache, type ReviewCacheKey } from './review-cache.js'
 import { join } from 'node:path'
 import { buildGateTrace } from './trace.js'
 
@@ -98,6 +99,27 @@ export interface CiVerdict { ok: boolean; summary: string }
  */
 const FLEET_BRANCH_RE = /^fleet\/([^/]+)\/([^/]+)$/
 
+/**
+ * The one WRITER of that grammar, next to the one reader. `buildArgs`
+ * (engines.ts) passes this to `dispatch-one.sh --branch`, and `realDispatch`
+ * (cli.ts) verifies the worktree and PR head against it — neither may spell
+ * the format out itself. Issue #812: the dispatcher used to name the branch
+ * after the worker (`fleet-shared-704`), which this regex does not
+ * recognise, so the fleet skipped verify/review for the PR and CI treated it
+ * as a non-fleet branch with no lane scope.
+ *
+ * Throws rather than returning a branch its own reader would reject: a lane
+ * or item id containing `/` (or an empty one) would otherwise produce a
+ * branch every consumer above treats as "not a fleet branch".
+ */
+export function fleetBranchFor(laneId: string, itemId: string): string {
+  const branch = `fleet/${laneId}/${itemId}`
+  if (laneIdFromBranch(branch) !== laneId || itemIdFromBranch(branch) !== itemId) {
+    throw new Error(`lane "${laneId}" / item "${itemId}" cannot form a fleet branch (fleet/<lane>/<item>)`)
+  }
+  return branch
+}
+
 export function laneIdFromBranch(branch: string): string | undefined {
   return FLEET_BRANCH_RE.exec(branch)?.[1]
 }
@@ -106,11 +128,12 @@ export function itemIdFromBranch(branch: string): string | undefined {
   return FLEET_BRANCH_RE.exec(branch)?.[2]
 }
 
-/** The reviewer's own `VERDICT: PASS|FAIL` line if it wrote one, else its
- *  first non-empty line — never an invented summary. */
+/** The one line `parseVerdict` judged — the reviewer's final non-empty line,
+ *  selected by the same function (`finalLine`), so the printed summary and the
+ *  job's exit code can never name different verdicts. Never an invented
+ *  summary and never a search of its own. */
 export function verdictSummary(text: string): string {
-  const lines = text.split('\n').map((l) => l.trim()).filter((l) => l.length > 0)
-  return lines.find((l) => /verdict:/i.test(l)) ?? lines[0] ?? '(no reviewer output)'
+  return finalLine(text) ?? '(no reviewer output)'
 }
 
 export interface CiContext {
@@ -150,6 +173,13 @@ export interface ReviewCiDeps extends CiDeps {
   apiKey: string | undefined
   prDiff(): Promise<string>
   secondOpinion(input: SecondOpinionInput): Promise<SecondOpinionResult>
+  /**
+   * `undefined` disables caching outright — every call reviews fresh,
+   * exactly like before this existed. Optional so every pre-existing test
+   * and call site that never heard of a review cache is unaffected: this
+   * is additive, not a new required wire.
+   */
+  cache?: ReviewCache
 }
 
 /**
@@ -215,7 +245,11 @@ export async function runVerifyCi(deps: VerifyCiDeps): Promise<CiVerdict> {
   const withTests = await deps.verify({ ...rangeFor(deps.ctx), lane, testDir: deps.ctx.headDir })
   return {
     ok: withTests.passed,
-    summary: [buildGateTrace({ report: withTests }), ...withTests.reasons.map((r) => `- ${r}`)].join('\n'),
+    summary: [
+      buildGateTrace({ report: withTests }),
+      ...(withTests.testResults ?? []).map((r) => `- ${r}`),
+      ...withTests.reasons.map((r) => `- ${r}`),
+    ].join('\n'),
   }
 }
 
@@ -249,9 +283,38 @@ export async function runReviewCi(deps: ReviewCiDeps): Promise<CiVerdict> {
     }
   }
 
+  const diff = await deps.prDiff()
+
+  // Exactly one review per PR per DIFF CONTENT, not per merge-queue attempt —
+  // a re-queue after the queue rebases this PR onto a newer `main` is a new
+  // `merge_group` event with a new head SHA, but the same diff, and must
+  // still hit. Keyed by a hash of the diff itself (`review-cache.ts`), never
+  // the head SHA.
+  //
+  // A lookup failure and a genuine cache miss are DELIBERATELY the same
+  // thing here — `cached === undefined` — because both mean "run the
+  // engine": see `artifactReviewCache`'s use of `ghJson`, which already
+  // returns `undefined` rather than throwing. The `try` below exists only
+  // because `deps.cache` is an injected interface, not `ghJson` itself, and
+  // a future or test implementation of it could still throw; the fail-safe
+  // direction must hold even then.
+  const cacheKey: ReviewCacheKey = { pr: deps.ctx.pr, diffHash: diffHash(diff) }
+  if (deps.cache !== undefined) {
+    let cached: CachedVerdict | undefined
+    try {
+      cached = await deps.cache.lookup(cacheKey)
+    } catch (e) {
+      deps.log(`review cache lookup threw — running the engine (fail safe): ${e instanceof Error ? e.message : String(e)}`)
+      cached = undefined
+    }
+    if (cached !== undefined) {
+      deps.log(`review cache hit for PR ${deps.ctx.pr} (sha256:${cacheKey.diffHash.slice(0, 12)}…) — re-publishing instead of invoking the engine`)
+      return { ok: true, summary: cached.text }
+    }
+  }
+
   let result: SecondOpinionResult
   try {
-    const diff = await deps.prDiff()
     // `snapshotDir`, never `worktree`: the export already exists, so this
     // job runs no git and creates nothing. Zero execution of the judged
     // commit's code anywhere in this job — which is what lets it hold the key.
@@ -268,7 +331,97 @@ export async function runReviewCi(deps: ReviewCiDeps): Promise<CiVerdict> {
   const summary = result.verdict === 'UNREADABLE'
     ? `review unavailable: ${verdictSummary(result.text)}`
     : verdictSummary(result.text)
-  return { ok: result.verdict === 'PASS', summary: `${summary}\n\n${result.text}` }
+  const verdict: CiVerdict = { ok: result.verdict === 'PASS', summary: `${summary}\n\n${result.text}` }
+
+  // Only a FRESH PASS this process itself just produced is ever recorded —
+  // never a FAIL, and never a cache hit being re-published (that would just
+  // re-upload the identical artifact under its own name for no benefit).
+  // Recording nothing for a FAIL is the entire mechanism behind "a FAIL is
+  // never reused": there is nothing a later lookup could ever find.
+  if (verdict.ok && deps.cache !== undefined) {
+    try {
+      await deps.cache.record(cacheKey, { verdict: 'PASS', text: verdict.summary })
+    } catch (e) {
+      deps.log(`review cache record failed (non-fatal — the review itself still passed): ${e instanceof Error ? e.message : String(e)}`)
+    }
+  }
+
+  return verdict
+}
+
+/**
+ * The three outcomes `fleet-review.yml`'s job-level `if:` used to encode —
+ * see #848 and this function's own comment for why that design fails open.
+ * The job now has NO `if:` at all and always reaches a real conclusion; this
+ * is what a step INSIDE it calls, before installing the review engine, to
+ * decide which of the three branches applies:
+ *
+ *  - `cache-hit`  — a prior PASS exists for this exact diff. Concludes the
+ *    job successfully with no engine call, regardless of which label fired
+ *    this run — this is what makes an unrelated label event (say,
+ *    `agent-dispatchable` on an already-reviewed PR) cheap and
+ *    non-destructive instead of a wasted (or worse, skipped) re-review.
+ *  - `not-requested` — no cached PASS, and this run was not the `review`
+ *    label (nor a manual `workflow_dispatch`). Fails the job outright: a
+ *    `fleet/review` a reader has not yet asked for is not a passing review,
+ *    and the old design's mistake was ever treating "not asked for" as
+ *    anything other than a fail-closed red check.
+ *  - `run-engine` — no cached PASS, and the review WAS requested. The
+ *    workflow proceeds through engine install, auth, the smoke test and the
+ *    real review exactly as before this file's `if:` removal.
+ *
+ * `runReviewCi` itself still opens with the identical cache lookup (see its
+ * own comment) — so a direct call to it from anywhere else stays correct on
+ * its own — at the cost of one redundant lookup on the `run-engine` path
+ * once this decision has already been made. That redundancy is cheap and
+ * never a correctness risk: both reads hit the same cache with the same key.
+ */
+export type ReviewGateOutcome =
+  | { kind: 'cache-hit'; cacheKey: ReviewCacheKey; verdict: CachedVerdict }
+  | { kind: 'not-requested'; cacheKey: ReviewCacheKey }
+  | { kind: 'run-engine'; cacheKey: ReviewCacheKey }
+
+export interface ReviewGateDeps {
+  ctx: CiContext
+  prDiff(): Promise<string>
+  cache: ReviewCache
+  /** Whether THIS event is the one that asks for a review: the `review`
+   *  label being applied, or a manual `workflow_dispatch`. Computed by the
+   *  workflow from `github.event_name` / `github.event.label.name` — never
+   *  re-derived here, so this function has exactly one job: cache first,
+   *  request second. */
+  requested: boolean
+  log(msg: string): void
+}
+
+export async function decideReviewGate(deps: ReviewGateDeps): Promise<ReviewGateOutcome> {
+  const diff = await deps.prDiff()
+  const cacheKey: ReviewCacheKey = { pr: deps.ctx.pr, diffHash: diffHash(diff) }
+
+  // Identical fail-safe direction as `runReviewCi`: a lookup failure and a
+  // genuine miss are indistinguishable on purpose, because both mean "this
+  // is not yet a known-good diff" — see `artifactReviewCache`'s own doc.
+  let cached: CachedVerdict | undefined
+  try {
+    cached = await deps.cache.lookup(cacheKey)
+  } catch (e) {
+    deps.log(`review cache lookup threw — treating pr=${cacheKey.pr} as a miss (fail safe): ${e instanceof Error ? e.message : String(e)}`)
+    cached = undefined
+  }
+  if (cached !== undefined) {
+    deps.log(`reused verdict for pr=${cacheKey.pr} sha256:${cacheKey.diffHash.slice(0, 12)}… — no engine call`)
+    return { kind: 'cache-hit', cacheKey, verdict: cached }
+  }
+
+  if (!deps.requested) {
+    deps.log(
+      `review not requested for pr=${cacheKey.pr} sha256:${cacheKey.diffHash.slice(0, 12)}… — ` +
+      'add the `review` label to run the non-author review',
+    )
+    return { kind: 'not-requested', cacheKey }
+  }
+
+  return { kind: 'run-engine', cacheKey }
 }
 
 /** `undefined` when the workflow did not supply a branch — a CI entry point

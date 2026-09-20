@@ -16,14 +16,13 @@ test.describe.configure({ mode: 'serial' })
 const hasLiveCreds = !!process.env.TWILIO_ACCOUNT_SID
 
 test.describe('Live Telephony', () => {
-  // eslint-disable-next-line playwright/no-skipped-test
   test.skip(!hasLiveCreds, 'Live telephony tests require TWILIO_ACCOUNT_SID')
 
   test.beforeAll(async ({ request }) => {
     await resetStaging(request)
   })
 
-  test('inbound call reaches IVR and language menu plays', async ({ page, request }) => {
+  test('inbound call reaches IVR and language menu plays', async ({ page }) => {
     // Login as admin first so we can check call logs later
     await loginAsAdmin(page)
 

@@ -329,7 +329,7 @@ function stepMatchesCucumberPhrase(gherkinStep: string, cucumberPhrase: string):
   // Step 2: Single-pass — handle Cucumber escapes, parameters, and regex-escape
   //         everything else simultaneously (avoids double-escaping from
   //         unescape-then-re-escape chains)
-  let pattern = cucumberPhrase
+  const pattern = cucumberPhrase
     .replace(/\\\\/g, "\\")
     .replace(/\\[\/()]|\{(?:string|int|word)\}|[.*+?^${}()|\\[\]]/g, (match) => {
       switch (match) {
@@ -996,7 +996,6 @@ function main() {
   // Check for duplicate feature basenames
   checkDuplicateFeatureNames(featureFiles);
 
-  let totalMissing = 0;
   const results: { platform: string; total: number; covered: number; missing: number }[] = [];
 
   for (const platform of platforms) {
@@ -1034,7 +1033,6 @@ function main() {
       covered: result.covered,
       missing: result.missing,
     });
-    totalMissing += result.missing;
   }
 
   console.log(`\n${"=".repeat(60)}`);

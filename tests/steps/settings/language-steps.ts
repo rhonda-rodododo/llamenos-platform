@@ -6,7 +6,7 @@
  * and persistence. No hollow steps that just assert PAGE_TITLE.
  */
 import { expect } from '@playwright/test'
-import { Given, When, Then } from '../fixtures'
+import { When, Then } from '../fixtures'
 import { TestIds } from '../../test-ids'
 import { Timeouts } from '../../helpers'
 

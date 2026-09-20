@@ -1,10 +1,11 @@
-import { checkBreakers, inQuotaCooldown } from './circuit.js'
+import { checkBreakers, inQuotaCooldown, isQuotaHaltReason, parseQuotaResumeAt } from './circuit.js'
 import { LIMITS, MAX_ATTEMPTS_PER_ITEM, type Lane } from './config.js'
 import { failedAttemptsIn, type Outcome, type RunRecord } from './ledger.js'
 import { runReviewLoop, type SecondOpinionInput, type SecondOpinionResult } from './review.js'
 import { judge, selectForLane, type Rejection } from './select.js'
 import type { ListResult, WorkItem } from './source.js'
 import { buildGateTrace } from './trace.js'
+import { fleetBranchFor } from './ci.js'
 import type { VerifyInput, VerifyReport } from './verify.js'
 
 export interface DispatchOutcome {
@@ -13,6 +14,19 @@ export interface DispatchOutcome {
   pr?: string
   branch?: string
   worktree?: string
+  /**
+   * Set when the work did NOT land on the `fleet/<lane>/<item>` branch this
+   * item was dispatched for: the worktree's checked-out branch, or the PR's
+   * head branch, is something else (value: that actual branch, or
+   * `unknown`/`unreadable-pr-head` when it could not be read). See
+   * `resolveDispatchResult` (cli.ts). A run carrying this is never verified
+   * and never armed — the diff the fleet would verify is not the diff that
+   * would merge.
+   */
+  branchMismatch?: string
+  /** See `RunRecord.quotaResetHint`/`quotaResetAt` (ledger.ts). */
+  quotaResetHint?: string
+  quotaResetAt?: number
 }
 
 /**
@@ -45,11 +59,19 @@ export interface SettleInput {
    * keeps the item from being re-claimed on the next pass. An ordinary
    * mechanical or review REJECTED is still retried up to
    * `MAX_ATTEMPTS_PER_ITEM` (the worker may simply fix it next attempt), so
-   * exactly one case sets this now: a worker-reported SUCCESS that could not
-   * be run through the pipeline at all (missing branch/worktree) — see the
-   * `else` branch in `runLiveDispatch`. That is the shape of issue #660/PR
-   * #662: a claimed success with an open, UNVERIFIED PR is far more
-   * dangerous left agent-dispatchable than a routine rejection is.
+   * exactly three cases set this now: a worker-reported SUCCESS that could
+   * not be run through the pipeline at all (missing branch/worktree) — see
+   * the `else` branch in `runLiveDispatch` — a branch mismatch (issue #812:
+   * the work landed on a branch other than `fleet/<lane>/<item>`), whatever
+   * the worker claimed, and an `UNVERIFIED` outcome (issue #870: the
+   * review loop ended `UNREADABLE` — the fleet's own verification pipeline,
+   * not the worker's diff, could not reach a verdict). The first is the
+   * shape of issue #660/PR #662: a claimed success with an open, unverified
+   * PR is far more dangerous left agent-dispatchable than a routine
+   * rejection is. The third is the shape of issue #870: re-dispatching a
+   * brand new worker attempt against a branch that may already hold correct,
+   * finished work wastes a worker on a problem this fleet never actually
+   * diagnosed.
    *
    * A PR that is verified, reviewed, and simply waiting — on a required
    * check, or on a code owner's approval — is NOT flagged here: it is
@@ -63,6 +85,15 @@ export interface TickDeps {
   now(): number
   acquireLock(): { held: true; release(): void } | { held: false; heldByPid: number }
   checkHalt(): Promise<{ halted: boolean; reason?: string }>
+  /**
+   * Issue #817: the ONLY halt this fleet ever clears itself, and only when
+   * `checkHalt()`'s reason is quota-shaped (`isQuotaHaltReason`) AND the
+   * absolute reset time embedded in that reason (`parseQuotaResumeAt`) has
+   * passed `now()`. Any other halt — including a human-typed `llamenos-fleet
+   * halt` or a GitHub `halt`-labelled issue — is left exactly as `checkHalt`
+   * found it; only a human's `resume` clears those.
+   */
+  resumeFleet(): void
   readLedger(): RunRecord[]
   resumedAt(): number
   listItems(lane: Lane): Promise<ListResult>
@@ -233,7 +264,36 @@ async function runLiveDispatch(
     branch = result.branch
     pr = result.pr
 
-    if (result.outcome === 'SUCCESS' && branch !== undefined && pr !== undefined && worktree !== undefined) {
+    if (result.branchMismatch !== undefined) {
+      // Issue #812: the work is on a branch this item was not dispatched
+      // for (live shape: PR #836 on `fleet-shared-704`). Checked BEFORE the
+      // outcome, and terminal whatever the worker claimed: verifying the
+      // expected branch would judge a diff that is not the one that merges,
+      // and verifying the actual one would run lane scope against a branch
+      // CI itself does not recognise as a fleet branch. FAILED, never armed
+      // (`armed` stays false, so the disarm below also clears any earlier
+      // arming), `needs-human` so it is not silently re-claimed, and the PR
+      // told plainly that nothing verified it.
+      const mismatch = result.branchMismatch
+      needsHuman = true
+      deps.log(
+        `verify: item ${item.id} pr ${pr ?? '(none)'} REFUSED — branch-mismatch:${mismatch} ` +
+        `(dispatched for ${fleetBranchFor(lane.id, item.id)}) — not verified, auto-merge not armed`,
+      )
+      if (pr !== undefined) {
+        await deps.commentOnPr(
+          pr,
+          `This PR is on branch \`${mismatch}\`, but the fleet dispatched issue #${item.id} on ` +
+          `\`${fleetBranchFor(lane.id, item.id)}\`. It was NOT verified by the fleet — no scope check, ` +
+          'no diff-targeted tests, no non-author review — and auto-merge has not been armed. ' +
+          'It needs a human: review it from scratch, or close it and re-dispatch the issue.',
+        )
+      }
+      final = {
+        ...base, outcome: 'FAILED', branch, pr,
+        note: truncateNote(result.note ?? `branch-mismatch:${mismatch}`),
+      }
+    } else if (result.outcome === 'SUCCESS' && branch !== undefined && pr !== undefined && worktree !== undefined) {
       // The bounded mechanical-verify -> second-opinion -> (on FAIL) revise
       // -> re-verify loop (task 13, review.ts). Mechanical failure is
       // terminal on whatever round it happens (no review is ever requested
@@ -277,13 +337,46 @@ async function runLiveDispatch(
       } else {
         deps.log(`review: item ${item.id} pr ${pr} verdict=${loop.finalVerdict} rounds=${loop.rounds}`)
 
-        if (loop.finalVerdict !== 'PASS') {
+        if (loop.finalVerdict === 'FAIL') {
+          // A real reviewer read the diff and said no — the fleet's own
+          // verification pipeline worked exactly as designed and caught
+          // something. This is the shape `circuit.ts`'s consecutive-failure
+          // breaker exists to catch, so it counts toward that streak.
           await deps.commentOnIssue(
             item.id,
             `Review did not pass after ${loop.rounds} round(s) (final verdict: ${loop.finalVerdict}) — needs a human.`,
           )
           final = {
             ...base, outcome: 'REJECTED', branch, pr,
+            note: truncateNote(`rounds=${loop.rounds} ${buildGateTrace({
+              report: verifyReport, reviewVerdict: loop.finalVerdict, reviewText: loop.lastVerdictText,
+            })}`),
+          }
+        } else if (loop.finalVerdict === 'UNREADABLE') {
+          // Issue #870: UNREADABLE never means "the diff is bad" — it means
+          // this fleet's OWN verification pipeline (the reviewer engine, a
+          // tamper check, or — the fleet-infra-722 shape, see review.ts's
+          // `runReviewLoop` — the revise round losing contact with a worker
+          // that had already finished correctly) could not reach a verdict.
+          // Mechanical verification already passed by this point (the branch
+          // above returns before this one is ever reached), so the work
+          // itself has NOT been shown to be bad — recording REJECTED here
+          // would count a fleet-side verification gap as if a real reviewer
+          // had rejected the work, and three of those in a row would trip
+          // `circuit.ts`'s consecutive-failure breaker over nothing but the
+          // fleet's own plumbing (the exact incident this outcome exists to
+          // stop). `needsHuman: true`: a PR the fleet could not get a second
+          // opinion on should be looked at directly, not silently re-dispatched
+          // as a brand new worker attempt against a branch that likely
+          // already holds correct, finished work.
+          await deps.commentOnIssue(
+            item.id,
+            `The fleet could not get a verification verdict after ${loop.rounds} round(s) (${loop.finalVerdict}) — ` +
+            'this is a gap in the fleet\'s own verification, not a claim that the work is wrong. Needs a human look.',
+          )
+          needsHuman = true
+          final = {
+            ...base, outcome: 'UNVERIFIED', branch, pr,
             note: truncateNote(`rounds=${loop.rounds} ${buildGateTrace({
               report: verifyReport, reviewVerdict: loop.finalVerdict, reviewText: loop.lastVerdictText,
             })}`),
@@ -367,17 +460,15 @@ async function runLiveDispatch(
       // The worker itself did not reach a mergeable state (BLOCKED, FAILED,
       // TIMEOUT, QUOTA), recorded as-is.
       //
-      // QUOTA specifically: this plumbing (the ledger outcome, the
-      // consecutive-failure breaker excluding it, `inQuotaCooldown`'s
-      // per-lane backoff above) is correct but currently UNREACHABLE against
-      // a real worker — `engines.ts`'s `statusToOutcome` has no status
-      // string that maps to `'QUOTA'`, because `dispatch-one.sh` has no
-      // quota-detection of its own yet. A real provider rate limit today
-      // surfaces as a plain `FAILED`, which feeds the failure-streak breaker
-      // and halts the fleet — safe, just less efficient than the per-lane
-      // cooldown this exists for. Do not assume QUOTA is live end-to-end
-      // until the engine side actually detects a quota condition and reports
-      // it through the status file.
+      // QUOTA specifically: issue #817 made this reachable against a real
+      // worker — `engines.ts`'s `dispatch()` now reads the worker's own raw
+      // log directly and reclassifies FAILED -> QUOTA when the runtime died
+      // at turn <= 1 on a provider quota rejection (`detectQuotaFromLog`),
+      // since `dispatch-one.sh` itself still has no quota-detection of its
+      // own. `result` carries `quotaResetHint`/`quotaResetAt` straight onto
+      // this ledger row when that happened, which is what `circuit.ts`'s
+      // `quotaBreaker` and the per-lane `inQuotaCooldown` backoff above both
+      // read back.
       final = { ...base, ...result }
     }
   } catch (e) {
@@ -435,8 +526,29 @@ export async function tick(deps: TickDeps): Promise<TickResult> {
 
     const halt = await deps.checkHalt()
     if (halt.halted) {
-      deps.log(`halted: ${halt.reason ?? 'unknown'}`)
-      return empty({ ran: true, halted: true, haltReason: halt.reason })
+      // Issue #817: the ONE halt this fleet clears itself. A quota-shaped
+      // reason (`engine quota exhausted (<engine>) — retry after <ISO>` —
+      // circuit.ts's `quotaBreaker`) carries its own resume time; once that
+      // has passed, sitting halted is not caution, it is just downtime a
+      // human has to notice and clear by hand. Any other reason — a human's
+      // `llamenos-fleet halt`, a GitHub `halt`-labelled issue, the plain
+      // consecutive-failures breaker — still requires that human `resume`,
+      // exactly as before.
+      if (isQuotaHaltReason(halt.reason)) {
+        const resumeAt = halt.reason !== undefined ? parseQuotaResumeAt(halt.reason) : undefined
+        if (resumeAt !== undefined && deps.now() >= resumeAt) {
+          deps.resumeFleet()
+          deps.log('RESUMED (quota window elapsed)')
+          // Fall through: this pass proceeds normally below, exactly as if
+          // it had never been halted.
+        } else {
+          deps.log(`halted (quota): ${halt.reason}`)
+          return empty({ ran: true, halted: true, haltReason: halt.reason })
+        }
+      } else {
+        deps.log(`halted: ${halt.reason ?? 'unknown'}`)
+        return empty({ ran: true, halted: true, haltReason: halt.reason })
+      }
     }
 
     const rows = deps.readLedger()
