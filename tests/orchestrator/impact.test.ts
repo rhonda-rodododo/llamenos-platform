@@ -286,6 +286,23 @@ describe('tierFor', () => {
     },
   )
 
+  // Regression for the fail-open a review gate caught on PR #870:
+  // `tier1Hit` used to match a `TIER1_PATHS` basename anywhere in the path
+  // (`f.includes(\`/${p}\`)`), so a file that merely ENDS with a Tier 1
+  // filename — while actually living under a Tier 2 "always" directory —
+  // classified as Tier 1 and skipped the non-author review entirely. Both
+  // examples are real Tier 2 directories (`packages/crypto/`,
+  // `orchestrator/`) paired with real TIER1_PATHS basenames
+  // (`eslint.config.js`, `lefthook.yml`) that are ONLY meant to match at
+  // the repo root. Neither path is a tracked file today — this asserts the
+  // classifier's behavior on a hypothetical path, not file existence.
+  it.each(['packages/crypto/eslint.config.js', 'orchestrator/src/lefthook.yml'])(
+    '%s stays Tier 2 (always) — a Tier 1 basename match must not shadow the directory it lives under',
+    (f) => {
+      expect(tierFor([f]).tier).toBe(2)
+    },
+  )
+
   it('a diff spanning tiers takes the HIGHEST tier it touches', () => {
     const mixed = tierFor(['docs/readme.md', '.claude/agents/backend-supervisor.md', 'packages/crypto/src/lib.rs'])
     expect(mixed.tier).toBe(2)

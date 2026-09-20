@@ -259,8 +259,25 @@ export const TIER1_PATHS: readonly string[] = [
   '.prettierrc.js',
 ]
 
+/**
+ * Anchored on purpose — this is the fix for a fail-open a review gate
+ * caught (see `tierForFile`'s doc comment, point 1): the earlier version
+ * matched with `f.startsWith(p) || f.includes(\`/${p}\`)`, the same
+ * unanchored-substring shape `classifyImpact` uses for `HIGH_IMPACT_PATHS`.
+ * For a directory entry that's a reasonable "is this path under that
+ * directory" test, but every `TIER1_PATHS` entry without a trailing `/` is
+ * a single REPO-ROOT file (`lefthook.yml`, `eslint.config.js`, ...), and
+ * `includes(\`/${p}\`)` matches that basename at ANY depth —
+ * `packages/crypto/eslint.config.js` or `orchestrator/src/lefthook.yml`
+ * would match here despite living under a directory `HIGH_IMPACT_PATHS`
+ * calls Tier 2 "always". Because `tierForFile` checks this list first, that
+ * false match let a crypto or orchestrator file skip the non-author review
+ * entirely. A path must match a `TIER1_PATHS` entry because it IS that
+ * directory's descendant, or literally IS that root file — never because
+ * the entry's text merely appears somewhere in the path string.
+ */
 function tier1Hit(f: string): string | undefined {
-  return TIER1_PATHS.find((p) => f.startsWith(p) || f.includes(`/${p}`))
+  return TIER1_PATHS.find((p) => (p.endsWith('/') ? f.startsWith(p) : f === p))
 }
 
 /**
