@@ -44,19 +44,93 @@ jobs:
 
     steps:
       # fetch-depth: 0 — see the identical comment on ci.yml's `changes` job
-      # checkout; the shared detect-changes action needs the diff base
-      # reachable locally.
+      # checkout; the diff base computed below needs to be reachable locally.
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           fetch-depth: 0
 
-      # Shared with ci.yml's `changes` job — see #664. Do not hand-roll a
-      # second copy of the iOS path list here; that drift is exactly what
-      # #664 fixed.
+      # KEEP THIS STEP IN SYNC WITH ci.yml's "Detect changed platforms" step
+      # — byte-for-byte identical on purpose (#664), including the outputs
+      # this job doesn't expose (only `ios` is wired to `outputs:` above; the
+      # rest are computed anyway so the two copies never diverge in shape).
+      # `.github/actions/` would be the natural place to share this, but
+      # ci.yml/ios-e2e.yml are owned by the CI/infra lane, which does NOT
+      # own `.github/actions/` (fleet/verify enforces per-lane scope) — see
+      # the identical comment in ci.yml for the full explanation. If you
+      # change one copy, change the other.
       - name: Detect changed platforms
         id: filter
-        uses: ./.github/actions/detect-changes
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            BASE="${{ github.event.pull_request.base.sha }}"
+          elif [[ "${{ github.event_name }}" == "merge_group" ]]; then
+            BASE="${{ github.event.merge_group.base_sha }}"
+          else
+            BASE="HEAD^"
+          fi
+
+          if [[ -z "$BASE" ]] || ! git cat-file -e "$BASE" 2>/dev/null; then
+            BASE="HEAD^"
+          fi
+
+          CHANGED=$(git diff --name-only "$BASE" HEAD 2>/dev/null || git diff --name-only HEAD)
+          echo "Diffing against: $BASE"
+          echo "Changed files:"
+          echo "$CHANGED"
+
+          DOCS_ONLY="true"
+          ANSIBLE_CHANGED="false"
+          SHARED_DEPS="false"
+          IOS_OWN="false"
+          ANDROID_OWN="false"
+          DESKTOP_OWN="false"
+          BACKEND_OWN="false"
+          CRYPTO_OWN="false"
+          ORCHESTRATOR_OWN="false"
+
+          SHARED_DEPS_REGEX='^packages/crypto/|^packages/protocol/|^packages/shared/|^packages/i18n/|^package\.json$|^bun\.lock$|^\.mise\.toml$|^\.github/workflows/ci\.yml$|^\.github/actions/|^scripts/|^tsconfig.*\.json$|^vitest.*\.config\.ts$'
+
+          while IFS= read -r file; do
+            [[ -z "$file" ]] && continue
+            if ! echo "$file" | grep -qE '\.md$|^site/'; then
+              DOCS_ONLY="false"
+              echo "Non-docs file changed: $file"
+            fi
+            if echo "$file" | grep -qE '^deploy/ansible/'; then
+              ANSIBLE_CHANGED="true"
+              echo "Ansible file changed: $file"
+            fi
+            if echo "$file" | grep -qE "$SHARED_DEPS_REGEX"; then
+              SHARED_DEPS="true"
+              echo "Shared-dependency file changed: $file"
+            fi
+            echo "$file" | grep -qE '^apps/ios/' && IOS_OWN="true"
+            echo "$file" | grep -qE '^apps/android/' && ANDROID_OWN="true"
+            echo "$file" | grep -qE '^apps/desktop/|^src/client/|^tests/' && DESKTOP_OWN="true"
+            echo "$file" | grep -qE '^apps/worker/|^sip-bridge/|^signal-notifier/|^deploy/docker/' && BACKEND_OWN="true"
+            echo "$file" | grep -qE '^packages/crypto/' && CRYPTO_OWN="true"
+            echo "$file" | grep -qE '^orchestrator/|^tests/orchestrator/' && ORCHESTRATOR_OWN="true"
+          done <<< "$CHANGED"
+
+          ios="false"; [[ "$SHARED_DEPS" == "true" || "$IOS_OWN" == "true" ]] && ios="true"
+          android="false"; [[ "$SHARED_DEPS" == "true" || "$ANDROID_OWN" == "true" ]] && android="true"
+          desktop="false"; [[ "$SHARED_DEPS" == "true" || "$DESKTOP_OWN" == "true" ]] && desktop="true"
+          backend="false"; [[ "$SHARED_DEPS" == "true" || "$BACKEND_OWN" == "true" ]] && backend="true"
+          crypto="false"; [[ "$SHARED_DEPS" == "true" || "$CRYPTO_OWN" == "true" ]] && crypto="true"
+          orchestrator="false"; [[ "$SHARED_DEPS" == "true" || "$ORCHESTRATOR_OWN" == "true" ]] && orchestrator="true"
+
+          {
+            echo "app=$([ "$DOCS_ONLY" = "false" ] && echo true || echo false)"
+            echo "docs_only=$DOCS_ONLY"
+            echo "ansible=$ANSIBLE_CHANGED"
+            echo "ios=$ios"
+            echo "android=$android"
+            echo "desktop=$desktop"
+            echo "backend=$backend"
+            echo "crypto=$crypto"
+            echo "orchestrator=$orchestrator"
+          } >> "$GITHUB_OUTPUT"
 
   # ─── Build App + Backend Once ──────────────────────────────────
   ios-e2e-build:

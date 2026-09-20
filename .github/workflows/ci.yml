@@ -4,7 +4,7 @@
 #   1. Detect changed files — skip tests for docs-only changes, and
 #      path-scope every platform-specific job (ios/android/desktop/backend/
 #      crypto) to the platforms the PR actually touches — see the `changes`
-#      job and .github/actions/detect-changes/ (#664). A job whose platform
+#      job's "Detect changed platforms" step (#664). A job whose platform
 #      didn't change is *skipped*, not absent, so it still satisfies
 #      `ci-status` and any required-check gate.
 #   2. Build & validate (codegen, typecheck, vite build, esbuild)
@@ -92,16 +92,111 @@ jobs:
 
     steps:
       # fetch-depth: 0 (full history) so the PR base / merge_group base
-      # computed by detect-changes is always reachable — same reason `lint`'s
-      # checkout below uses it.
+      # computed below is always reachable — same reason `lint`'s checkout
+      # further down in this file uses it.
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           fetch-depth: 0
 
+      # KEEP THIS STEP IN SYNC WITH ios-e2e.yml's "Detect changed platforms"
+      # step — byte-for-byte identical on purpose (#664). A `.github/actions/`
+      # composite action would be the natural single source of truth here,
+      # but ci.yml and ios-e2e.yml are owned by the CI/infra lane, which does
+      # NOT own `.github/actions/` (fleet/verify enforces this per-lane
+      # scope) — so this script is inlined in both files instead of
+      # factored out. If you change one copy, change the other.
       - name: Detect changed platforms
         id: filter
-        uses: ./.github/actions/detect-changes
+        run: |
+          # ── Pick the diff base ──────────────────────────────────────────
+          # PR runs diff against the PR's actual base commit, not HEAD^
+          # (which, on a multi-commit PR, only covers the most recent commit
+          # and misses everything else the PR touched — see #664).
+          # merge_group uses the queue's own base for the same reason `lint`
+          # already does (see that job's "Determine changed files" step
+          # below). push and workflow_dispatch keep the original HEAD^
+          # single-commit fallback.
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            BASE="${{ github.event.pull_request.base.sha }}"
+          elif [[ "${{ github.event_name }}" == "merge_group" ]]; then
+            BASE="${{ github.event.merge_group.base_sha }}"
+          else
+            BASE="HEAD^"
+          fi
+
+          # Fall back to a single-commit diff if the computed base isn't
+          # reachable in this checkout (shallow history, force-push, first
+          # commit on a branch).
+          if [[ -z "$BASE" ]] || ! git cat-file -e "$BASE" 2>/dev/null; then
+            BASE="HEAD^"
+          fi
+
+          CHANGED=$(git diff --name-only "$BASE" HEAD 2>/dev/null || git diff --name-only HEAD)
+          echo "Diffing against: $BASE"
+          echo "Changed files:"
+          echo "$CHANGED"
+
+          DOCS_ONLY="true"
+          ANSIBLE_CHANGED="false"
+          SHARED_DEPS="false"
+          IOS_OWN="false"
+          ANDROID_OWN="false"
+          DESKTOP_OWN="false"
+          BACKEND_OWN="false"
+          CRYPTO_OWN="false"
+          ORCHESTRATOR_OWN="false"
+
+          # Files that transitively affect every platform: the shared crypto
+          # crate (compiled into every app via native/WASM/UniFFI), protocol
+          # schemas (codegen'd into every platform's types), shared TS types,
+          # i18n, and the JS/TS toolchain itself. `.github/actions/` is
+          # included because bootstrap-backend (used by e2e, desktop-e2e,
+          # backend-bdd, android-e2e, ios-e2e) is a composite action —
+          # changing it changes every job that calls it, the same way
+          # changing this very step would.
+          SHARED_DEPS_REGEX='^packages/crypto/|^packages/protocol/|^packages/shared/|^packages/i18n/|^package\.json$|^bun\.lock$|^\.mise\.toml$|^\.github/workflows/ci\.yml$|^\.github/actions/|^scripts/|^tsconfig.*\.json$|^vitest.*\.config\.ts$'
+
+          while IFS= read -r file; do
+            [[ -z "$file" ]] && continue
+            if ! echo "$file" | grep -qE '\.md$|^site/'; then
+              DOCS_ONLY="false"
+              echo "Non-docs file changed: $file"
+            fi
+            if echo "$file" | grep -qE '^deploy/ansible/'; then
+              ANSIBLE_CHANGED="true"
+              echo "Ansible file changed: $file"
+            fi
+            if echo "$file" | grep -qE "$SHARED_DEPS_REGEX"; then
+              SHARED_DEPS="true"
+              echo "Shared-dependency file changed: $file"
+            fi
+            echo "$file" | grep -qE '^apps/ios/' && IOS_OWN="true"
+            echo "$file" | grep -qE '^apps/android/' && ANDROID_OWN="true"
+            echo "$file" | grep -qE '^apps/desktop/|^src/client/|^tests/' && DESKTOP_OWN="true"
+            echo "$file" | grep -qE '^apps/worker/|^sip-bridge/|^signal-notifier/|^deploy/docker/' && BACKEND_OWN="true"
+            echo "$file" | grep -qE '^packages/crypto/' && CRYPTO_OWN="true"
+            echo "$file" | grep -qE '^orchestrator/|^tests/orchestrator/' && ORCHESTRATOR_OWN="true"
+          done <<< "$CHANGED"
+
+          ios="false"; [[ "$SHARED_DEPS" == "true" || "$IOS_OWN" == "true" ]] && ios="true"
+          android="false"; [[ "$SHARED_DEPS" == "true" || "$ANDROID_OWN" == "true" ]] && android="true"
+          desktop="false"; [[ "$SHARED_DEPS" == "true" || "$DESKTOP_OWN" == "true" ]] && desktop="true"
+          backend="false"; [[ "$SHARED_DEPS" == "true" || "$BACKEND_OWN" == "true" ]] && backend="true"
+          crypto="false"; [[ "$SHARED_DEPS" == "true" || "$CRYPTO_OWN" == "true" ]] && crypto="true"
+          orchestrator="false"; [[ "$SHARED_DEPS" == "true" || "$ORCHESTRATOR_OWN" == "true" ]] && orchestrator="true"
+
+          {
+            echo "app=$([ "$DOCS_ONLY" = "false" ] && echo true || echo false)"
+            echo "docs_only=$DOCS_ONLY"
+            echo "ansible=$ANSIBLE_CHANGED"
+            echo "ios=$ios"
+            echo "android=$android"
+            echo "desktop=$desktop"
+            echo "backend=$backend"
+            echo "crypto=$crypto"
+            echo "orchestrator=$orchestrator"
+          } >> "$GITHUB_OUTPUT"
 
   # ─── Guard: No Generated Files In Git ────────────────────
   no-generated-files-in-git:
