@@ -16,15 +16,31 @@
  * 35504685113) with no diff to point at — v0.19.13 shipped with only
  * checksums/provenance/SBOM, no installer.
  *
- * The fix is to pin both to the same exact version (no `^`, `~`, or bare
- * major) so they cannot drift independently. This test is the rail: it reads
- * the two manifests directly (the same failure mode the CLI's own check
- * reacts to) and fails loudly if their major.minor ever disagree again, or if
- * either reverts to a floating range that hides the minor entirely.
+ * The fix (#895) was to pin the Rust crate and `@tauri-apps/api` to the same
+ * exact version so they couldn't drift independently — but it missed the
+ * third member of the trio, `@tauri-apps/cli` (`package.json`
+ * `devDependencies`), which was left on a floating `^2.10.1`. That let the
+ * CLI resolve to a newer minor than the other two on a fresh install (no
+ * lockfile-pinned resolution can be assumed reproducible across bun
+ * versions/hosts), and that newer CLI stopped accepting the
+ * `bunx tauri build apps/desktop` positional-argument form the release
+ * workflow relied on:
+ *
+ *   error: unexpected argument 'apps/desktop' found
+ *
+ * That broke every macOS/Linux/Windows leg of tauri-release.yml (CI run
+ * 35521542402) — the exact same "one package left floating" defect in a new
+ * place. The fix is to pin all three to the same exact version (no `^`, `~`,
+ * or bare major) so none of them can drift alone. This test is the rail: it
+ * reads all three manifests directly (the same failure mode the CLI's own
+ * mismatch check reacts to) and fails loudly if ANY of their major.minor
+ * versions disagree, or if any of them reverts to a floating range that
+ * hides the minor entirely.
  *
  * Mutation check performed while authoring this test (see PR body for the
- * actual output): setting the two versions to different minors made the test
- * fail with the expected message; restoring the matching pin made it pass.
+ * actual output): setting each version in turn to a different minor made the
+ * corresponding test fail with the expected message; restoring the matching
+ * pin made it pass.
  */
 
 import { test, expect } from '@playwright/test'
@@ -63,64 +79,76 @@ function parseMajorMinor(raw: string, context: string): MajorMinor {
   return { raw, major: Number(match[1]), minor: Number(match[2]) }
 }
 
-function readCargoTauriVersion(): MajorMinor {
-  const contents = readFileSync(CARGO_TOML_PATH, 'utf-8')
-  // Matches both `tauri = "2.11.1"` and `tauri = { version = "2.11.1", ... }`,
-  // anchored to the start of a line so `tauri-build`/`tauri-plugin-*` never match.
-  const match = contents.match(/^tauri\s*=\s*(?:"([^"]+)"|\{[^}]*version\s*=\s*"([^"]+)")/m)
-  if (!match) {
-    throw new Error(`Could not find a top-level "tauri" dependency in ${CARGO_TOML_PATH}`)
-  }
-  const version = match[1] ?? match[2]
-  return parseMajorMinor(version, `apps/desktop/Cargo.toml "tauri" dependency`)
-}
-
-function readNpmTauriApiVersion(): MajorMinor {
+/**
+ * All three Tauri packages that must move together, with the raw
+ * (unstripped) version string used for the "exact pin" check below.
+ */
+function readAllTauriVersions(): Array<{ label: string; version: MajorMinor; raw: string }> {
   const pkg = JSON.parse(readFileSync(PACKAGE_JSON_PATH, 'utf-8')) as {
     dependencies?: Record<string, string>
+    devDependencies?: Record<string, string>
   }
-  const version = pkg.dependencies?.['@tauri-apps/api']
-  if (!version) {
-    throw new Error(`package.json has no "@tauri-apps/api" entry under "dependencies"`)
+  const cargoMatch = readFileSync(CARGO_TOML_PATH, 'utf-8').match(
+    /^tauri\s*=\s*(?:"([^"]+)"|\{[^}]*version\s*=\s*"([^"]+)")/m,
+  )
+  if (!cargoMatch) {
+    throw new Error(`Could not find a top-level "tauri" dependency in ${CARGO_TOML_PATH}`)
   }
-  return parseMajorMinor(version, `package.json "@tauri-apps/api" dependency`)
+  const cargoRaw = (cargoMatch[1] ?? cargoMatch[2]) as string
+  const apiRaw = pkg.dependencies?.['@tauri-apps/api']
+  const cliRaw = pkg.devDependencies?.['@tauri-apps/cli']
+  if (!apiRaw) throw new Error(`package.json has no "@tauri-apps/api" entry under "dependencies"`)
+  if (!cliRaw) throw new Error(`package.json has no "@tauri-apps/cli" entry under "devDependencies"`)
+
+  return [
+    { label: 'apps/desktop/Cargo.toml "tauri" crate', version: parseMajorMinor(cargoRaw, 'Cargo.toml "tauri"'), raw: cargoRaw },
+    { label: 'package.json "@tauri-apps/api"', version: parseMajorMinor(apiRaw, 'package.json "@tauri-apps/api"'), raw: apiRaw },
+    { label: 'package.json "@tauri-apps/cli"', version: parseMajorMinor(cliRaw, 'package.json "@tauri-apps/cli"'), raw: cliRaw },
+  ]
 }
 
 test.describe('Tauri version alignment', () => {
-  test('Rust tauri crate and npm @tauri-apps/api pin the same major.minor', () => {
-    const rust = readCargoTauriVersion()
-    const npm = readNpmTauriApiVersion()
+  test('Rust tauri crate, npm @tauri-apps/api and @tauri-apps/cli all pin the same major.minor', () => {
+    const [rustEntry, apiEntry, cliEntry] = readAllTauriVersions()
+    const rust = rustEntry.version
+    const api = apiEntry.version
+    const cli = cliEntry.version
 
     expect(
-      rust.major === npm.major && rust.minor === npm.minor,
-      `Tauri Rust crate (${rust.raw}) and npm @tauri-apps/api (${npm.raw}) are on ` +
+      rust.major === api.major && rust.minor === api.minor,
+      `Tauri Rust crate (${rust.raw}) and npm @tauri-apps/api (${api.raw}) are on ` +
         `different minors. \`tauri build\` hard-fails on this exact mismatch — bump ` +
         `both apps/desktop/Cargo.toml's "tauri" dependency and package.json's ` +
         `"@tauri-apps/api" dependency together to a matching version.`,
     ).toBe(true)
+
+    expect(
+      rust.major === cli.major && rust.minor === cli.minor,
+      `Tauri Rust crate (${rust.raw}) and npm @tauri-apps/cli (${cli.raw}) are on ` +
+        `different minors. A drifted CLI can silently change its accepted argument ` +
+        `shapes (e.g. dropping support for a positional project path) independently ` +
+        `of the crate/api pair — bump package.json's "@tauri-apps/cli" dependency to ` +
+        `match apps/desktop/Cargo.toml's "tauri" dependency.`,
+    ).toBe(true)
   })
 
-  test('both dependencies are pinned to an exact version, not a floating range', () => {
-    const cargoRaw = readFileSync(CARGO_TOML_PATH, 'utf-8')
-      .match(/^tauri\s*=\s*(?:"([^"]+)"|\{[^}]*version\s*=\s*"([^"]+)")/m)
-    const npmRaw = (
-      JSON.parse(readFileSync(PACKAGE_JSON_PATH, 'utf-8')) as { dependencies?: Record<string, string> }
-    ).dependencies?.['@tauri-apps/api']
-
-    expect(cargoRaw, 'expected to find the tauri dependency in Cargo.toml').toBeTruthy()
-    const cargoVersion = (cargoRaw?.[1] ?? cargoRaw?.[2]) as string
-
-    // Cargo exact pins use a leading "=" (e.g. "=2.11.1"); npm/bun exact pins
-    // simply omit any range operator (no "^", "~", "*", or bare major).
-    expect(
-      cargoVersion.startsWith('='),
-      `apps/desktop/Cargo.toml's "tauri" version ("${cargoVersion}") must be an exact ` +
-        `pin (e.g. "=2.11.1") so cargo cannot resolve a different minor than npm.`,
-    ).toBe(true)
-    expect(
-      /^\d+\.\d+\.\d+/.test(npmRaw ?? ''),
-      `package.json's "@tauri-apps/api" version ("${npmRaw}") must be an exact pin ` +
-        `(no "^"/"~" prefix) so bun cannot resolve a different minor than cargo.`,
-    ).toBe(true)
+  test('all three Tauri packages are pinned to an exact version, not a floating range', () => {
+    for (const { label, raw } of readAllTauriVersions()) {
+      if (label.startsWith('apps/desktop/Cargo.toml')) {
+        // Cargo exact pins use a leading "=" (e.g. "=2.11.1").
+        expect(
+          raw.startsWith('='),
+          `${label} version ("${raw}") must be an exact pin (e.g. "=2.11.1") so cargo ` +
+            `cannot resolve a different minor than the npm packages.`,
+        ).toBe(true)
+      } else {
+        // npm/bun exact pins simply omit any range operator (no "^", "~", "*", or bare major).
+        expect(
+          /^\d+\.\d+\.\d+/.test(raw),
+          `${label} version ("${raw}") must be an exact pin (no "^"/"~" prefix) so bun ` +
+            `cannot resolve a different minor than the Rust crate.`,
+        ).toBe(true)
+      }
+    }
   })
 })
