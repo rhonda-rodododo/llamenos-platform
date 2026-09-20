@@ -193,8 +193,9 @@ When('the third party attempts to decrypt the note', async ({request, world}) =>
 
 Then('decryption should fail', async ({ world }) => {
   // Third party (unregistered) gets 401 (unknown pubkey) or 403 (no permission)
-  if (getSecTestState(world).sessionResult) {
-    expect([401, 403, 404]).toContain(getSecTestState(world).sessionResult.status)
+  const sessionResult = getSecTestState(world).sessionResult
+  if (sessionResult) {
+    expect([401, 403, 404]).toContain(sessionResult.status)
   }
 })
 
@@ -351,7 +352,7 @@ Given('a volunteer with an active session', async ({request, world}) => {
   const vol = await createVolunteerViaApi(request, {
     name: `Session Vol ${Date.now()}`,
   })
-  getSecTestState(world).volunteerKeypair = { seedHex: vol.seedHex, pubkey: vol.pubkey, skHex: '' }
+  getSecTestState(world).volunteerKeypair = { seedHex: vol.seedHex, pubkey: vol.pubkey }
 })
 
 When("an admin changes the volunteer's role", async ({request, world}) => {
@@ -369,8 +370,9 @@ Then("the volunteer's existing session should be invalidated", async () => {
 Then('the volunteer must re-authenticate', async ({request, world}) => {
   // After role change, the volunteer's cached permissions should be stale
   // A new auth request verifies the updated role
-  if (getSecTestState(world).volunteerKeypair?.seedHex) {
-    const result = await getMeViaApi(request, getSecTestState(world).volunteerKeypair.seedHex)
+  const volunteerKeypair = getSecTestState(world).volunteerKeypair
+  if (volunteerKeypair?.seedHex) {
+    const result = await getMeViaApi(request, volunteerKeypair.seedHex)
     // Should succeed but with updated roles
     if (result.status === 200 && result.data) {
       expect(result.data.roles).toBeDefined()
@@ -386,8 +388,9 @@ When('the volunteer is deactivated by an admin', async ({request, world}) => {
 })
 
 Then("the volunteer's session tokens should be invalidated", async ({request, world}) => {
-  if (getSecTestState(world).volunteerKeypair?.seedHex) {
-    const result = await getMeViaApi(request, getSecTestState(world).volunteerKeypair.seedHex)
+  const volunteerKeypair = getSecTestState(world).volunteerKeypair
+  if (volunteerKeypair?.seedHex) {
+    const result = await getMeViaApi(request, volunteerKeypair.seedHex)
     // Deactivated volunteer: Schnorr auth is stateless per-request, so the server
     // may still accept the token (200) but the volunteer's active flag is false.
     // Future: auth middleware should check active status → 403.
@@ -400,7 +403,7 @@ Given('a user authenticated on two devices', async ({request, world}) => {
   const vol = await createVolunteerViaApi(request, {
     name: `Multi-device ${Date.now()}`,
   })
-  getSecTestState(world).volunteerKeypair = { seedHex: vol.seedHex, pubkey: vol.pubkey, skHex: '' }
+  getSecTestState(world).volunteerKeypair = { seedHex: vol.seedHex, pubkey: vol.pubkey }
 })
 
 When('both devices make requests simultaneously', async ({request, world}) => {
@@ -438,8 +441,9 @@ Then("device 1's session should be invalid", async () => {
 Then("device 2's session should still be valid", async ({request, world}) => {
   // A new auth request from the same keypair should still work
   // (Schnorr tokens are per-request, not session-based)
-  if (getSecTestState(world).volunteerKeypair?.seedHex) {
-    const result = await getMeViaApi(request, getSecTestState(world).volunteerKeypair.seedHex)
+  const volunteerKeypair = getSecTestState(world).volunteerKeypair
+  if (volunteerKeypair?.seedHex) {
+    const result = await getMeViaApi(request, volunteerKeypair.seedHex)
     // Should still work since Schnorr auth is stateless
     expect(result.status).not.toBe(401)
   }

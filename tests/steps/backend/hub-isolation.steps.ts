@@ -270,8 +270,8 @@ When('I GET provider status for all hubs', async ({ request, world }) => {
   const state = getIS(world)
   // Super admin can view all provider setups via the provider-setup status
   // Query each hub's status individually as super admin
-  const resA = await apiGet(request, `/hubs/${state.hubA.hubId}/onboard/provider-status`)
-  const resB = await apiGet(request, `/hubs/${state.hubB.hubId}/onboard/provider-status`)
+  const resA = await apiGet<Record<string, unknown>>(request, `/hubs/${state.hubA.hubId}/onboard/provider-status`)
+  const resB = await apiGet<Record<string, unknown>>(request, `/hubs/${state.hubB.hubId}/onboard/provider-status`)
   state.lastRes = {
     status: 200,
     data: {

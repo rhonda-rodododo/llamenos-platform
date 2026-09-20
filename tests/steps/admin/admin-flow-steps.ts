@@ -44,13 +44,15 @@ When('I close the nsec card', async ({ page }) => {
   await expect(page.getByTestId(TestIds.DISMISS_DEVICE_KEY)).not.toBeVisible({ timeout: 5000 })
 })
 
-Then('the volunteer should appear in the list', async ({ page, backendRequest, workerHub, adminWorld }) => {
+Then('the volunteer should appear in the list', async ({ page, backendRequest, adminWorld }) => {
   // UI verification
   const row = page.getByTestId(TestIds.VOLUNTEER_ROW).filter({ hasText: adminWorld.lastUserName })
   await expect(row.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
 
-  // API verification: volunteer exists in backend
-  const volunteers = await listVolunteersViaApi(backendRequest, workerHub)
+  // API verification: volunteer exists in backend.
+  // listVolunteersViaApi has no hub-scoped overload (tests/api-helpers.ts is outside this
+  // lane's ownership — see PR notes), so this checks the unscoped /users list by name.
+  const volunteers = await listVolunteersViaApi(backendRequest)
   const found = volunteers.find(v => v.name === adminWorld.lastUserName)
   expect(found).toBeTruthy()
   adminWorld.lastUserPubkey = found!.pubkey
@@ -63,13 +65,13 @@ When('I delete the volunteer', async ({ page, adminWorld }) => {
   await expect(page.getByRole('dialog')).toBeHidden({ timeout: 5000 })
 })
 
-Then('the volunteer should be removed from the list', async ({ page, backendRequest, workerHub, adminWorld }) => {
+Then('the volunteer should be removed from the list', async ({ page, backendRequest, adminWorld }) => {
   // UI verification
   const row = page.getByTestId(TestIds.VOLUNTEER_ROW).filter({ hasText: adminWorld.lastUserName })
   await expect(row).not.toBeVisible({ timeout: Timeouts.ELEMENT })
 
-  // API verification: volunteer is gone
-  const volunteers = await listVolunteersViaApi(backendRequest, workerHub)
+  // API verification: volunteer is gone (see note above re: listVolunteersViaApi scope)
+  const volunteers = await listVolunteersViaApi(backendRequest)
   const found = volunteers.find(v => v.name === adminWorld.lastUserName)
   expect(found).toBeUndefined()
 })

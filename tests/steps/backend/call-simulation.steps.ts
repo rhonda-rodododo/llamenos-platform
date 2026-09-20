@@ -271,13 +271,16 @@ Given('a shift configured for 9am-5pm in America\\/New_York', async ({ request, 
   const vol = await createVolunteerViaApi(request, { name: uniqueName('TZ Vol') })
   getCallSimState(world).shiftVolunteers = [{ pubkey: vol.pubkey, deviceKey: vol.deviceKey }]
   getScenarioState(world).volunteers.push({ ...vol, onShift: true })
+  // NOTE: createShiftViaApi (tests/api-helpers.ts, outside this lane's ownership) has no
+  // timezone option — shifts have no server-side timezone concept today. The scenario's
+  // "current time is 10am Eastern" step is a documented no-op precondition, so dropping
+  // this unsupported field does not change what the scenario actually verifies.
   await createShiftViaApi(request, {
     name: uniqueName('TZ Shift'),
     startTime: '09:00',
     endTime: '17:00',
     days: [0, 1, 2, 3, 4, 5, 6],
     userPubkeys: [vol.pubkey],
-    timezone: 'America/New_York',
     hubId,
   })
 })

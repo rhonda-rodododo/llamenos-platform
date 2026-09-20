@@ -66,8 +66,9 @@ async function ensureEntityType(
     name: `lifecycle_case_${Date.now()}`,
     hubId,
   })
-  getLifecycleState(world).entityTypeId = et.id
-  return et.id
+  const entityTypeId = et.id as string
+  getLifecycleState(world).entityTypeId = entityTypeId
+  return entityTypeId
 }
 
 // ── Full Lifecycle ────────────────────────────────────────────────
