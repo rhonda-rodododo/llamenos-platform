@@ -437,8 +437,28 @@ jobs:
           target: app
           push: true
           tags: ${{ steps.meta.outputs.tags }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          # Registry-backed cache, not `type=gha`. `type=gha,mode=max` was
+          # the actual cause of every `docker-stable` failure on 0.19.14
+          # (run 35520224670, three consecutive attempts): `mode=max`
+          # exports every intermediate layer of this multi-stage build, and
+          # this repo's single Actions cache quota (10GB total, shared with
+          # docker.yml/ci.yml/security-audit.yml — see PR body) was pinned
+          # at its ceiling with 167 of 224 entries being `buildkit-blob-*`
+          # layers from this exact export. Purging those entries did not
+          # fix the underlying failure: the next `mode=max` export from any
+          # of the four workflows refills the same shared quota and
+          # reproduces `error writing layer blob: failed to reserve cache`.
+          # GHCR has no such shared/fixed quota, this job already
+          # authenticates to it (`Log in to GHCR` above) with `packages:
+          # write`, and moving here also means `docker-stable` no longer
+          # competes with docker.yml/ci.yml/security-audit.yml for the one
+          # shared Actions cache — see the PR body for why those three are
+          # deliberately NOT touched here (#902/#903 own CI caching
+          # strategy). `mode=max` is kept — worth it for a release build
+          # that includes the Rust crypto FFI compile — because registry
+          # storage isn't the resource that was exhausted.
+          cache-from: type=registry,ref=${{ steps.meta.outputs.image }}:buildcache
+          cache-to: type=registry,ref=${{ steps.meta.outputs.image }}:buildcache,mode=max
 
       - name: Generate SBOM attestation
         uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v2.1.0
