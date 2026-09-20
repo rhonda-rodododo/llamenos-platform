@@ -98,9 +98,55 @@
 #
 # `fleet/verify` stays out of this file — it is cheap and mechanical, still
 # runs on `pull_request` for fast feedback (see `fleet-verify.yml`).
-# `fleet/review` is the expensive, rate-limited one — a non-author MODEL call
-# against a paid, weekly-quota'd provider — and must run at most once per PR,
-# on demand (the `review` label), never on every push.
+# `fleet/review` is the expensive one — a non-author MODEL call — and must
+# run at most once per PR, on demand (the `review` label), never on every
+# push.
+#
+# Operator decision (#812): coding-agent SESSIONS review better than a thin
+# API call. The evidence is this project's own gate history — the previous
+# `opencode`/Kimi-for-Coding reviewer's genuine findings were good, but most
+# of its failures were infrastructure (UNREADABLE from turn-budget
+# exhaustion, smoke-test failures, provider quota exhausted mid-week) rather
+# than the reviewer actually missing something, and its 2-3-turn cap could
+# not even be enforced on `opencode`'s own CLI (no equivalent flag existed).
+# A Claude Code session has real tools, can read the whole export and reason
+# over it with room to do so, and runs on the operator's own Max
+# subscription instead of a metered key.
+#
+# A self-hosted runner is registered for exactly this job: name
+# `llamenos-review-box`, labels `self-hosted,Linux,X64,fleet-review`,
+# working dir `~/actions-runner-llamenos`. The `claude` CLI is authenticated
+# on that machine for the operator's own account — that login state (under
+# `HOME`) is the entire authentication mechanism for this job now; see
+# `VERIFIER_ENV_ALLOWLIST`'s doc comment in `orchestrator/src/review.ts`.
+# `FLEET_REVIEW_API_KEY` (below, still referenced) is NOT forwarded into the
+# reviewer's own environment — it is kept only as (1) the operator's
+# explicit "review is enabled for this repo" toggle, unchanged UX from
+# before #812, and (2) what keeps CodeQL's cache-poisoning query treating
+# this job as privileged and therefore out of scope for that specific query
+# (see the "job that executes the judged commit's code cannot be reached by
+# a cache-write event" rail in `tests/orchestrator/guards.test.ts`, and
+# `REVIEW_KEY_ENV`'s doc comment in `orchestrator/src/ci.ts`).
+#
+# Running PR-triggered work on a machine the operator owns is exactly the
+# kind of thing that must never process a fork PR unattended — see the
+# "Refuse to run on a fork PR" step below, the job's literal FIRST step, for
+# the mandatory guard. Availability is honest, not silently degraded: if
+# `llamenos-review-box` is offline, this job QUEUES (GitHub Actions holds a
+# job for a runner matching its labels; it does not fail it), and a PR
+# waiting on `fleet/review` simply cannot merge until the box comes back —
+# fail-closed, the same posture this file has had since #848.
+#
+# The honest cost, stated plainly rather than left implicit: the fleet's
+# workers author with `claude`, and the reviewer is now ALSO `claude` — a
+# different session on a different machine with no shared context, but no
+# longer an independent VENDOR the way `opencode` (Kimi) was. A model does
+# not review its own blind spots as well as a different model would.
+# Recommended mitigation, not yet applied: run the reviewer on a different
+# MODEL TIER than the lanes use (e.g. `opus` here, `sonnet` on the lanes)
+# once budget allows — `FLEET_REVIEW_MODEL` below is exactly the dial for
+# that, a repo variable, never a code change. See `verifierFor`'s doc
+# comment in `orchestrator/src/review.ts` for the full accounting.
 name: Fleet Review
 
 on:
@@ -178,13 +224,18 @@ jobs:
     # skipping it — either way the job reaches a real, reported conclusion,
     # which a job-level `if:` can never guarantee once GitHub decides the
     # job merely "didn't run".
-    runs-on: ubuntu-latest
+    # #812: a dedicated self-hosted runner, never a GitHub-hosted one — this
+    # is the only label combination that reaches `llamenos-review-box`. See
+    # the "Operator decision (#812)" paragraph in this file's header for why,
+    # and the "Refuse to run on a fork PR" step below (the job's literal
+    # first step) for the guard a self-hosted runner processing PR events
+    # requires.
+    runs-on: [self-hosted, fleet-review]
     permissions:
-      # contents: read — the reviewer runs inside this job with the review
-      # key on disk, so the containment that matters is that NOTHING from
-      # the commit under judgement ever executes here: it is a `git archive`
-      # export the model reads, never a checkout, never installed, never on
-      # a module path.
+      # contents: read — the reviewer runs inside this job, so the
+      # containment that matters is that NOTHING from the commit under
+      # judgement ever executes here: it is a `git archive` export the model
+      # reads, never a checkout, never installed, never on a module path.
       contents: read
       # Used only on the workflow_dispatch path (`gh api .../pulls/$pr`) to
       # resolve the PR's branch name and base/head SHAs. The `pull_request`
@@ -197,40 +248,59 @@ jobs:
       # this line is exactly why that rail asserts `read`, not the whole
       # key's absence.
       actions: read
-    # HIGH_IMPACT_TIMEOUT_MS is 8 minutes (review.ts, cut from 25 at #812 —
-    # see the comment above it); checkout, deps, the engine download, the
-    # smoke call and the cache lookup have to fit around it.
-    timeout-minutes: 20
+    # HIGH_IMPACT_TIMEOUT_MS is 20 minutes (review.ts — widened at #812 from
+    # the old thin-API-call budget now that the reviewer is a full claude
+    # session on the operator's own Max subscription, not a metered,
+    # quota'd provider); this stays comfortably above that so the JOB itself
+    # is never what kills a review still within its own budget — checkout,
+    # deps, the smoke call and the cache lookup all have to fit in the
+    # difference too.
+    timeout-minutes: 30
 
-    # Repo Settings > Secrets and variables > Actions > Variables — so a
-    # quota-exhausted or revoked provider is an operator action (set two
-    # variables, rotate one secret), never a code change or a PR. Both steps
-    # below that talk to opencode (auth + smoke) key off these; so does the
-    # "Review" step, which reads `FLEET_REVIEW_MODEL` itself (review.ts's
-    # VERIFIER_ENGINE) rather than a literal, precisely so a variable change
-    # moves the smoke test and the real review together. See "Switching the
-    # review engine provider" in
-    # docs/superpowers/specs/2026-09-11-llamenos-fleet-orchestrator-design.md.
+    # Repo Settings > Secrets and variables > Actions > Variables — so
+    # raising the reviewer's model tier is an operator action (one repo
+    # variable), never a code change or a PR. The smoke-test step below and
+    # the "Review" step both key off this; `review.ts`'s `REVIEWER_MODEL`
+    # reads the identical env var with the identical default, so a variable
+    # change moves the smoke test and the real review together. There is no
+    # `FLEET_REVIEW_PROVIDER` any more — `claude`, pre-authenticated on this
+    # runner, is the only provider now (see the file header).
     #
-    # Deliberately NO `|| 'literal-default'` fallback here anymore. There
-    # used to be one (`kimi-for-coding` / `kimi-for-coding/k3-256k`), and it
-    # is the reason a whole night got spent chasing an opaque
-    # `UnknownError: "Unexpected server error"` across ~10 PRs: that provider
-    # id was retired on 2026-09-19, the hardcoded fallback kept silently
-    # substituting the dead id whenever the vars happened to be unset, and
-    # the ONLY thing that has kept this job green since is the repo
-    # variables having been set BY HAND to the live id — invisible
-    # configuration with no diff and no signal the day someone clears it. A
-    # provider id that can (and has, twice — see the comment above
-    # `DEFAULT_OPENCODE_MODEL` in `orchestrator/src/review.ts`)
-    # go stale must never be guessed at silently; see "Require review engine
-    # configuration" below, which turns an absent variable into a named,
-    # actionable failure instead.
+    # #891 banned a silent literal default for the review engine, but that
+    # was about a swappable PROVIDER id going stale and being guessed at
+    # invisibly (`kimi-for-coding`, retired twice under everyone's feet — see
+    # the comment above `DEFAULT_OPENCODE_MODEL` in `orchestrator/src/
+    # review.ts`, kept for that history even though it no longer drives this
+    # job). This job has no provider left to guess at: `claude` is the only
+    # engine (`reviewerBinaryFor` hard-fails for anything else), and
+    # `'sonnet'` is a real, always-valid model tier, not a dead id someone
+    # forgot to update — the smoke test below still classifies a bad
+    # `FLEET_REVIEW_MODEL` as `engine-misconfigured` before the real review
+    # ever runs, so an operator TYPO is still loud, just not an unconfigured
+    # variable being silently invisible the way an absent provider id was.
     env:
-      FLEET_REVIEW_PROVIDER: ${{ vars.FLEET_REVIEW_PROVIDER }}
-      FLEET_REVIEW_MODEL: ${{ vars.FLEET_REVIEW_MODEL }}
+      FLEET_REVIEW_MODEL: ${{ vars.FLEET_REVIEW_MODEL || 'sonnet' }}
 
     steps:
+      # MANDATORY, and must stay the literal first step: a self-hosted
+      # runner executing PR-triggered work is dangerous enough that this
+      # check must run before anything else in the job — before the base
+      # checkout, before the head export, before even `bun` is on PATH. A
+      # `workflow_dispatch` run has no `pull_request` payload at all (it is
+      # an operator-triggered, write-access-gated event), so it is exempt by
+      # construction rather than by an explicit allowlist.
+      - name: Refuse to run on a fork PR (self-hosted runner guard)
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          THIS_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          if [[ "$EVENT_NAME" == "pull_request" && "$HEAD_REPO" != "$THIS_REPO" ]]; then
+            echo "::error::fleet/review FAILED: fork-pr-guard — this job runs on a self-hosted runner and must never process a fork PR (head repo '$HEAD_REPO' != '$THIS_REPO')"
+            exit 1
+          fi
+
       # On `pull_request` (the labeled event), the base/head SHAs and the
       # PR's own branch name all come straight from the event's own payload
       # — GitHub computed it for exactly this label-application event, so
@@ -274,7 +344,7 @@ jobs:
             pr="$DISPATCH_PR"
           fi
           if [[ ! "$pr" =~ ^[0-9]+$ ]]; then
-            echo "::error::no numeric PR number to review (pull_request number=$PR_EVENT_NUMBER, workflow_dispatch pr_number=$DISPATCH_PR)"
+            echo "::error::fleet/review FAILED: no-pr-number — no numeric PR number to review (pull_request number=$PR_EVENT_NUMBER, workflow_dispatch pr_number=$DISPATCH_PR)"
             exit 1
           fi
           if [[ "$EVENT_NAME" == "pull_request" ]]; then
@@ -282,11 +352,26 @@ jobs:
             head_sha="$PR_EVENT_HEAD_SHA"
             branch="$PR_EVENT_BRANCH"
           else
-            pr_json="$(gh api "repos/${{ github.repository }}/pulls/$pr")"
+            # Guarded (`if ! x=$(...)`, not a bare assignment): under this
+            # step's inherited `-e`, an unguarded `pr_json="$(gh api ...)"`
+            # would die the instant `gh api` failed (bad PR number, an
+            # unreachable API, an expired token) with nothing beyond gh's own
+            # raw stderr tying the failure back to "resolving PR #$pr for
+            # workflow_dispatch" at all.
+            if ! pr_json="$(gh api "repos/${{ github.repository }}/pulls/$pr" 2>&1)"; then
+              echo "::error::fleet/review FAILED: gh-api-pr-lookup — \`gh api .../pulls/$pr\` failed while resolving context for workflow_dispatch:"
+              printf '%s\n' "$pr_json"
+              exit 1
+            fi
             branch="$(echo "$pr_json" | jq -r '.head.ref')"
             base_sha="$(echo "$pr_json" | jq -r '.base.sha')"
             head_sha="$DISPATCH_SHA"
             live_head="$(echo "$pr_json" | jq -r '.head.sha')"
+            if [[ "$branch" == "null" || -z "$branch" || "$base_sha" == "null" || -z "$base_sha" ]]; then
+              echo "::error::fleet/review FAILED: gh-api-pr-parse — \`gh api .../pulls/$pr\` returned data that did not parse into a branch/base_sha (got branch='$branch' base_sha='$base_sha'); raw response:"
+              printf '%s\n' "$pr_json"
+              exit 1
+            fi
             if [[ "$live_head" != "$head_sha" ]]; then
               echo "::warning::PR #$pr's current head ($live_head) differs from the dispatched commit ($head_sha) — a newer commit has landed since this run was triggered. Reviewing the dispatched commit only; re-dispatch against the new head once it is ready."
             fi
@@ -345,14 +430,23 @@ jobs:
           git fetch --no-tags origin "$HEAD_SHA"
           mkdir -p "$RUNNER_TEMP/head"
           git archive "$HEAD_SHA" | tar -x -C "$RUNNER_TEMP/head"
-          test ! -e "$RUNNER_TEMP/head/.git"
+          # A bare `test ! -e ...` here would die under `-e` with ZERO
+          # output the moment a `.git` ever appeared in the export — exactly
+          # the opaque "exit code 1" this file's steps must never produce,
+          # and on the one invariant (never execute the judged commit's own
+          # code — see the gate's first catch, #665) this step exists to
+          # enforce. Spelled out as an explicit if/exit instead.
+          if [ -e "$RUNNER_TEMP/head/.git" ]; then
+            echo "::error::fleet/review FAILED: git-export-invariant — \`git archive\` produced a .git entry at $RUNNER_TEMP/head/.git; this export must never carry a git object database"
+            exit 1
+          fi
           control=( \( -iname opencode.json -o -iname opencode.jsonc -o -iname .opencode
             -o -iname AGENTS.md -o -iname CONTEXT.md -o -iname .agents
             -o -iname CLAUDE.md -o -iname .claude -o -type l \) )
           find "$RUNNER_TEMP/head" -mindepth 1 "${control[@]}" -prune -print -exec rm -rf {} +
           left="$(find "$RUNNER_TEMP/head" -mindepth 1 "${control[@]}" -print -quit)"
           if [ -n "$left" ]; then
-            echo "::error::agent configuration survived the strip: $left"
+            echo "::error::fleet/review FAILED: agent-config-strip — agent configuration survived the strip: $left"
             exit 1
           fi
 
@@ -410,7 +504,7 @@ jobs:
         run: |
           set -euo pipefail
           if [ ! -f orchestrator/src/cli.ts ]; then
-            echo "::error::the base commit predates the fleet review gate (orchestrator/src/cli.ts does not exist), so it cannot judge this PR"
+            echo "::error::fleet/review FAILED: base-predates-gate — the base commit predates the fleet review gate (orchestrator/src/cli.ts does not exist), so it cannot judge this PR"
             echo "The gate deliberately runs from the BASE, never from the commit it judges."
             echo "This PR's base is stale — update/rebase it against a newer main to pick up fleet review support, then re-apply the \`review\` label."
             exit 1
@@ -419,7 +513,7 @@ jobs:
           case "$usage" in
             *review-gate*) ;;
             *)
-              echo "::error::the base commit has no 'review-gate' command, so it cannot judge this PR"
+              echo "::error::fleet/review FAILED: base-missing-review-gate-command — the base commit has no 'review-gate' command, so it cannot judge this PR"
               echo "This PR's base predates the fleet review gate — update/rebase it against a newer main to pick up review-gate support, then re-apply the \`review\` label."
               exit 1
               ;;
@@ -454,130 +548,82 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: bun orchestrator/src/cli.ts review-gate
 
-      # `${{ vars.FLEET_REVIEW_PROVIDER }}` / `${{ vars.FLEET_REVIEW_MODEL }}`
-      # (job-level `env:` above) resolve to an EMPTY STRING, not an error,
-      # when the repo variable is unset — GitHub Actions has no concept of a
-      # required variable. Left unchecked, every later step would either
-      # silently no-op on an empty model (opencode) or, worse, quietly accept
-      # whatever ad-hoc value someone tried instead of a real fallback. This
-      # step is the only thing standing between "unset" and "opaque failure
-      # three steps later" now that this job no longer guesses at a default
-      # (see the job-level `env:` comment above for why the previous
-      # `|| 'kimi-for-coding'` fallback was the actual incident).
-      - name: Require review engine configuration
+      # Bootstrap guard, the SAME shape as "Check the base provides the
+      # review gate itself" / "Check the base provides the gate" above and
+      # below — for the same underlying reason, one function narrower:
+      # `reviewerInvocationFor` (review.ts) is THIS PR's own addition, and
+      # the smoke step two steps down imports it from the BASE checkout, not
+      # from this PR's head (the gate always judges from base — see the file
+      # header). A base that predates it cannot run that import at all: `bun
+      # -e "import { reviewerInvocationFor } from ..."` fails at module-load
+      # time with bun's own uncaught `SyntaxError: Export named
+      # 'reviewerInvocationFor' not found`, before the smoke step's own
+      # `fail()` classification ever gets a chance to run — the exact opaque
+      # crash shape the two gate-bootstrap steps above already exist to
+      # replace with a named, actionable failure.
+      #
+      # This is the PR that introduces `reviewerInvocationFor` (#866 itself),
+      # so this check will FAIL on this PR's own `fleet/review` run, by
+      # construction — the identical, already-accepted bootstrap limitation
+      # "Check the base provides the gate" documents for `review-ci`: merge
+      # with this check not yet required by the ruleset (or via an
+      # authorized override), and every later PR is judged by the
+      # now-trusted, merged engine-resolution code, because base will then
+      # actually provide the symbol this checks for.
+      - name: Check the base provides reviewerInvocationFor
         if: steps.gate.outputs.outcome == 'run-engine'
         run: |
           set -euo pipefail
-          missing=()
-          if [ -z "$FLEET_REVIEW_PROVIDER" ]; then
-            missing+=("FLEET_REVIEW_PROVIDER (opencode provider id, e.g. kimi-code-plan-global)")
-          fi
-          if [ -z "$FLEET_REVIEW_MODEL" ]; then
-            missing+=("FLEET_REVIEW_MODEL (opencode provider/model id, e.g. kimi-code-plan-global/k3-256k)")
-          fi
-          if [ "${#missing[@]}" -gt 0 ]; then
-            echo "::error::fleet/review has no review engine configured. Set the following under Settings > Secrets and variables > Actions > Variables:"
-            for m in "${missing[@]}"; do
-              echo "::error::  - $m"
-            done
-            echo "::error::the reviewer's current live id is documented at orchestrator/src/review.ts's DEFAULT_OPENCODE_MODEL — read the comment above it before choosing a value, it has already gone stale twice."
+          if ! grep -q '^export function reviewerInvocationFor' orchestrator/src/review.ts 2>/dev/null; then
+            echo "::error::fleet/review FAILED: base-missing-reviewer-invocation-for — the base commit's orchestrator/src/review.ts has no 'reviewerInvocationFor' export, so the smoke test below (which imports it from THIS base checkout) cannot run"
+            echo "The gate deliberately runs from the BASE, never from the commit it judges."
+            echo "This is expected for the PR that INTRODUCES reviewerInvocationFor (#866) — merge"
+            echo "that one PR with this check not yet required by the ruleset; every later PR is"
+            echo "judged by the now-trusted, merged engine-resolution code."
             exit 1
           fi
-          echo "review engine configuration present (provider=$FLEET_REVIEW_PROVIDER model=$FLEET_REVIEW_MODEL)"
 
-      # From a pinned release asset whose sha256 is recorded here — never a
-      # `curl | bash` installer, in a repo that pins every action by SHA. (The
-      # npm package `opencode-ai@1.18.30` was tried first, per the preferred
-      # option, and rejected on evidence: it ships a postinstall that fetches
-      # the real binary, which newer npm blocks by default, leaving a shim
-      # that exits `Error: opencode-ai's postinstall script was not run.` A
-      # hash a reader can re-check beats a trust-on-first-use script.)
+      # #812: no "Install the non-author review engine" or "Authenticate the
+      # review engine" step any more. `claude` is pre-installed on
+      # `llamenos-review-box` and already logged in under the operator's own
+      # account (that login state lives under `HOME`, which the runner sets
+      # to the operator's own home directory — see `VERIFIER_ENV_ALLOWLIST`'s
+      # doc comment in `orchestrator/src/review.ts`). There is nothing left
+      # to fetch or configure before the smoke test below — there is no
+      # provider variable left to validate either (see the job-level `env:`
+      # comment above): `FLEET_REVIEW_MODEL` always resolves to a real value
+      # (the repo variable or the `'sonnet'` default), and a bad value is
+      # caught by the smoke test's own `engine-misconfigured` classification,
+      # not by a separate "is this set" step.
       #
-      # The fleet's workers are `claude`, so the reviewer is `opencode`: a
-      # model reviewing its own output shares its own blind spots, which is
-      # the entire reason this check exists.
-      - name: Install the non-author review engine
-        if: steps.gate.outputs.outcome == 'run-engine'
-        env:
-          OPENCODE_VERSION: "1.18.30"
-          OPENCODE_SHA256: "55007246858165496ff85ba1c2b648f7421e8e2013bf4189a680c9ff8e699d17"
-        run: |
-          set -euo pipefail
-          url="https://github.com/anomalyco/opencode/releases/download/v${OPENCODE_VERSION}/opencode-linux-x64.tar.gz"
-          curl -fsSL -o /tmp/opencode.tar.gz "$url"
-          echo "${OPENCODE_SHA256}  /tmp/opencode.tar.gz" | sha256sum -c -
-          mkdir -p "$HOME/.local/bin"
-          tar -xzf /tmp/opencode.tar.gz -C "$HOME/.local/bin"
-          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
-          "$HOME/.local/bin/opencode" --version
-
-      # opencode authenticates from `auth.json`, not an env var (there is no
-      # OPENCODE_API_KEY — see review.ts's VERIFIER_ENV_ALLOWLIST comment).
-      # Written to a file rather than passed through the environment, so the
-      # key is never in the verifier subprocess's env at all.
-      # This is the shape confirmed on the operator's own machine. No
-      # `opencode.json` is written: opencode resolves `FLEET_REVIEW_MODEL`
-      # against its built-in models.dev registry directly, so a committed
-      # provider block would only be a second copy that can drift from the
-      # registry. The `auth.json` key is `$FLEET_REVIEW_PROVIDER` itself, not
-      # a literal — that is the whole mechanism that makes a provider switch a
-      # variable change rather than a code change (see the job-level `env:`
-      # comment above, and the runbook in
-      # docs/superpowers/specs/2026-09-11-llamenos-fleet-orchestrator-design.md).
-      - name: Authenticate the review engine
-        if: steps.gate.outputs.outcome == 'run-engine'
-        env:
-          FLEET_REVIEW_API_KEY: ${{ secrets.FLEET_REVIEW_API_KEY }}
-        run: |
-          # Guarded in shell, not in `if:` — the `secrets` context is not
-          # available in a step condition. A missing key is NOT an error here;
-          # the smoke step below is where it becomes one.
-          if [ -z "$FLEET_REVIEW_API_KEY" ]; then
-            echo "FLEET_REVIEW_API_KEY is not configured; the smoke step will fail, deliberately"
-            exit 0
-          fi
-          mkdir -p "$HOME/.local/share/opencode"
-          jq -n --arg p "$FLEET_REVIEW_PROVIDER" --arg k "$FLEET_REVIEW_API_KEY" \
-            '{($p):{"type":"api","key":$k}}' \
-            > "$HOME/.local/share/opencode/auth.json"
-          chmod 600 "$HOME/.local/share/opencode/auth.json"
-
-      # Proves the engine, the key, the provider, the model id AND the
-      # reviewer's permission config all work BEFORE the real review runs — so
-      # "the reviewer is misconfigured" can never again be indistinguishable
-      # from "the reviewer read the diff and could not produce a verdict". An
-      # earlier round's model id did not exist and `--format text` was not a
-      # valid choice, so every review had silently been UNREADABLE; an
-      # array-shaped `permission` does the same thing (1.18.30 rejects it and
-      # exits 1).
+      # Proves the binary, the model id AND the reviewer's non-interactive,
+      # read-only posture all work BEFORE the real review runs — so "the
+      # reviewer is misconfigured" can never again be indistinguishable from
+      # "the reviewer read the diff and could not produce a verdict". This is
+      # the exact lesson the retired opencode reviewer paid for twice (a
+      # model id that did not exist, an invalid `--format` value) — every
+      # review had silently been UNREADABLE until each was caught here first.
       #
-      # Invoked the way review.ts's invokeVerifierEngine invokes it: from an
-      # EMPTY project root, never from an export (a PR's `.opencode/` and
-      # `opencode.json` execute when the PR is the project root); settings
-      # only from a fresh OPENCODE_CONFIG_DIR holding the object-form deny-all
-      # permission; `--format json`. `opencode debug config` makes the binary
-      # itself validate the config shape — it exits non-zero on a shape it
-      # rejects. (review.ts additionally grants read access to the export
-      # under `external_directory`; there is no export here to grant.)
+      # Invoked the way `review.ts`'s `invokeVerifierEngine` invokes it: an
+      # EMPTY project root (never the checkout, never an export — there is
+      # no export at this point in the job), `--print` (non-interactive) with
+      # `--permission-mode plan` (read-only: no edits, no destructive
+      # commands, never the flag that lets a worker write without being
+      # asked — see `invokeVerifierEngine`'s own doc comment in review.ts).
       #
-      # Judged by the review's OWN code — `opencodeAssistantText` (assistant
-      # text parts only, never tool output or stray stdout) and `parseVerdict`
-      # (exact final line), both imported from this trusted base checkout —
-      # never a looser substring or shell comparison: an engine whose output
-      # grows colour codes or a trailing line must fail HERE, not pass the
-      # smoke step and then make every real review UNREADABLE.
+      # Judged by the review's OWN code — `parseVerdict` (exact final line),
+      # imported from this trusted base checkout — never a looser substring
+      # or shell comparison: an engine whose output grows colour codes or a
+      # trailing line must fail HERE, not pass the smoke step and then make
+      # every real review UNREADABLE.
       #
       # A failure here is ALWAYS a job failure — nothing below turns a bad
-      # engine call into a pass. What changed is that a failure now names
-      # WHY, on one line, before the job goes red, distinguishing three
-      # causes so an operator never again has to open the log to tell "the
-      # provider's weekly quota ran out" (`engine-quota`) from "the key is
-      # wrong" (`engine-auth`) from everything else (`engine-unavailable` —
-      # a bad model id, a network error, a rejected config, or the engine
-      # running but never producing a valid verdict). This exact ambiguity —
-      # a Moonshot Kimi subscription's weekly quota silently exhausted — is
-      # what made `fleet/review` red repo-wide with no actionable signal on
-      # 2026-09-15.
+      # engine call into a pass. A failure names WHY, on one line, before the
+      # job goes red, distinguishing three causes so an operator never has to
+      # open the log to tell "the account hit a usage limit" (`engine-quota`)
+      # from "the runner's claude login expired" (`engine-auth`) from
+      # everything else (`engine-unavailable` — a bad model id, a missing
+      # binary, or the engine running but never producing a valid verdict).
       - name: Smoke-test the review engine
         if: steps.gate.outputs.outcome == 'run-engine'
         run: |
@@ -586,102 +632,118 @@ jobs:
           # that -e is already active by the time this script starts — a
           # bare `set -uo pipefail` does NOT clear an inherited -e, it only
           # adds -u/pipefail on top. Left alone, the FIRST unguarded failing
-          # assignment below (`run_out="$(opencode run ...)"` when the engine
-          # call fails) is a failing simple command, so -e kills the script
-          # on that line — before `run_status=$?` is read, before `classify`
-          # runs, before `fail` ever prints anything. The step then dies
-          # silently with exit 1 and no diagnostic, which is the exact
-          # opacity this step exists to remove. `set +e` clears the
+          # assignment below (`run_out="$(... "$rev_binary" ... )"` when the
+          # engine call fails) is a failing simple command, so -e kills the
+          # script on that line — before `run_status=$?` is read, before
+          # `classify` runs, before `fail` ever prints anything. The step
+          # then dies silently with exit 1 and no diagnostic, which is the
+          # exact opacity this step exists to remove. `set +e` clears the
           # inherited -e so every capture below reaches its own status check
           # and, on failure, `fail()` — which is the only path that exits,
-          # and always exits 1. (Captures already guarded with `||`, like
-          # `config_out=... || fail ...`, were never affected by -e; this
-          # fixes the unguarded ones: `run_out=` and `verdict_out=`.)
+          # and always exits 1. This bug and fix were originally found and
+          # applied against the retired non-author engine's smoke test
+          # (#872); the same unguarded-capture shape (`run_out=`,
+          # `verdict_out=`, and now `engine_json=`) carries over unchanged to
+          # this `claude`-based rewrite (#866), so the fix stays required
+          # here too.
           set -uo pipefail
           set +e
           root="$(mktemp -d)"
-          cfg="$(mktemp -d)"
-          jq -n '{
-            "$schema": "https://opencode.ai/config.json",
-            "permission": {
-              "bash": "deny", "edit": "deny", "webfetch": "deny", "websearch": "deny",
-              "external_directory": { "*": "deny" }
-            }
-          }' > "$cfg/opencode.json"
-          export OPENCODE_CONFIG_DIR="$cfg" OPENCODE_DISABLE_PROJECT_CONFIG=1
+          # Set before engine resolution runs, so `fail()` can reference them
+          # under `set -u` even if resolution itself is what failed.
+          rev_binary=""
+          rev_model=""
 
-          # $1: engine-quota | engine-auth | engine-misconfigured |
-          # engine-unavailable. $2: the raw engine text to print for a human,
-          # then always exits 1 — this function is the only way the step
-          # fails, and it always fails.
+          # $1: engine-misconfigured | engine-quota | engine-auth |
+          # engine-unavailable. $2: the raw engine text to print for a
+          # human, then always exits 1 — this function is the only way the
+          # step fails, and it always fails.
           fail() {
-            echo "review engine smoke test FAILED: $1 (provider=$FLEET_REVIEW_PROVIDER model=$FLEET_REVIEW_MODEL)"
+            echo "fleet/review FAILED: review engine smoke test FAILED: $1 (engine=${rev_binary:-unresolved} model=${rev_model:-unresolved})"
             printf '%s\n' "$2"
             exit 1
           }
 
-          # Best-effort classification of the engine's own error text — heuristic,
-          # not authoritative, because opencode does not expose a structured error
-          # code here. Weekly/usage-limit language is engine-quota; 401/invalid-key
-          # or missing-credential language is engine-auth; anything else the
-          # engine said is engine-unavailable. Deliberately never returns
-          # engine-misconfigured: that classification requires an actual
-          # registry lookup (below), not a guess from error text, so it is
-          # never reachable through this heuristic.
+          # Best-effort classification of the engine's own error text —
+          # heuristic, not authoritative, because claude does not expose a
+          # structured error code here. A `--model` id claude itself refuses
+          # to run at all (`classifyEngineFailure` in review.ts carries the
+          # identical check — see its doc comment for why a bare, slash-free
+          # id like the `sonnet` that triggered #866 must classify here too,
+          # not just a well-formed-but-unknown one) is engine-misconfigured;
+          # usage-limit language is engine-quota; 401/invalid-credential/
+          # not-logged-in language is engine-auth; anything else the engine
+          # said is engine-unavailable.
           classify() {
             local text="$1"
-            if printf '%s' "$text" | grep -qiE 'quota|rate.?limit|usage.?limit|too many requests|\b429\b'; then
+            if printf '%s' "$text" | grep -qiE "unrecognized_model|isn'?t described by this version'?s model catalog|issue with the selected model"; then
+              echo "engine-misconfigured"
+            elif printf '%s' "$text" | grep -qiE 'quota|rate.?limit|usage.?limit|too many requests|\b429\b'; then
               echo "engine-quota"
-            elif printf '%s' "$text" | grep -qiE '\b401\b|unauthorized|invalid.*(api.?key|token)|no.*api.?key|authenticat(e|ion)? (fail|error|required)'; then
+            elif printf '%s' "$text" | grep -qiE '\b401\b|unauthorized|invalid.*(api.?key|token|credential)|not logged in|please (run|login|re-?authenticate)|authenticat(e|ion)? (fail|error|required)'; then
               echo "engine-auth"
             else
               echo "engine-unavailable"
             fi
           }
 
-          config_out="$(cd "$root" && opencode debug config --pure 2>&1)" || fail "$(classify "$config_out")" "$config_out"
-          printf '%s' "$config_out" > "$RUNNER_TEMP/opencode-config.json"
-          jq -e '.permission | .bash == "deny" and .edit == "deny" and .webfetch == "deny" and .websearch == "deny"' \
-            "$RUNNER_TEMP/opencode-config.json" \
-            || fail "engine-unavailable" "opencode debug config did not round-trip the deny-all permission block"
+          # THE single source for what to smoke-test: a `bun -e` import of
+          # `reviewerInvocationFor` from THIS job's own BASE checkout of
+          # review.ts — the exact function `invokeVerifierEngine` (the real
+          # "Review" step below) calls too. Deliberately NOT a literal
+          # `claude`/`$FLEET_REVIEW_MODEL` pair typed into this file: #866
+          # shipped with exactly that pair, agreeing with the real review's
+          # own resolution only by coincidence, and the coincidence broke
+          # the instant this PR's OWN fix to `verifierFor` landed on this
+          # branch without yet reaching the BASE this job actually runs
+          # review-ci from (see the file header above for why the gate
+          # always judges from base) — the smoke test kept "passing" against
+          # `claude` while the real review, still running base's old
+          # cross-engine logic, silently invoked a DIFFERENT reviewer binary
+          # entirely, handed a `claude`-shaped model id it could not resolve.
+          # Importing the same function both places removes the coincidence,
+          # and therefore the failure mode, entirely: there is no second
+          # literal left to drift.
+          # stderr goes to its own temp file, exactly like `run_out`/`run_err`
+          # below — never `2>&1` merged into `engine_json` itself, which must
+          # stay pure JSON on the success path for `jq` to parse. A stray
+          # warning line on stderr merged onto stdout would otherwise corrupt
+          # every jq call after it for a reason with nothing to do with
+          # engine configuration.
+          engine_json="$(bun -e '
+            import { reviewerInvocationFor } from "./orchestrator/src/review.ts"
+            const inv = reviewerInvocationFor("claude")
+            console.log(JSON.stringify({ binary: inv.binary, model: inv.model }))
+          ' 2>"$RUNNER_TEMP/engine-resolve-stderr.log")"
+          engine_status=$?
+          engine_err="$(cat "$RUNNER_TEMP/engine-resolve-stderr.log" 2>/dev/null || true)"
+          if [ "$engine_status" -ne 0 ]; then
+            fail "engine-misconfigured" "$engine_json"$'\n'"$engine_err"
+          fi
+          rev_binary="$(printf '%s' "$engine_json" | jq -r '.binary')"
+          rev_model="$(printf '%s' "$engine_json" | jq -r '.model')"
+          if [ -z "$rev_binary" ] || [ "$rev_binary" = "null" ] || [ -z "$rev_model" ] || [ "$rev_model" = "null" ]; then
+            fail "engine-misconfigured" "reviewerInvocationFor printed unparseable output: $engine_json"$'\n'"$engine_err"
+          fi
+
+          if ! command -v "$rev_binary" >/dev/null 2>&1; then
+            fail "engine-unavailable" "the $rev_binary CLI is not on PATH on this runner"
+          fi
 
           run_out="$(cd "$root" && printf 'Reply with exactly: VERDICT: PASS\n' \
-            | opencode run --pure --model "$FLEET_REVIEW_MODEL" --format json --dir "$root" 2>"$RUNNER_TEMP/opencode-run-stderr.log")"
+            | "$rev_binary" --print --permission-mode plan --model "$rev_model" --max-turns 1 2>"$RUNNER_TEMP/claude-run-stderr.log")"
           run_status=$?
-          run_err="$(cat "$RUNNER_TEMP/opencode-run-stderr.log" 2>/dev/null || true)"
+          run_err="$(cat "$RUNNER_TEMP/claude-run-stderr.log" 2>/dev/null || true)"
           if [ "$run_status" -ne 0 ]; then
-            combined="$run_out"$'\n'"$run_err"
-            # The same registry check `invokeVerifierEngine` (review.ts) runs
-            # before the real review — reused here via `checkOpencodeModelKnown`,
-            # never reimplemented, so a bad provider/model id is named
-            # `engine-misconfigured` in this smoke test exactly the way it is
-            # named for the real review, instead of collapsing into the same
-            # opaque `engine-unavailable` a genuine outage produces (this is
-            # the actual bug this whole fix exists for — `UnknownError:
-            # "Unexpected server error"` looked identical for both). The
-            # `opencode run` call just above is what populates opencode's own
-            # local models.dev cache (`opencodeModelsCachePath`), so this is
-            # a warm-cache check, not a guess against an empty one — matching
-            # `checkOpencodeModelKnown`'s own "indeterminate" contract: a
-            # cold/missing cache here falls through to the ordinary
-            # `classify()` heuristic below, never a false positive.
-            known="$(bun -e '
-              import { checkOpencodeModelKnown } from "./orchestrator/src/review.ts"
-              console.log(await checkOpencodeModelKnown(process.env["FLEET_REVIEW_MODEL"] ?? ""))
-            ' 2>/dev/null)"
-            if [ "$known" = "unknown" ]; then
-              fail "engine-misconfigured" "$combined"
-            fi
-            fail "$(classify "$combined")" "$combined"
+            fail "$(classify "$run_out"$'\n'"$run_err")" "$run_out"$'\n'"$run_err"
           fi
 
           verdict_out="$(printf '%s' "$run_out" | bun -e '
-            import { opencodeAssistantText, parseVerdict } from "./orchestrator/src/review.ts"
-            const { text, errors } = opencodeAssistantText(await Bun.stdin.text())
+            import { parseVerdict } from "./orchestrator/src/review.ts"
+            const text = await Bun.stdin.text()
             console.log(text)
-            for (const e of errors) console.log("engine error event: " + e)
             const verdict = parseVerdict(text)
-            console.log("smoke verdict (parseVerdict of assistant text): " + verdict)
+            console.log("smoke verdict (parseVerdict of claude output): " + verdict)
             process.exit(verdict === "PASS" ? 0 : 1)
           ')"
           verdict_status=$?
@@ -689,8 +751,7 @@ jobs:
             fail "engine-unavailable" "$verdict_out"
           fi
           printf '%s\n' "$verdict_out"
-          echo "review engine smoke test OK (provider=$FLEET_REVIEW_PROVIDER model=$FLEET_REVIEW_MODEL)"
-
+          echo "review engine smoke test OK (engine=$rev_binary model=$rev_model)"
 
       # Bootstrap guard. The gate runs from the BASE checkout by design, so
       # the FIRST pull request that introduces the gate cannot be judged by
@@ -708,7 +769,7 @@ jobs:
           case "$usage" in
             *review-ci*) ;;
             *)
-              echo "::error::the base commit has no 'review-ci' command, so it cannot judge this PR"
+              echo "::error::fleet/review FAILED: base-missing-review-ci-command — the base commit has no 'review-ci' command, so it cannot judge this PR"
               echo "The gate deliberately runs from the BASE, never from the commit it judges."
               echo "The PR that INTRODUCES the gate therefore cannot pass it. Merge that one PR"
               echo "with these checks not yet required by the ruleset; every later PR is judged"
@@ -722,7 +783,12 @@ jobs:
         if: steps.gate.outputs.outcome == 'run-engine'
         env:
           # Absent fails the job — never a skip and never a pass. A review
-          # that could not run is not a review that passed.
+          # that could not run is not a review that passed. NOT actually
+          # used to authenticate the reviewer any more (claude authenticates
+          # via the runner's own login state under HOME — see
+          # `VERIFIER_ENV_ALLOWLIST`'s doc comment in review.ts, and
+          # `REVIEW_KEY_ENV`'s doc comment in ci.ts for why this secret
+          # reference stays required anyway).
           FLEET_REVIEW_API_KEY: ${{ secrets.FLEET_REVIEW_API_KEY }}
           FLEET_CI_BRANCH: ${{ steps.ctx.outputs.branch }}
           FLEET_CI_PR: ${{ steps.ctx.outputs.pr }}
