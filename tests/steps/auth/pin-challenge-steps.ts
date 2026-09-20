@@ -34,9 +34,6 @@ Then('the PIN challenge dialog should remain open', async ({ page }) => {
 })
 
 Then('I should see the unmasked phone number', async ({ page }) => {
-  // Scope phone number lookup within the PIN challenge context / volunteer row
-  const pinDialog = page.getByTestId(TestIds.PIN_CHALLENGE_DIALOG)
-  const dialogGone = await pinDialog.isVisible({ timeout: 1000 }).catch(() => false)
   // After dialog closes, the phone should be visible in the volunteer row
   const phoneText = page.getByTestId(TestIds.VOLUNTEER_ROW).first().locator('text=/\\+/')
   await expect(phoneText).toBeVisible({ timeout: 5000 })

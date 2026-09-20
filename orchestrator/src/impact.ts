@@ -76,6 +76,17 @@ export const HIGH_IMPACT_PATHS: readonly string[] = [
   'lefthook.yml',
   '.github/workflows/',
   'knope.toml',
+  // The vitest configs. `fleet/verify` no longer loads a PR's copy of these
+  // (verify.ts installs the base's bytes over it), but whatever lands on main
+  // IS what vitest's main process executes when judging every later PR —
+  // including its `globalSetup` and plugins. Exact files, one per config: this
+  // list is prefix/exact matching, and `CODEOWNERS` owns the `vitest.*.config.ts`
+  // glob so a new config is owned before anyone remembers to list it here
+  // (guards.test.ts fails until they do).
+  'vitest.desktop.config.ts',
+  'vitest.integration.config.ts',
+  'vitest.orchestrator.config.ts',
+  'vitest.unit.config.ts',
 
   // Deanonymization surfaces (PR #794, matching CODEOWNERS): sip-bridge/
   // routes PSTN calls and handles caller phone numbers; signal-notifier/

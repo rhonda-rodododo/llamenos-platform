@@ -53,7 +53,7 @@ Si aplicación no puede conectar a PostgreSQL:
 
 ### Relé WebSocket no conecta
 
-Relé WebSocket (WebSocket relay) iin servicio núcleo, no opcional. Si relé no está corriendo:
+Relé WebSocket iin servicio núcleo, no opcional. Si relé no está corriendo:
 
 ```bash
 # Verificar estado relé

@@ -3,18 +3,15 @@
  * Simulates calls, verifies routing, call state, and call history via API.
  */
 import { expect } from '@playwright/test'
-import { Given, When, Then } from './fixtures'
+import { When, Then } from './fixtures'
 import { getScenarioState } from './common.steps'
 import {
   simulateIncomingCall,
   simulateAnswerCall,
   simulateEndCall,
   simulateVoicemail,
-  uniqueCallerNumber,
 } from '../../simulation-helpers'
 import { apiGet } from '../../api-helpers'
-
-const BASE_URL = process.env.TEST_HUB_URL || 'http://localhost:3000'
 
 // ── Call Simulation ────────────────────────────────────────────────
 
@@ -29,7 +26,7 @@ When('a call arrives from {string}', async ({ request, world }, caller: string) 
     if (state.banPhones.includes(caller)) {
       state.callStatus = 'rejected'
     }
-  } catch (e) {
+  } catch {
     // Call rejected (e.g., banned caller, server error)
     state.callStatus = 'rejected'
   }
@@ -108,7 +105,7 @@ Then('the most recent call shows status {string}', async ({request, world}, expe
   expect(data.calls[0].status).toBe(expectedStatus)
 })
 
-Then('the most recent call shows caller {string}', async ({request, world}, expectedCaller: string) => {
+Then('the most recent call shows caller {string}', async ({request, world}, _expectedCaller: string) => {
   const { hubId } = getScenarioState(world)
   const path = hubId ? `/hubs/${hubId}/calls/history?limit=1` : '/calls/history?limit=1'
   const { status, data } = await apiGet<{ calls: Array<{ callerLast4?: string; callerNumber?: string }> }>(

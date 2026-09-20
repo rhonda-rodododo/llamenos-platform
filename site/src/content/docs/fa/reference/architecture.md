@@ -166,7 +166,7 @@ nsec داوطلب (BIP-340 Schnorr / secp256k1)
     | محتوای رویداد را با کلید hub رمزنگاری می‌کند
     | به عنوان رویداد WebSocket امضا می‌کند (Schnorr)
     v
-رله WebSocket (رله WebSocket / Nosflare)
+رله WebSocket
     |
     | به مشترکان پخش می‌کند
     v

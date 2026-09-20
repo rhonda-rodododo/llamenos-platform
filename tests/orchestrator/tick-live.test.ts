@@ -28,6 +28,7 @@ function baseDeps(over: Partial<TickDeps> = {}): TickDeps {
     now: () => 1000,
     acquireLock: () => ({ held: true, release: () => {} }),
     checkHalt: async () => ({ halted: false }),
+    resumeFleet: vi.fn(),
     readLedger: () => [],
     resumedAt: () => 0,
     listItems: async () => ({ ok: true as const, items: [item()] }),
@@ -275,6 +276,85 @@ describe('tick: live dispatch pipeline (task 7)', () => {
     await tick(d)
     expect(d.record).toHaveBeenCalledWith(expect.objectContaining({ outcome: 'REJECTED' }))
   })
+
+  // Issue #817: a QUOTA outcome from dispatch() (engines.ts's own
+  // FAILED -> QUOTA reclassification off the worker's raw log) is recorded
+  // as-is, exactly like BLOCKED/FAILED/TIMEOUT — never run through the
+  // verify/review pipeline (there is no diff to verify: the worker never
+  // even started), and never armed.
+  it('a QUOTA outcome skips verify/review entirely and records the reset fields on the ledger row', async () => {
+    const dispatch = vi.fn(async (): Promise<DispatchOutcome> =>
+      ({ outcome: 'QUOTA', note: 'dep:abc | quota reset: when the current 5-hour window ends', quotaResetHint: 'when the current 5-hour window ends' }))
+    const d = baseDeps({ dispatch })
+    await tick(d)
+    expect(d.verifyMechanical).not.toHaveBeenCalled()
+    expect(d.secondOpinion).not.toHaveBeenCalled()
+    expect(d.enableAutoMerge).not.toHaveBeenCalled()
+    expect(d.record).toHaveBeenCalledWith(expect.objectContaining({
+      outcome: 'QUOTA',
+      quotaResetHint: 'when the current 5-hour window ends',
+    }))
+  })
+})
+
+// Issue #812: dispatch-one.sh cut the worktree on the worker name, so PR #836
+// sat on `fleet-shared-704`. resolveDispatchResult (cli.ts) reports that as
+// `branchMismatch`; tick must refuse it outright, whatever the worker claimed.
+describe('tick: branch mismatch (issue #812)', () => {
+  const mismatched = (over: Partial<DispatchOutcome> = {}): TickDeps['dispatch'] =>
+    vi.fn(async (): Promise<DispatchOutcome> => ({
+      outcome: 'FAILED', branch: 'fleet-ios-1', pr: '836', worktree: '/wt/llamenos-fleet-ios-1',
+      branchMismatch: 'fleet-ios-1', note: 'branch-mismatch:fleet-ios-1 dep:abc', ...over,
+    }))
+
+  it('never verifies, reviews or arms — and disarms anything an earlier attempt armed', async () => {
+    const d = baseDeps({ dispatch: mismatched() })
+    await tick(d)
+    expect(d.verifyMechanical).not.toHaveBeenCalled()
+    expect(d.secondOpinion).not.toHaveBeenCalled()
+    expect(d.enableAutoMerge).not.toHaveBeenCalled()
+    expect(d.disableAutoMerge).toHaveBeenCalledWith('836')
+  })
+
+  it('records FAILED with the branch-mismatch reason and hands the item to a human', async () => {
+    const d = baseDeps({ dispatch: mismatched() })
+    await tick(d)
+    expect(d.record).toHaveBeenCalledWith(expect.objectContaining({
+      outcome: 'FAILED', pr: '836', note: expect.stringMatching(/^branch-mismatch:fleet-ios-1\b/),
+    }))
+    expect(d.settle).toHaveBeenCalledWith(expect.objectContaining({ outcome: 'FAILED', needsHuman: true }))
+  })
+
+  it('tells the PR it was not verified by the fleet, naming both branches', async () => {
+    const d = baseDeps({ dispatch: mismatched() })
+    await tick(d)
+    expect(d.commentOnPr).toHaveBeenCalledWith('836', expect.stringContaining('NOT verified by the fleet'))
+    expect(d.commentOnPr).toHaveBeenCalledWith('836', expect.stringContaining('fleet-ios-1'))
+    expect(d.commentOnPr).toHaveBeenCalledWith('836', expect.stringContaining('fleet/ios/1'))
+  })
+
+  it('logs a REFUSED verify line, never the misleading "missing worktree" skip', async () => {
+    const lines: string[] = []
+    const d = baseDeps({ dispatch: mismatched(), log: (m) => { lines.push(m) } })
+    await tick(d)
+    expect(lines.some((l) => /verify: item 1 pr 836 REFUSED — branch-mismatch:fleet-ios-1/.test(l))).toBe(true)
+    expect(lines.some((l) => /missing worktree/.test(l))).toBe(false)
+  })
+
+  it('still hands off to a human when there is no PR to comment on', async () => {
+    const d = baseDeps({ dispatch: mismatched({ pr: undefined }) })
+    await tick(d)
+    expect(d.commentOnPr).not.toHaveBeenCalled()
+    expect(d.settle).toHaveBeenCalledWith(expect.objectContaining({ outcome: 'FAILED', needsHuman: true }))
+  })
+
+  it('a claimed SUCCESS on the right branch still runs the full pipeline — the mismatch guard does not swallow it', async () => {
+    const d = baseDeps()
+    await tick(d)
+    expect(d.verifyMechanical).toHaveBeenCalled()
+    expect(d.enableAutoMerge).toHaveBeenCalledWith('42')
+    expect(d.record).toHaveBeenCalledWith(expect.objectContaining({ outcome: 'SUCCESS', pr: '42' }))
+  })
 })
 
 describe('tick: G1 needs-human handoff and G2 gate-trace observability', () => {
@@ -295,6 +375,38 @@ describe('tick: G1 needs-human handoff and G2 gate-trace observability', () => {
     const d = baseDeps({ secondOpinion: vi.fn(async () => ({ verdict: 'FAIL' as const, text: 'VERDICT: FAIL — nope' })) })
     await tick(d)
     expect(d.settle).toHaveBeenCalledWith(expect.objectContaining({ outcome: 'REJECTED', needsHuman: false }))
+  })
+
+  // Issue #870: a review loop that ends UNREADABLE (the fleet's own
+  // verification — a reviewer-engine outage, a tamper halt, or an
+  // unreachable worker mid-revise — never reached a verdict) must NOT be
+  // recorded the same way as an ordinary REJECTED. REJECTED means a real
+  // reviewer read the diff and objected; UNREADABLE means this fleet never
+  // got an answer at all. Conflating the two is exactly how three
+  // genuinely-successful workers (fleet-backend-705, fleet-desktop-775,
+  // fleet-infra-722) tripped the consecutive-failure breaker on nothing but
+  // the fleet's own plumbing.
+  it('a review loop ending UNREADABLE is recorded UNVERIFIED, not REJECTED or FAILED, WITH needs-human', async () => {
+    const d = baseDeps({ secondOpinion: vi.fn(async () => ({ verdict: 'UNREADABLE' as const, text: 'reviewer engine was unreachable' })) })
+    const r = await tick(d)
+    expect(d.record).toHaveBeenCalledWith(expect.objectContaining({ outcome: 'UNVERIFIED', pr: '42', branch: 'fleet/ios/1' }))
+    expect(d.settle).toHaveBeenCalledWith(expect.objectContaining({ outcome: 'UNVERIFIED', needsHuman: true }))
+    expect(r.failed).toBe(0) // this is not a `threw` / uncaught-exception FAILED
+  })
+
+  // The actual bug this fixes: mutating `UNVERIFIED` back into `REJECTED`
+  // (or `FAILED`) here would make this pass but `circuit.test.ts`'s
+  // companion mutation-guard fail — see that file for the other half.
+  it('an UNVERIFIED outcome does not feed circuit.ts\'s consecutive-failure streak', async () => {
+    const recorded: RunRecord[] = []
+    const d = baseDeps({
+      record: vi.fn((rec: RunRecord) => recorded.push(rec)),
+      secondOpinion: vi.fn(async () => ({ verdict: 'UNREADABLE' as const, text: 'unreachable' })),
+    })
+    await tick(d)
+    const terminal = recorded.find((rec) => rec.outcome !== 'DISPATCHED')
+    expect(terminal?.outcome).toBe('UNVERIFIED')
+    expect(failureBreaker(recorded, LIMITS, 0)).toBeUndefined()
   })
 
   it('logs one line per gate stage reached: verify and review', async () => {
