@@ -28,10 +28,28 @@ import { LEDGER_FILE } from './paths.js'
  * QUOTA is deliberately not a flavour of FAILED. A provider rate limit is not
  * the fleet misbehaving, and letting it feed the consecutive-failure breaker
  * turns a billing event into a global halt.
+ *
+ * UNVERIFIED is the same idea applied to this fleet's OWN plumbing rather
+ * than a provider's. Issue #870: `fleet-backend-705`, `fleet-desktop-775`,
+ * and `fleet-infra-722` all wrote a real terminal `SUCCESS` to their own
+ * status file, with a real, working PR — and the ledger recorded all three
+ * `FAILED` anyway, because something between the worker and this ledger
+ * broke: a re-dispatch's own launch call (`dispatch-one.sh`, which returns
+ * almost immediately under normal load) outran its short supervising
+ * timeout while three lanes contended for one box at once (backend/705,
+ * desktop/775), and a review round's `tmux send-keys` addressed a session
+ * the worker had already exited on its own after finishing (infra/722). In
+ * neither case did the WORK fail; this fleet's own attempt to talk to or
+ * about the worker did. `UNVERIFIED` names that outcome so it reads as
+ * "the fleet couldn't confirm this, look at the PR yourself" rather than as
+ * "the task failed" — and, like QUOTA, it must never feed
+ * `circuit.ts`'s consecutive-failure streak: three verification gaps in a
+ * row are not three failures, and halting the fleet over them is exactly
+ * the false alarm this outcome exists to prevent.
  */
 export type Outcome =
   | 'DISPATCHED' | 'SUCCESS' | 'FAILED' | 'BLOCKED'
-  | 'TIMEOUT' | 'SHADOW' | 'REJECTED' | 'QUOTA'
+  | 'TIMEOUT' | 'SHADOW' | 'REJECTED' | 'QUOTA' | 'UNVERIFIED'
 
 export interface RunRecord {
   ts: number
@@ -89,7 +107,13 @@ export function since(windowMs: number, now = Date.now()): RunRecord[] {
   return sinceIn(readAll(), windowMs, now)
 }
 
-const TERMINAL_FAILURES: ReadonlySet<Outcome> = new Set<Outcome>(['FAILED', 'TIMEOUT', 'BLOCKED', 'REJECTED'])
+// UNVERIFIED counts here (bounding an item's per-attempt retries — same
+// reasoning as BLOCKED, immediately below in this list) even though it must
+// NOT feed circuit.ts's fleet-wide streak (see the `Outcome` doc comment
+// above): an item whose verification keeps coming back inconclusive still
+// needs to stop being re-claimed forever, it just must not take the whole
+// fleet down while it does.
+const TERMINAL_FAILURES: ReadonlySet<Outcome> = new Set<Outcome>(['FAILED', 'TIMEOUT', 'BLOCKED', 'REJECTED', 'UNVERIFIED'])
 
 /** Counts backward from the newest record for this item and stops at a SUCCESS. */
 export function failedAttemptsIn(rows: RunRecord[], itemId: string): number {

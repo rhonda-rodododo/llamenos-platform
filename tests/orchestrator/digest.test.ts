@@ -93,6 +93,13 @@ describe('waitingOnHuman', () => {
   it('is empty when nothing is blocked or a claimed success', () => {
     expect(waitingOnHuman([r('FAILED', 1), r('REJECTED', 2), r('TIMEOUT', 3)])).toEqual([])
   })
+
+  // Issue #870: UNVERIFIED means the fleet's own verification pipeline could
+  // not reach a verdict on an otherwise-open PR — exactly the shape this
+  // section exists to surface, alongside SUCCESS and BLOCKED.
+  it('lists UNVERIFIED as a candidate — a verification gap still leaves a PR waiting on a human', () => {
+    expect(waitingOnHuman([r('UNVERIFIED', 1, 'a')]).map((x) => x.itemId)).toEqual(['a'])
+  })
 })
 
 describe('resume command', () => {
