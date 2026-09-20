@@ -70,7 +70,7 @@ This document covers five disaster recovery scenarios for Llamenos self-hosted d
 
 ### Notes
 - E2EE notes remain protected. The server never had plaintext note content.
-- The WebSocket relay relay database is ephemeral (kind 20001 events) and does not need restoration. It rebuilds as clients reconnect.
+- The WebSocket relay database is ephemeral (kind 20001 events) and does not need restoration. It rebuilds as clients reconnect.
 - Caddy will automatically obtain new TLS certificates on first request.
 
 ---

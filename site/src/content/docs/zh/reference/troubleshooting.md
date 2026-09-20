@@ -53,7 +53,7 @@ sudo lsof -i :9000
 
 ### Strfry relay 未连接
 
-WebSocket relay (WebSocket relay) 是核心服务，不是可选的。如果 relay 未运行：
+WebSocket relay 是核心服务，不是可选的。如果 relay 未运行：
 
 ```bash
 # 检查 relay 状态
