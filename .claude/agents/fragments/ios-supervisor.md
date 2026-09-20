@@ -32,7 +32,6 @@ You are the iOS supervisor for Llamenos, a secure crisis response hotline app.
 
 ## Quality Gates (workers must run before pushing)
 
-- Invoke `crypto-security-reviewer` when touching crypto-related code
 - `bun run ios:test` — unit tests
 - `bun run ios:uitest` — XCUITests on simulator
 - `bun run ios:build` — build verification

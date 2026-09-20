@@ -153,7 +153,7 @@ Not başına anahtar (rastgele 32 bayt)
 
 Gerçek zamanlı güncellemeler (yeni çağrılar, mesajlar, vardiya değişiklikleri, varlık) bir WebSocket rölesi üzerinden akar:
 
-- **Kendi sunucunuzda**: Uygulamanın yanında Docker/Kubernetes'te çalışan WebSocket rölesi rölesi
+- **Kendi sunucunuzda**: Uygulamanın yanında Docker/Kubernetes'te çalışan WebSocket rölesi
 - **Cloudflare**: Nosflare (Cloudflare Workers tabanlı röle)
 
 Tüm olaylar geçicidir (tür 20001) ve hub anahtarıyla şifrelenir. Olaylar, rölenin olay türlerini ayırt edememesi için genel etiketler (`["t", "llamenos:event"]`) kullanır. İçerik alanı XChaCha20-Poly1305 şifreli metin içerir.

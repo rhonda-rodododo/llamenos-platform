@@ -1,0 +1,18 @@
+---
+# llamenos-ntfy defaults — see README.md for the full auth/topic model.
+
+# Docker image for the ntfy broker. Pin by digest like the other optional
+# sidecars (signal, whisper) — override in vars.yml to bump.
+llamenos_ntfy_image: "binwiederhier/ntfy:v2.11.0@sha256:4a7d0f0adc6d5d9fc36e64ab55ef676e76e124a2bdd50ce115b6d9c1c7430294"
+
+# Dedicated ntfy account the backend publishes as. Not a login — ntfy has no
+# concept of a "service account" beyond a regular user with a scoped ACL, so
+# this is just a stable name to grant write-only access to.
+ntfy_publish_username: "llamenos-app"
+
+# Host-local debug/health-check port (127.0.0.1 only — never exposed off-box).
+# Matches the port docker-compose.dev.yml already uses for the same image so
+# `curl localhost:2586/v1/health` behaves the same in dev and on a deployed
+# host. Public traffic never reaches this port; it goes through Caddy on
+# ntfy_domain instead (see roles/llamenos-caddy/templates/caddy.j2).
+llamenos_ntfy_local_port: 2586

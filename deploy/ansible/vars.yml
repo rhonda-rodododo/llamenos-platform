@@ -88,9 +88,10 @@ llamenos_app_image: "docker.io/llamenos/llamenos:latest"
 llamenos_postgres_image: "postgres:17-alpine"
 llamenos_caddy_image: "caddy:2.9-alpine"
 llamenos_rustfs_image: "rustfs/rustfs:latest"
-llamenos_whisper_image: "fedirz/faster-whisper-server:0.4.1"
+llamenos_whisper_image: "fedirz/faster-whisper-server:0.4.0-cpu" # 0.4.1 was never published (see #722)
 llamenos_asterisk_image: "andrius/asterisk:20"
 llamenos_signal_image: "bbernhard/signal-cli-rest-api:0.92"
+llamenos_ntfy_image: "binwiederhier/ntfy:v2.11.0@sha256:4a7d0f0adc6d5d9fc36e64ab55ef676e76e124a2bdd50ce115b6d9c1c7430294"
 
 # ─── Application ─────────────────────────────────────────────────
 app_dir: /opt/llamenos
@@ -137,11 +138,20 @@ apns_key_p8: ""
 apns_key_id: ""
 apns_team_id: ""
 
-# ntfy/UnifiedPush (Android). Requires a self-hosted ntfy instance reachable
-# at ntfy_url from the app container — standing that service up is tracked
-# separately (#717); this only wires the app's side of the connection.
+# ntfy/UnifiedPush (Android). Setting llamenos_ntfy_enabled: true stands up a
+# self-hosted ntfy broker (roles/llamenos-ntfy) reachable by the app
+# container at ntfy_url and by Android devices at ntfy_domain over TLS.
 llamenos_ntfy_enabled: false
 ntfy_url: "http://ntfy:80"
+# Public hostname for the broker, e.g. "push.{{ domain }}". Required when
+# llamenos_ntfy_enabled is true — Caddy and NTFY_BASE_URL both use it.
+ntfy_domain: "push.{{ domain }}"
+# Unlike every other secret in this file, do NOT generate this one with
+# openssl: ntfy only accepts bearer tokens it mints itself. Leave this empty
+# — roles/llamenos-ntfy generates it on first deploy (via `ntfy token add`)
+# and overrides this value with the real one for the rest of the run. It is
+# also persisted on the host at {{ app_dir }}/services/ntfy/.publish-token
+# so re-deploys don't mint a new token every time.
 ntfy_auth_token: ""
 
 # ─── Crash Reporting (Epic 293) ──────────────────────────────────

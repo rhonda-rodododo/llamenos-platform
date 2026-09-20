@@ -34,7 +34,7 @@ jobs:
       matrix:
         include:
           - platform: macos-latest
-            target: universal-apple-darwin
+            target: x86_64-apple-darwin
             os_label: macOS
           - platform: windows-latest
             target: x86_64-pc-windows-msvc
@@ -56,10 +56,13 @@ jobs:
           toolchain: stable
           targets: ${{ matrix.target }}
 
-      # macOS universal binary needs both targets
+      # macOS universal binary (--target universal-apple-darwin in the build step below)
+      # needs both real Darwin triples. x86_64-apple-darwin comes from the matrix target
+      # above (a valid rustup triple — unlike "universal-apple-darwin", which rustup does
+      # not recognize); aarch64-apple-darwin is added here.
       - name: Add macOS aarch64 target
         if: matrix.platform == 'macos-latest'
-        run: rustup target add aarch64-apple-darwin x86_64-apple-darwin
+        run: rustup target add aarch64-apple-darwin
 
       - name: Rust cache
         uses: swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
@@ -225,7 +228,17 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: bun run tauri:build
 
-      # Upload build artifacts
+      # Upload build artifacts.
+      #
+      # bundle.targets is "all" (tauri.conf.json) with no per-OS overrides, so each
+      # platform produces BOTH a human-installable installer AND a separate, smaller
+      # "updater artifact" (createUpdaterArtifacts: true) used only by the in-app
+      # updater. Per Tauri v2 docs, these are NOT the same file:
+      #   - macOS:   *.dmg (installable)              + *.app.tar.gz (updater-only)
+      #   - Windows: *-setup.exe, *.msi (installable)  + *.nsis.zip, *.msi.zip (updater-only)
+      #   - Linux:   *.deb, *.AppImage (installable)   + *.AppImage.tar.gz (updater-only)
+      # Previously only the updater-only variants were captured for Windows/Linux —
+      # meaning no human-runnable Windows or Linux installer ever left this workflow.
       - name: Upload artifacts
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
@@ -234,8 +247,16 @@ jobs:
             apps/desktop/target/**/release/bundle/**/*.app.tar.gz
             apps/desktop/target/**/release/bundle/**/*.app.tar.gz.sig
             apps/desktop/target/**/release/bundle/**/*.dmg
+            apps/desktop/target/**/release/bundle/**/*-setup.exe
+            apps/desktop/target/**/release/bundle/**/*-setup.exe.sig
+            apps/desktop/target/**/release/bundle/**/*.msi
+            apps/desktop/target/**/release/bundle/**/*.msi.sig
+            apps/desktop/target/**/release/bundle/**/*.msi.zip
+            apps/desktop/target/**/release/bundle/**/*.msi.zip.sig
             apps/desktop/target/**/release/bundle/**/*.nsis.zip
             apps/desktop/target/**/release/bundle/**/*.nsis.zip.sig
+            apps/desktop/target/**/release/bundle/**/*.AppImage
+            apps/desktop/target/**/release/bundle/**/*.AppImage.sig
             apps/desktop/target/**/release/bundle/**/*.AppImage.tar.gz
             apps/desktop/target/**/release/bundle/**/*.AppImage.tar.gz.sig
             apps/desktop/target/**/release/bundle/**/*.deb
@@ -295,6 +316,9 @@ jobs:
           find artifacts -type f \( \
             -name '*.tar.gz' -o -name '*.tar.gz.sig' \
             -o -name '*.nsis.zip' -o -name '*.nsis.zip.sig' \
+            -o -name '*-setup.exe' -o -name '*-setup.exe.sig' \
+            -o -name '*.msi' -o -name '*.msi.sig' -o -name '*.msi.zip' -o -name '*.msi.zip.sig' \
+            -o -name '*.AppImage' -o -name '*.AppImage.sig' \
             -o -name '*.AppImage.tar.gz' -o -name '*.AppImage.tar.gz.sig' \
             -o -name '*.dmg' -o -name '*.deb' \
           \) -exec cp {} flat-artifacts/ \;
@@ -305,7 +329,7 @@ jobs:
       - name: Generate SHA-256 checksums
         run: |
           cd flat-artifacts
-          sha256sum * | sort > ../CHECKSUMS.txt
+          sha256sum -- * | sort > ../CHECKSUMS.txt
           cd ..
           echo "$(wc -l < CHECKSUMS.txt) files checksummed"
           cat CHECKSUMS.txt
@@ -539,8 +563,12 @@ jobs:
           | Platform | Download |
           |----------|----------|
           | macOS (Universal) | [DMG](https://releases.llamenos.org/desktop/v${VERSION}/Hotline.dmg) |
-          | Windows (x64) | [NSIS Installer](https://releases.llamenos.org/desktop/v${VERSION}/Hotline_${VERSION}_x64-setup.nsis.zip) |
-          | Linux (x64) | [AppImage](https://releases.llamenos.org/desktop/v${VERSION}/hotline_${VERSION}_amd64.AppImage.tar.gz) \| [deb](https://releases.llamenos.org/desktop/v${VERSION}/hotline_${VERSION}_amd64.deb) |
+          | Windows (x64) | [NSIS Installer](https://releases.llamenos.org/desktop/v${VERSION}/Hotline_${VERSION}_x64-setup.exe) \| [MSI](https://releases.llamenos.org/desktop/v${VERSION}/Hotline_${VERSION}_x64_en-US.msi) |
+          | Linux (x64) | [AppImage](https://releases.llamenos.org/desktop/v${VERSION}/hotline_${VERSION}_amd64.AppImage) \| [deb](https://releases.llamenos.org/desktop/v${VERSION}/hotline_${VERSION}_amd64.deb) |
+
+          The \`.nsis.zip\` / \`.msi.zip\` / \`.AppImage.tar.gz\` variants alongside these are
+          updater-only bundles consumed by the in-app auto-updater — not meant for direct
+          download. Use the links above to install.
 
           ### Verification
 
