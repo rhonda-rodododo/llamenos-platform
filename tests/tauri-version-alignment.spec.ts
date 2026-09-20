@@ -108,7 +108,7 @@ test.describe('Tauri version alignment', () => {
     ).dependencies?.['@tauri-apps/api']
 
     expect(cargoRaw, 'expected to find the tauri dependency in Cargo.toml').toBeTruthy()
-    const cargoVersion = cargoRaw![1] ?? cargoRaw![2]
+    const cargoVersion = (cargoRaw?.[1] ?? cargoRaw?.[2]) as string
 
     // Cargo exact pins use a leading "=" (e.g. "=2.11.1"); npm/bun exact pins
     // simply omit any range operator (no "^", "~", "*", or bare major).
