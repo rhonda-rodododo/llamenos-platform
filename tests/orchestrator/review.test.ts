@@ -4,7 +4,8 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, 
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
-  opencodeAssistantText, parseVerdict, stripReviewerControlFiles, verifierFor,
+  checkOpencodeModelKnown, DEFAULT_OPENCODE_MODEL, opencodeAssistantText, opencodeModelsCachePath,
+  parseVerdict, stripReviewerControlFiles, verifierFor,
 } from '../../orchestrator/src/review.js'
 
 describe('verifierFor', () => {
@@ -176,6 +177,89 @@ describe('stripReviewerControlFiles', () => {
   })
 })
 
+/**
+ * `checkOpencodeModelKnown` is the rail behind this file's fix: a configured
+ * opencode `provider/model` id, checked against a LOCAL fixture registry
+ * standing in for `~/.cache/opencode/models.json` (never the real one —
+ * these tests must not depend on what happens to be cached on whatever box
+ * runs them, or on network access to models.dev).
+ */
+describe('checkOpencodeModelKnown', () => {
+  const originalXdgCacheHome = process.env['XDG_CACHE_HOME']
+  let cacheHome: string | undefined
+
+  function writeRegistry(registry: Record<string, unknown>): void {
+    const dir = join(cacheHome as string, 'opencode')
+    mkdirSync(dir, { recursive: true })
+    writeFileSync(join(dir, 'models.json'), JSON.stringify(registry))
+  }
+
+  beforeEach(() => {
+    cacheHome = mkdtempSync(join(tmpdir(), 'llamenos-fleet-review-registry-test-'))
+    process.env['XDG_CACHE_HOME'] = cacheHome
+  })
+
+  afterEach(() => {
+    if (originalXdgCacheHome === undefined) delete process.env['XDG_CACHE_HOME']
+    else process.env['XDG_CACHE_HOME'] = originalXdgCacheHome
+    if (cacheHome !== undefined) rmSync(cacheHome, { recursive: true, force: true })
+    cacheHome = undefined
+  })
+
+  it('resolves the cache path under $XDG_CACHE_HOME/opencode/models.json', () => {
+    expect(opencodeModelsCachePath()).toBe(join(cacheHome as string, 'opencode', 'models.json'))
+  })
+
+  it('is "known" when the provider and model are both present in the registry', async () => {
+    writeRegistry({ 'kimi-code-plan-global': { models: { 'k3-256k': {} } } })
+    await expect(checkOpencodeModelKnown('kimi-code-plan-global/k3-256k')).resolves.toBe('known')
+  })
+
+  // Reproduces the actual incident this file fixes: the `kimi-for-coding`
+  // PROVIDER itself was retired from the registry (in favour of
+  // `kimi-code-plan-global`) — this is "provider key absent", not "model
+  // key absent under a present provider". Both must read 'unknown', but
+  // this is the one that actually happened and broke every review.
+  it('is "unknown" when the configured PROVIDER no longer exists in the registry at all (the kimi-for-coding incident)', async () => {
+    writeRegistry({ 'kimi-code-plan-global': { models: { 'k3-256k': {} } } })
+    await expect(checkOpencodeModelKnown('kimi-for-coding/k3-256k')).resolves.toBe('unknown')
+  })
+
+  it('is "unknown" when the provider exists but the specific model id does not', async () => {
+    writeRegistry({ 'kimi-code-plan-global': { models: { 'k3-256k': {} } } })
+    await expect(checkOpencodeModelKnown('kimi-code-plan-global/does-not-exist')).resolves.toBe('unknown')
+  })
+
+  // Several real providers nest a slash inside the model id itself (e.g.
+  // `cloudflare-ai-gateway/anthropic/claude-opus-5`) — splitting on every
+  // slash instead of just the first would misfile a perfectly valid id as
+  // unknown.
+  it('splits on the FIRST slash only, so a model id that itself contains a slash still resolves', async () => {
+    writeRegistry({ 'cloudflare-ai-gateway': { models: { 'anthropic/claude-opus-5': {} } } })
+    await expect(checkOpencodeModelKnown('cloudflare-ai-gateway/anthropic/claude-opus-5')).resolves.toBe('known')
+  })
+
+  it('is "indeterminate" — never a confident "unknown" — when the registry cache file does not exist', async () => {
+    // Deliberately no writeRegistry() call: a fresh temp dir with no
+    // opencode/models.json, standing in for a box that has never run
+    // opencode. A false "unknown" here would misconfigure-fail a perfectly
+    // valid id on every such box.
+    await expect(checkOpencodeModelKnown('kimi-code-plan-global/k3-256k')).resolves.toBe('indeterminate')
+  })
+
+  it('is "indeterminate" when the cache file exists but is not valid JSON', async () => {
+    const dir = join(cacheHome as string, 'opencode')
+    mkdirSync(dir, { recursive: true })
+    writeFileSync(join(dir, 'models.json'), 'not valid json {{{')
+    await expect(checkOpencodeModelKnown('kimi-code-plan-global/k3-256k')).resolves.toBe('indeterminate')
+  })
+
+  it('is "indeterminate" for an id with no slash — nothing to split into provider/model', async () => {
+    writeRegistry({ 'kimi-code-plan-global': { models: { 'k3-256k': {} } } })
+    await expect(checkOpencodeModelKnown('kimi-code-plan-global')).resolves.toBe('indeterminate')
+  })
+})
+
 // --- I/O-bearing behaviour, mocked at the node:child_process boundary ---
 
 // review.ts (and gh.ts) call `promisify(execFile)` exactly once, at module
@@ -280,40 +364,68 @@ describe('secondOpinion', () => {
   })
 
   /**
-   * Pins the exact opencode argv, because both of its previous values were
-   * wrong in ways nothing here could see: `--format text` is not one of
-   * opencode's accepted choices (`default` | `json`), so `opencode run`
-   * printed its help and exited 0 without contacting a model at all; and the
-   * model id `kimi-for-coding/k2p6` does not exist in opencode's registry, so
-   * the provider answered `Unexpected server error`. Either one on its own
-   * meant `fleet/review` could never return a verdict — every call came back
+   * Pins the exact opencode argv, because its previous values were wrong in
+   * ways nothing here could see: `--format text` is not one of opencode's
+   * accepted choices (`default` | `json`), so `opencode run` printed its
+   * help and exited 0 without contacting a model at all; the model id
+   * `kimi-for-coding/k2p6` did not exist in opencode's registry (2026-09-12);
+   * and — the incident this file's current fix is for — the whole
+   * `kimi-for-coding` PROVIDER was later retired in favour of
+   * `kimi-code-plan-global` (2026-09-19), so even the id that replaced k2p6
+   * (`kimi-for-coding/k3-256k`) went stale in turn. Each one on its own meant
+   * `fleet/review` could never return a verdict — every call came back
    * UNREADABLE, which blocks correctly but reads exactly like "the engine was
-   * unreachable", so nobody looked. Both were confirmed by running the real
-   * binary (1.18.30) each way. The CI job's smoke step is the end-to-end
-   * guard; this is the one that fails before a push.
+   * unreachable", so nobody looked. All three were confirmed by running the
+   * real binary (1.18.30 / 1.18.31) each way. The CI job's smoke step is the
+   * end-to-end guard; this is the one that fails before a push.
+   *
+   * `FLEET_REVIEW_MODEL` and `XDG_CACHE_HOME` are both pinned here (env
+   * cleared, cache pointed at an empty temp dir) so this test's result can
+   * never depend on ambient state — whatever happens to be set in the
+   * shell that runs it, or whatever opencode has cached on that machine.
    */
-  it('invokes opencode with a model and format the binary actually accepts', async () => {
-    mockExecFileResolves(opencodeText('VERDICT: PASS'))
-    const { secondOpinion } = await import('../../orchestrator/src/review.js')
-    const worktree = makeAuthorWorktree()
-    await secondOpinion({
-      authorEngine: 'claude', pr: '1', worktree, diff: 'diff',
-      report: {
-        passed: true, reasons: [], changedFiles: ['apps/worker/x.ts'], addedLines: 1,
-        impact: 'low' as const, impactReasons: [],
-      },
-    })
-    const args = mockExecFile.mock.calls[0]?.[1] as string[]
-    const format = args[args.indexOf('--format') + 1]
-    const model = args[args.indexOf('--model') + 1]
-    expect(args[0]).toBe('run')
-    // `json` specifically: it is what separates assistant text from tool output.
-    expect(format).toBe('json')
-    expect(model).toMatch(/^kimi-for-coding\//)
-    expect(model).not.toBe('kimi-for-coding/k2p6') // removed from the registry
-    // No external plugins: the reviewer's behaviour must not depend on
-    // whatever happens to be configured on the machine running it.
-    expect(args).toContain('--pure')
+  it('invokes opencode with DEFAULT_OPENCODE_MODEL and the format the binary actually accepts, when FLEET_REVIEW_MODEL is unset', async () => {
+    const originalFleetReviewModel = process.env['FLEET_REVIEW_MODEL']
+    const originalXdgCacheHome = process.env['XDG_CACHE_HOME']
+    delete process.env['FLEET_REVIEW_MODEL']
+    // Empty, freshly created — guaranteed no opencode/models.json, so the
+    // registry pre-flight reads 'indeterminate' and falls through to
+    // invoking the (mocked) engine, exactly like a box that has never run
+    // opencode. This test is about the ARGV, not the registry check.
+    const emptyCacheHome = mkdtempSync(join(tmpdir(), 'llamenos-fleet-review-argv-test-'))
+    process.env['XDG_CACHE_HOME'] = emptyCacheHome
+    vi.resetModules()
+    try {
+      mockExecFileResolves(opencodeText('VERDICT: PASS'))
+      const { secondOpinion } = await import('../../orchestrator/src/review.js')
+      const worktree = makeAuthorWorktree()
+      await secondOpinion({
+        authorEngine: 'claude', pr: '1', worktree, diff: 'diff',
+        report: {
+          passed: true, reasons: [], changedFiles: ['apps/worker/x.ts'], addedLines: 1,
+          impact: 'low' as const, impactReasons: [],
+        },
+      })
+      const args = mockExecFile.mock.calls[0]?.[1] as string[]
+      const format = args[args.indexOf('--format') + 1]
+      const model = args[args.indexOf('--model') + 1]
+      expect(args[0]).toBe('run')
+      // `json` specifically: it is what separates assistant text from tool output.
+      expect(format).toBe('json')
+      expect(model).toBe(DEFAULT_OPENCODE_MODEL)
+      expect(model).not.toBe('kimi-for-coding/k2p6') // removed from the registry 2026-09-12
+      expect(model).not.toBe('kimi-for-coding/k3-256k') // the whole provider was retired 2026-09-19
+      // No external plugins: the reviewer's behaviour must not depend on
+      // whatever happens to be configured on the machine running it.
+      expect(args).toContain('--pure')
+    } finally {
+      if (originalFleetReviewModel === undefined) delete process.env['FLEET_REVIEW_MODEL']
+      else process.env['FLEET_REVIEW_MODEL'] = originalFleetReviewModel
+      if (originalXdgCacheHome === undefined) delete process.env['XDG_CACHE_HOME']
+      else process.env['XDG_CACHE_HOME'] = originalXdgCacheHome
+      rmSync(emptyCacheHome, { recursive: true, force: true })
+      vi.resetModules()
+    }
   })
 
   it('treats an unreachable reviewer as UNREADABLE, not a pass', async () => {
@@ -532,6 +644,103 @@ describe('secondOpinion', () => {
 
     expect(capturedCwd).toBeDefined()
     expect(existsSync(capturedCwd ?? '')).toBe(false)
+  })
+
+  /**
+   * The actual bug this file fixes: `opencode run` fails a bad model id
+   * (`kimi-for-coding/k3-256k`, once the whole provider was retired) with
+   * the IDENTICAL opaque `{"name":"UnknownError","data":{"message":
+   * "Unexpected server error..."}}` a genuine outage or quota exhaustion
+   * produces — verified against the real opencode binary (1.18.31) before
+   * writing this fix; there is no reliable way to tell the two apart from
+   * that error text alone. `invokeVerifierEngine` now checks the configured
+   * id against opencode's own local registry cache BEFORE spawning
+   * anything, so a bad id is reported as `engine-misconfigured` — naming
+   * it — instead of collapsing into the same UNREADABLE a transient outage
+   * produces.
+   */
+  describe('model registry pre-flight (engine-misconfigured vs engine-unavailable)', () => {
+    const originalFleetReviewModel = process.env['FLEET_REVIEW_MODEL']
+    const originalXdgCacheHome = process.env['XDG_CACHE_HOME']
+    let cacheHome: string | undefined
+
+    function writeRegistry(registry: Record<string, unknown>): void {
+      const dir = join(cacheHome as string, 'opencode')
+      mkdirSync(dir, { recursive: true })
+      writeFileSync(join(dir, 'models.json'), JSON.stringify(registry))
+    }
+
+    beforeEach(() => {
+      cacheHome = mkdtempSync(join(tmpdir(), 'llamenos-fleet-review-preflight-test-'))
+      process.env['XDG_CACHE_HOME'] = cacheHome
+    })
+
+    afterEach(() => {
+      if (originalFleetReviewModel === undefined) delete process.env['FLEET_REVIEW_MODEL']
+      else process.env['FLEET_REVIEW_MODEL'] = originalFleetReviewModel
+      if (originalXdgCacheHome === undefined) delete process.env['XDG_CACHE_HOME']
+      else process.env['XDG_CACHE_HOME'] = originalXdgCacheHome
+      if (cacheHome !== undefined) rmSync(cacheHome, { recursive: true, force: true })
+      cacheHome = undefined
+      vi.resetModules()
+    })
+
+    // MUTATION GUARD (this project's "audit gates by breaking them" rule):
+    // delete the pre-flight `checkOpencodeModelKnown` call out of
+    // `invokeVerifierEngine` — collapsing `failureKind` back to a single
+    // value the way this bug's `catch` block alone used to behave — and
+    // this test fails on BOTH assertions: `mockExecFile` WOULD be called
+    // (nothing short-circuits the spawn), and `failureKind` would read
+    // 'engine-unavailable', never 'engine-misconfigured'. Run by hand
+    // before opening the PR (commented out the pre-flight `if` block,
+    // reran this test, confirmed the failure) — see the PR body for the
+    // observed output.
+    it('reports a model id the registry does not resolve as engine-misconfigured, naming the id, and never spawns the engine', async () => {
+      // The registry loaded fine, but the configured PROVIDER itself is
+      // absent — this is the actual kimi-for-coding incident, reproduced
+      // with a fixture instead of the real (and real-world-mutable) cache.
+      writeRegistry({ 'kimi-code-plan-global': { models: { 'k3-256k': {} } } })
+      process.env['FLEET_REVIEW_MODEL'] = 'kimi-for-coding/k3-256k'
+      vi.resetModules()
+      const { secondOpinion } = await import('../../orchestrator/src/review.js')
+      const worktree = makeAuthorWorktree()
+      const result = await secondOpinion({ authorEngine: 'claude', pr: '1', worktree, diff: '', report: okReport })
+
+      expect(mockExecFile).not.toHaveBeenCalled()
+      expect(result.verdict).toBe('UNREADABLE')
+      expect(result.failureKind).toBe('engine-misconfigured')
+      expect(result.text).toContain('kimi-for-coding/k3-256k')
+      expect(result.text).toMatch(/configuration defect/i)
+    })
+
+    it('reports a genuinely unreachable but validly-configured engine as engine-unavailable — distinct from a misconfigured id', async () => {
+      writeRegistry({ 'kimi-code-plan-global': { models: { 'k3-256k': {} } } })
+      process.env['FLEET_REVIEW_MODEL'] = 'kimi-code-plan-global/k3-256k'
+      vi.resetModules()
+      mockExecFileRejects(new Error('ETIMEDOUT'))
+      const { secondOpinion } = await import('../../orchestrator/src/review.js')
+      const worktree = makeAuthorWorktree()
+      const result = await secondOpinion({ authorEngine: 'claude', pr: '1', worktree, diff: '', report: okReport })
+
+      expect(mockExecFile).toHaveBeenCalled()
+      expect(result.verdict).toBe('UNREADABLE')
+      expect(result.failureKind).toBe('engine-unavailable')
+    })
+
+    it('proceeds to invoke the engine, rather than claiming misconfigured, when the registry cache is simply absent', async () => {
+      // No writeRegistry() call — cacheHome has no opencode/models.json at
+      // all, standing in for a box that has never run opencode.
+      process.env['FLEET_REVIEW_MODEL'] = 'kimi-code-plan-global/k3-256k'
+      vi.resetModules()
+      mockExecFileResolves(opencodeText('VERDICT: PASS'))
+      const { secondOpinion } = await import('../../orchestrator/src/review.js')
+      const worktree = makeAuthorWorktree()
+      const result = await secondOpinion({ authorEngine: 'claude', pr: '1', worktree, diff: '', report: okReport })
+
+      expect(mockExecFile).toHaveBeenCalled()
+      expect(result.verdict).toBe('PASS')
+      expect(result.failureKind).toBeUndefined()
+    })
   })
 })
 
