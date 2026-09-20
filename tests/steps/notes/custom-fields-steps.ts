@@ -87,12 +87,10 @@ Given('a note exists with text {string} and {string} set to {string}', async ({ 
 })
 
 When('I click edit on the note', async ({ page }) => {
-  // Ensure we're on the notes page
+  // The preceding Given step ("a note exists...") already navigates to the notes
+  // page and waits for the note card to be visible, so no re-navigation guard is
+  // needed here — just wait on the guaranteed state directly.
   const noteCard = page.getByTestId(TestIds.NOTE_CARD).first()
-  const isVisible = await noteCard.isVisible({ timeout: 2000 }).catch(() => false)
-  if (!isVisible) {
-    await Navigation.goToNotes(page)
-  }
   await expect(noteCard).toBeVisible({ timeout: Timeouts.ELEMENT })
   // The edit button is within the note card — hover to reveal it (may be hidden by default)
   await noteCard.hover()
@@ -112,30 +110,17 @@ When('I change {string} to {string}', async ({ page }, fieldLabel: string, newVa
 })
 
 When('I change the note text to {string}', async ({ page }, newText: string) => {
-  // The inline edit form uses note-edit-input (NoteEditForm textarea)
+  // This step always follows "I click edit on the note", which sets editingId on
+  // the notes route and unconditionally renders NoteEditForm (note-edit-input) —
+  // never the new-note form or the command-palette note sheet. Target that
+  // element directly instead of racing three isVisible() probes to guess which
+  // edit surface rendered.
   const editInput = page.getByTestId(TestIds.NOTE_EDIT_INPUT)
-  const isEditInput = await editInput.isVisible({ timeout: 3000 }).catch(() => false)
-  if (isEditInput) {
-    await editInput.click({ clickCount: 3 })
-    await editInput.fill(newText)
-    return
-  }
-  const noteContent = page.getByTestId(TestIds.NOTE_CONTENT)
-  // The edit form may use a sheet or inline edit — wait for the element to be visible
-  const isVisible = await noteContent.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
-  if (isVisible) {
-    // Use triple-click + type to replace content instead of clear() which can timeout
-    // on some textarea implementations
-    await noteContent.click({ clickCount: 3 })
-    await noteContent.fill(newText)
-  } else {
-    // Neither the inline edit input nor the direct note-content field rendered —
-    // the only remaining edit surface is the note sheet. One of the three must exist.
-    const sheetText = page.getByTestId(TestIds.SHEET_NOTE_TEXT)
-    await expect(sheetText).toBeVisible({ timeout: Timeouts.ELEMENT })
-    await sheetText.click({ clickCount: 3 })
-    await sheetText.fill(newText)
-  }
+  await expect(editInput).toBeVisible({ timeout: Timeouts.ELEMENT })
+  // Use triple-click + type to replace content instead of clear() which can timeout
+  // on some textarea implementations
+  await editInput.click({ clickCount: 3 })
+  await editInput.fill(newText)
 })
 
 Then('I should not see the original text', async ({ page }) => {

@@ -7,35 +7,30 @@ import { Then } from '../fixtures'
 import { Timeouts } from '../../helpers'
 
 Then('I should see the erasure request button or pending state', async ({ page }) => {
+  // One of these states should be visible once the settings API call resolves.
+  // A combined `.or()` locator with a single waiting assertion replaces the old
+  // Promise.race(waitFor) + isVisible() double-check — isVisible() never waits
+  // (its `timeout` option is a documented no-op), so re-checking with it after
+  // the race raced the page load a second time for no benefit.
+  // `section` (account-erasure) is the parent Card that wraps whichever of
+  // available/pending/completed rendered, so once expanded BOTH the child div
+  // and the parent Card match simultaneously — an outer `.first()` on the union
+  // is required, otherwise this resolves to 2 elements and toBeVisible() throws
+  // a strict-mode violation instead of waiting.
   const available = page.getByTestId('erasure-available')
   const pending = page.getByTestId('erasure-pending')
   const completed = page.getByTestId('erasure-completed')
-  // One of these states should be visible after loading
-  await Promise.race([
-    available.waitFor({ state: 'visible', timeout: Timeouts.API }),
-    pending.waitFor({ state: 'visible', timeout: Timeouts.API }),
-    completed.waitFor({ state: 'visible', timeout: Timeouts.API }),
-  ]).catch(() => {
-    // If none visible, still loading or API unavailable — check page loaded
-  })
-  const anyVisible =
-    (await available.isVisible().catch(() => false)) ||
-    (await pending.isVisible().catch(() => false)) ||
-    (await completed.isVisible().catch(() => false)) ||
-    (await page.getByTestId('account-erasure').isVisible().catch(() => false))
-  expect(anyVisible).toBe(true)
+  const section = page.getByTestId('account-erasure')
+  await expect(available.or(pending).or(completed).or(section).first()).toBeVisible({ timeout: Timeouts.API })
 })
 
 Then('I should see the erasure available state or pending state', async ({ page }) => {
-  // Allow time for the API call to complete
-  await page.waitForLoadState('domcontentloaded')
+  // See note above — `section` wraps `available`/`pending`, so an outer `.first()`
+  // on the union avoids a strict-mode violation when both match at once.
   const available = page.getByTestId('erasure-available')
   const pending = page.getByTestId('erasure-pending')
   const section = page.getByTestId('account-erasure')
-  const isAvailable = await available.isVisible({ timeout: Timeouts.API }).catch(() => false)
-  const isPending = await pending.isVisible({ timeout: 2000 }).catch(() => false)
-  const isSectionVisible = await section.isVisible({ timeout: 2000 }).catch(() => false)
-  expect(isAvailable || isPending || isSectionVisible).toBe(true)
+  await expect(available.or(pending).or(section).first()).toBeVisible({ timeout: Timeouts.API })
 })
 
 Then('the account erasure section should be visible', async ({ page }) => {
