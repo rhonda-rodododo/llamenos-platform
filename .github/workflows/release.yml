@@ -216,21 +216,56 @@ jobs:
 
       - name: Install cosign
         uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+        with:
+          # Pin explicitly: the installer's own default happens to be
+          # v3.0.6 today, but that default lives in the action, not here —
+          # a routine Dependabot bump of the installer's SHA could change
+          # the resolved cosign version with zero diff in this file. cosign
+          # v3 flipped `--new-bundle-format`/`--use-signing-config` to
+          # default true, which is what broke signing below; pinning here
+          # means that class of surprise requires an explicit version bump
+          # we review, not a silent installer update.
+          cosign-release: 'v3.0.6'
 
       - name: Attest SBOM
         run: |
+          # --output-file is cosign's generic "log output to a file" flag —
+          # it does NOT write the attestation; the real flag is
+          # --output-attestation. That flag (like sign-blob's
+          # --output-signature/--output-certificate below) is silently
+          # ignored under cosign v3's default new bundle format, so this
+          # step could report success while sbom.cdx.json.att holds no
+          # usable attestation, which scripts/verify-build.sh's
+          # `cosign verify-blob-attestation` would only catch much later.
+          # Force the legacy single-file output explicitly so this
+          # produces a real, verifiable attestation now.
           cosign attest-blob --yes \
             --predicate sbom.cdx.json \
             --type cyclonedx \
-            --output-file sbom.cdx.json.att \
+            --new-bundle-format=false \
+            --use-signing-config=false \
+            --output-attestation sbom.cdx.json.att \
             CHECKSUMS.txt
           echo "SBOM attestation attached to CHECKSUMS.txt"
 
       - name: Sign release artifacts (keyless)
         run: |
+          # cosign v3 defaults --new-bundle-format and --use-signing-config
+          # to true, which makes --output-signature/--output-certificate
+          # deprecated-and-ignored and instead requires --bundle. Without a
+          # --bundle path, cosign tries to create a bundle file at an EMPTY
+          # path and fails: "create bundle file: open : no such file or
+          # directory". Force the legacy flags explicitly so this keeps
+          # producing separate .cosign.sig/.cosign.pem files, which is what
+          # scripts/verify-build.sh (outside this PR's ownership) verifies
+          # against. No `|| true` / `continue-on-error` anywhere here: a
+          # signing failure must fail this job, not publish an unsigned
+          # release.
           for f in CHECKSUMS.txt provenance.json; do
             [ -f "$f" ] || continue
             cosign sign-blob --yes \
+              --new-bundle-format=false \
+              --use-signing-config=false \
               --output-signature "${f}.cosign.sig" \
               --output-certificate "${f}.cosign.pem" \
               "$f"
@@ -397,6 +432,11 @@ jobs:
 
       - name: Install cosign
         uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+        with:
+          # Same pin as the blob-signing job's "Install cosign" step, kept
+          # in sync so both jobs always resolve the identical cosign
+          # version instead of relying on the installer's own default.
+          cosign-release: 'v3.0.6'
 
       - name: Sign container image (keyless)
         env:
