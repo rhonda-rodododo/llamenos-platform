@@ -213,7 +213,7 @@ of work*:
 |---|---|---|---|
 | **Planner** | Opus, high | Issues, dependency edges, lane assignment | Issues only, never code |
 | **Implementer** | Sonnet default; Opus when the issue carries `effort:high` | One issue → one worktree → one PR | Its lane's scope only |
-| **Reviewer** | *different engine from the author* — Claude author reviewed by GLM/Kimi via opencode, and vice versa | A verdict, and a reply to the author | Nothing — plan mode |
+| **Reviewer** | `claude` session, `sonnet` default (see the "#812 move to a self-hosted claude session" section below — historically GLM/Kimi via `opencode`, a genuinely different vendor from the `claude` author) | A verdict, and a reply to the author | Nothing — plan mode |
 | **Integrator** | Sonnet | Rebases, CI watch, post-merge revert-on-red | Merges only |
 | **Release engineer** | Opus, max | Pipeline runs, artifact verification | Never merges its own work |
 
@@ -273,53 +273,108 @@ Eight, each a file, each asserted by a test rather than promised by a comment.
    the scope breaker nothing to compare against. Asserted in a test that refuses
    to let such a lane be `live`.
 
-#### Switching the review engine provider
+#### Switching the review engine provider (historical) / the #812 move to a self-hosted claude session
 
-`fleet/review`'s non-author reviewer (rail 1, above) runs on `opencode`,
-driven entirely by two repo variables — `vars.FLEET_REVIEW_PROVIDER` (default
-`kimi-for-coding`) and `vars.FLEET_REVIEW_MODEL` (default
-`kimi-for-coding/k3-256k`) — plus the `FLEET_REVIEW_API_KEY` secret. Switching
-provider needs **no code change**:
+Through 2026-09-15, `fleet/review`'s non-author reviewer (rail 1, above) ran
+on `opencode`, driven entirely by two repo variables —
+`vars.FLEET_REVIEW_PROVIDER` (default `kimi-for-coding`) and
+`vars.FLEET_REVIEW_MODEL` (default `kimi-for-coding/k3-256k`) — plus the
+`FLEET_REVIEW_API_KEY` secret written into `~/.local/share/opencode/
+auth.json`. That design is what unblocked the fleet on 2026-09-15 itself: the
+Moonshot Kimi subscription backing the hardcoded `kimi-for-coding` provider
+had exhausted its weekly quota, so every `fleet/review` smoke test failed and
+the required check was red repo-wide, with no way to recover short of
+waiting out the week. Fail-closed on a real outage is correct; being
+un-switchable to a different provider was not.
 
-1. Set the two repo variables (repo Settings → Secrets and variables →
-   Actions → Variables) to the new provider id and its `provider/model`
-   string, e.g. `zai-coding-plan` / `zai-coding-plan/glm-5.3`.
-2. Replace `FLEET_REVIEW_API_KEY` with a key valid for that provider.
-3. Force a re-review of any open PR outside the normal label flow (manual
-   debugging only): `gh workflow run fleet-review.yml --ref <branch>
-   -f pr_number=<n>`. The normal path is applying the `review` label to the
-   PR — see below. The "Authenticate the review engine" step keys
-   `~/.local/share/opencode/auth.json` off `FLEET_REVIEW_PROVIDER` itself
-   (never a literal), the "Smoke-test the review engine" step passes
-   `FLEET_REVIEW_MODEL` to `--model`, and the real "Review" step
-   (`review-ci` → `review.ts`'s `VERIFIER_ENGINE`) reads the same
-   `FLEET_REVIEW_MODEL` env var — so all three move together from the one
-   variable change.
+**#812 retired `opencode`/Kimi as the reviewer engine entirely.** Operator
+decision: coding-agent SESSIONS review better than a thin API call. Most of
+the `opencode` engine's failures were infrastructure (UNREADABLE from
+turn-budget exhaustion, smoke-test failures, provider quota exhausted
+mid-week) rather than the reviewer actually missing something, and its
+2-3-turn cap could not even be enforced on `opencode`'s own CLI (no
+equivalent flag existed). `fleet/review` now runs a `claude` session on a
+dedicated self-hosted runner (`llamenos-review-box`, labels
+`self-hosted,Linux,X64,fleet-review`), authenticated under the operator's own
+account and the operator's own Max subscription — not a metered,
+weekly-quota'd key.
 
-This is what unblocked the fleet on 2026-09-15: the Moonshot Kimi
-subscription backing the hardcoded `kimi-for-coding` provider had exhausted
-its weekly quota, so every `fleet/review` smoke test failed and the required
-check was red repo-wide, with no way to recover short of waiting out the
-week. Fail-closed on a real outage is correct; being un-switchable to a
-different provider was not.
+What this changes structurally:
+
+- `runs-on: [self-hosted, fleet-review]`, never a GitHub-hosted runner — the
+  only label combination that reaches that box.
+- A MANDATORY fork guard is the job's literal first step: a self-hosted
+  runner must never process a fork PR
+  (`github.event.pull_request.head.repo.full_name != github.repository`
+  fails the job before anything else runs — a `workflow_dispatch` run has no
+  `pull_request` payload at all and is exempt by construction).
+- `vars.FLEET_REVIEW_PROVIDER` is gone — there is exactly one provider now.
+  `vars.FLEET_REVIEW_MODEL` (default `sonnet`) remains, read identically by
+  the smoke-test step and by `review.ts`'s `REVIEWER_MODEL`, so raising the
+  reviewer's tier (e.g. to `opus`) is still one repo variable, never a code
+  change.
+- The "Install the non-author review engine" and "Authenticate the review
+  engine" steps are gone — `claude` is pre-installed and pre-authenticated
+  on the runner itself, so there is nothing left to fetch or configure.
+  `FLEET_REVIEW_API_KEY` stays a required repo secret, but is no longer
+  forwarded into the reviewer's own environment; it now serves only as (1)
+  the operator's explicit "review is enabled" toggle and (2) what keeps
+  CodeQL's cache-poisoning query treating this job as privileged (see
+  `REVIEW_KEY_ENV`'s doc comment in `orchestrator/src/ci.ts`).
+- The budget widened from the thin-API-call sizing (`DEFAULT_MAX_TURNS = 2`
+  / `HIGH_IMPACT_MAX_TURNS = 3`, 5/8-minute wall clock) to a full session's
+  budget (`DEFAULT_MAX_TURNS = 10` / `HIGH_IMPACT_MAX_TURNS = 20`,
+  10/20-minute wall clock) — see the constants and their doc comments in
+  `orchestrator/src/review.ts`. The job's own `timeout-minutes: 30` stays
+  above the 20-minute high-impact ceiling.
+
+**The honest cost, stated plainly:** the fleet's workers author with
+`claude`, and the reviewer is now ALSO `claude` — a different session on a
+different machine with no shared context, but no longer an independent
+VENDOR the way `opencode` (Kimi) was. A model does not review its own blind
+spots as well as a different model would. Recommended mitigation, not yet
+applied: run the reviewer on a different MODEL TIER than the lanes use
+(`FLEET_REVIEW_MODEL` is the dial) once budget allows. See `verifierFor`'s
+doc comment in `orchestrator/src/review.ts` for the full accounting.
+
+**Availability**, honestly stated: if `llamenos-review-box` is offline, this
+job QUEUES rather than fails outright — GitHub Actions holds a job for a
+runner matching its labels — and a PR waiting on `fleet/review` simply
+cannot merge until the box comes back. This is the intended fail-closed
+behaviour, not a bug: the same posture this file has had since #848, just
+with a different reason the job might not be running yet.
 
 The smoke-test step also now names *why* the engine call failed, on one line,
 before it fails the job — it never turns a bad call into a pass. Three
 causes: `engine-quota` (weekly/usage-limit language from the provider),
 `engine-auth` (401 / invalid or missing key), or `engine-unavailable`
 (anything else — a bad model id, a network error, a rejected config, or the
-engine running but never producing a valid verdict). See the comment above
-"Smoke-test the review engine" in `.github/workflows/fleet-review.yml` for
-the exact classification, which is a best-effort heuristic over the engine's
-own error text, not a structured error code opencode exposes.
+engine running but never producing a valid verdict), or `engine-misconfigured`
+(a `--model` id `claude` itself refuses outright — see `classifyEngineFailure`
+in `orchestrator/src/review.ts`). See the comment above "Smoke-test the
+review engine" in `.github/workflows/fleet-review.yml` for the exact
+classification, which is a best-effort heuristic over the engine's own error
+text, not a structured error code `claude` exposes.
+
+This is also where #891's fail-loud lesson (determinism invariant #9, §11 —
+the Kimi subscription's weekly quota exhausting silently on 2026-09-15, with
+a stale `kimi-for-coding` fallback masking the real cause) carries forward:
+there is no `|| 'literal-default'` for anything that can go silently stale.
+`FLEET_REVIEW_MODEL` still defaults to `'sonnet'` when unset, but that is not
+the same failure shape #891 fixed — `'sonnet'` is a live, always-valid model
+tier, not a provider id that can be retired out from under the job, and a bad
+value is still caught loudly by the smoke test's `engine-misconfigured`
+classification before the real review ever runs. There is no
+`FLEET_REVIEW_PROVIDER` any more for #891's original fix to apply to: `claude`
+is the only reviewer engine (`reviewerBinaryFor` hard-fails for anything
+else), so the class of bug #891 fixed — an unconfigured, swappable provider
+silently guessed at — has no remaining surface to reintroduce it on.
 
 **`fleet/review` now lives in its own workflow file, `fleet-review.yml`, not
-`ci.yml`.** It moved there to fix a fail-open bug: `ci.yml` also triggers on
-`pull_request`, so a job living there and merely `if:`-gated to skip on that
-event was still *instantiated* on every PR — and GitHub's branch protection
-treats a skipped required check as satisfied, exactly like a green one. #844
-merged with `fleet/review` reporting "skipping" and no model review ever run,
-as a direct result.
+`ci.yml`.** `ci.yml` also triggers on `pull_request`, so a job living there
+and merely `if:`-gated to skip on that event was still *instantiated* on
+every PR — determinism invariant #1 (§11), in the flesh: #844 merged with
+`fleet/review` reporting "skipping" and no model review ever run.
 
 `fleet-review.yml`'s first version (#848) triggered on `workflow_dispatch` +
 `merge_group` only, so an ordinary PR produced no `fleet/review` context at
@@ -338,15 +393,13 @@ a `pull_request`-triggered run's check result attaches to the PR's head SHA
 automatically, the same mechanism `fleet/verify` (`fleet-verify.yml`) already
 relies on.
 
-#848's own first fix reintroduced the exact bug class it closed: it narrowed
-the `labeled` trigger back down with a job-level `if:
-github.event_name == 'workflow_dispatch' || github.event.label.name ==
-'review'`. GitHub cannot filter a `pull_request` trigger by label *value* —
-only by `types:` — so applying any *other* label (e.g. the fleet's own
-`agent-dispatchable`) still instantiated the job, which the `if:` then
-skipped, and a skipped required check satisfies branch protection with no
-review ever run. `fleet/review`'s own verdict caught this on #848 itself,
-before #848 merged.
+#848's own first fix reintroduced the same bug class: it narrowed the
+`labeled` trigger back down with a job-level `if: github.event_name ==
+'workflow_dispatch' || github.event.label.name == 'review'`. GitHub cannot
+filter a `pull_request` trigger by label *value* — only by `types:` — so
+applying any *other* label (e.g. the fleet's own `agent-dispatchable`) still
+instantiated the job, which the `if:` then skipped. `fleet/review`'s own
+verdict caught this on #848 itself, before #848 merged.
 
 The job now carries **no job-level `if:` at all** — it always runs and always
 reaches a real conclusion, on every `labeled` event. What used to be the
@@ -373,15 +426,10 @@ steps.gate.outputs.outcome == 'run-engine'`:
   job goes red, which is the correct, honest state for a PR nobody has asked
   to be reviewed yet.
 
-A step failing mid-job is not a "skipped" job: GitHub Actions still runs the
-job to a real conclusion (failure), and that conclusion is what
-`fleet/review`'s required check reports. This is the structural difference
-from the job-level `if:` bug: a job-level `if:` can make the whole job (and
-therefore its check run) never run at all while GitHub still reports
-"skipped", which branch protection treats as green; a step skipped by its
-*own* `if:` inside an always-instantiated job changes nothing about whether
-the job itself concludes. `tests/orchestrator/guards.test.ts` pins the rail
-that no job-level `if:` exists on this job again.
+A step failing mid-job still reaches a real job conclusion (failure) — unlike
+a job-level `if:`, which can make the whole job report "skipped" and pass
+branch protection regardless (invariant #1, §11). `tests/orchestrator/guards.test.ts`
+pins that no job-level `if:` exists on this job again.
 
 With no label applied at all, the workflow's `on: pull_request: types:
 [labeled]` trigger never fires and the `fleet/review` context stays ABSENT —
@@ -635,3 +683,31 @@ a one-line ask. That ask is what the blocked ping carries.
 | Agent messaging | GitHub only: issue comments for items, PR reviews for diffs. No custom bus — a git mailbox assumed a shared filesystem, and a runtime relay had no consumer |
 | Shared memory | Contracts in git (true *at a commit*); everything else on GitHub or derived |
 | Ramp | One shadow pass, then all six lanes live at cap 1 |
+
+## 11. Determinism invariants
+
+Checkable invariants, not advice — each learned from a specific live failure. Canonical
+source: `/home/rikki/tier-prompts/determinism-rules.md`; folded into every worker prompt
+via `.claude/agents/fragments/_worker-rules.md`.
+
+**Gating and merges**
+1. A skipped required check counts as SATISFIED — never gate with a job-level `if:` inside a workflow that also triggers on `pull_request` (#844 merged with `fleet/review` reporting "skipping" and no review ever run; §5.5).
+2. Freshness is keyed to the head SHA, never a time window (a clock lets a push slip past a stale PASS).
+3. Anything a gate calls must already exist on `main` — gate jobs run base-ref code (a PR adding the CLI subcommand a gate invokes would break the gate on itself if not landed first, additively).
+4. Re-run policy is exhaustive, not ad hoc: UNREADABLE verdicts and named Playwright probe-races get one re-run each; infra/network errors get one; a substantive FAIL, lint, typecheck, backend, or build failure never does (re-running is not a bypass; merging past red is).
+5. Never `--admin`, `--force`, `--approve`, `--no-verify`, or a ruleset edit to land a PR (bot-authored PRs need a code-owner approval, given only after the gate passes).
+6. A PR's changed paths decide which checks matter — required contexts stay fixed; scoping lives in `ci.yml`'s own `if:` (a skipped job still satisfies the required-check aggregate, per #1).
+
+**Fleet mechanics**
+7. Never trust a worker's self-report — branch, worktree, PR number and outcome are derived from `gh`/`git` at read time (a status file that carries branch/worktree is a claim, not an observation).
+8. Pass the branch explicitly and verify the worktree is actually on it before briefing the worker (a mismatch is a recorded failure, never a silent skip — rail 6, §5.5).
+9. Quota exhaustion is not task failure — classify it separately, halt with the reset time, auto-resume when the window elapses (the 2026-09-15 Kimi weekly-quota outage that made `fleet/review` red repo-wide with no recovery until the provider became switchable; §5.5).
+10. A verification gap is not a failure either — a worker that wrote SUCCESS and opened a PR is never recorded FAILED solely because it could not be independently verified.
+11. Engines are routed by role, not availability — implementation workers on Claude, the review gate on its own quota (sharing one subscription starves the gate exactly when it is needed most; §5.4).
+12. Workers run every command in the FOREGROUND (a backgrounded run outlives the session; the worker dies with no terminal status and the work is lost).
+13. Tests must never touch the operator's real fleet state — `FLEET_HOME` isolation is enforced in code (a test resolving the real halt file is an error, not a warning).
+
+**Code rules that keep biting**
+14. Codegen renames are bulk renames — never a typealias, never a hand-written duplicate of a generated type (a hand-written duplicate drifts the moment the schema changes).
+15. No non-waiting probe may guard a write — `isVisible()`/`.first()` used for control flow around a click/fill/toggle is a bug regardless of flakiness.
+16. Fix the app, not the test — a test that passes when its dependency is unreachable is a no-op (make it fail loudly or exclude it by tag).
