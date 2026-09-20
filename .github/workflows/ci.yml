@@ -17,9 +17,32 @@ on:
   push:
     branches: [main, desktop]
   pull_request:
+  # The merge queue's own ref. Neither `fleet/verify` (fleet-verify.yml) nor
+  # `fleet/review` (fleet-review.yml) is defined in THIS file any more — see
+  # the "Fleet gates" comment below — but `ci-status`, this file's own
+  # required aggregate, still must report on `merge_group` too (a required
+  # context that never reports on the queue's own ref blocks the queue
+  # forever), so this trigger stays even though it now gates nothing fleet
+  # -specific of its own.
+  merge_group:
+    types: [checks_requested]
+  # A manual full-CI run — an operator invoking this expects every job to run
+  # (no PR/merge_group context to specialize `changes`' and `lint`'s `HEAD^`
+  # fallback with, but otherwise unchanged). No inputs: the one input this
+  # trigger used to carry (`pr_number`, for a manual `fleet/review` re-run)
+  # moved with that job to `fleet-review.yml`, which has its own
+  # `workflow_dispatch` trigger now.
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.event_name == 'pull_request' && format('ci-pr-{0}', github.ref) || format('ci-push-{0}', github.sha) }}
+  # Never cancelled: a merge_group check that gets cancelled mid-run leaves
+  # its required check permanently missing (GitHub does not distinguish
+  # "cancelled" from "still running" for queue purposes the same way it
+  # would surface a failure), which stalls the queue rather than failing it
+  # loudly. `github.sha` on a merge_group event is the queue's own commit
+  # SHA (unique per attempt), so a re-queue after a rebase gets its own
+  # concurrency group rather than cancelling the attempt still in flight.
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions: {}  # deny-all; per-job permissions below
@@ -34,7 +57,22 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-    if: "!startsWith(github.event.head_commit.message, 'chore(release):')"
+    # Scoped to `push` only (see #812). `head_commit` only exists on a push
+    # payload — on `pull_request`/`merge_group` it is null, so the intended
+    # guard silently evaluated to "run" there rather than skip. That is only
+    # a happy accident: it means an ordinary PR runs full CI regardless of
+    # title, but it ALSO means a release PR (title `chore(release): v...`,
+    # opened by knope) exercised the guard's `push`-only intent by luck, not
+    # by construction — the day this expression's null-coercion behavior
+    # changes, or the job gains a second `push`-shaped trigger, the same
+    # bug reappears from the other direction. Original intent (see
+    # `git log -S`, commit 60b1e6c69): skip the (at the time synchronous,
+    # since-removed) `audit`/`version` work on the automated release commit
+    # landing on main via `push` — never meant to touch `pull_request` at
+    # all, since knope's release PR did not exist yet when this guard was
+    # written. Pinning `github.event_name != 'push'` makes that scope
+    # explicit instead of relying on an absent field coercing to falsy.
+    if: "github.event_name != 'push' || !startsWith(github.event.head_commit.message, 'chore(release):')"
 
     outputs:
       app: ${{ steps.filter.outputs.app }}
@@ -349,7 +387,7 @@ jobs:
 
       - name: Cache Playwright browsers
         id: playwright-cache
-        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ steps.playwright-version.outputs.version }}
@@ -493,7 +531,7 @@ jobs:
 
       - name: Cache Playwright browsers
         id: playwright-cache
-        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ steps.playwright-version.outputs.version }}
@@ -780,7 +818,7 @@ jobs:
       # creation fails (no key generation possible).
       - name: Cache native crypto .so
         id: crypto-cache
-        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: apps/android/app/src/debug/jniLibs/x86_64/libllamenos_core.so
           key: android-crypto-x86_64-test-kdf-${{ runner.os }}-${{ hashFiles('packages/crypto/src/**/*.rs', 'packages/crypto/Cargo.toml', 'packages/crypto/Cargo.lock') }}
@@ -832,7 +870,7 @@ jobs:
 
       - name: Cache AVD snapshot
         id: avd-cache
-        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
             ~/.android/avd/*
@@ -1007,7 +1045,7 @@ jobs:
       # Key includes all Rust sources + Cargo manifests + the build script.
       - name: Cache crypto XCFramework + bindings
         id: xcframework-cache
-        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
             apps/ios/LlamenosCoreFFI.xcframework
@@ -1053,7 +1091,7 @@ jobs:
 
       # Cache DerivedData for incremental Swift builds
       - name: Cache DerivedData
-        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: /tmp/llamenos-build
           key: deriveddata-ios-${{ runner.os }}-${{ hashFiles('apps/ios/**/*.swift', 'apps/ios/project.yml') }}
@@ -1239,6 +1277,14 @@ jobs:
           if [[ "${{ github.event_name }}" == "pull_request" ]]; then
             BASE="${{ github.event.pull_request.base.sha }}"
             HEAD="${{ github.event.pull_request.head.sha }}"
+          elif [[ "${{ github.event_name }}" == "merge_group" ]]; then
+            # The queue's own base/head, not `before`/`after` — a merge_group
+            # event carries neither (that pair is push-only), and lint's own
+            # required-check status must still land on this ref: see the
+            # "Fleet gates" comment above fleet-verify for why a required
+            # check that never reports on merge_group blocks the queue.
+            BASE="${{ github.event.merge_group.base_sha }}"
+            HEAD="${{ github.event.merge_group.head_sha }}"
           else
             BASE="${{ github.event.before }}"
             HEAD="${{ github.event.after }}"
@@ -1325,7 +1371,7 @@ jobs:
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
 
       - name: Log in to Docker Hub
         uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
@@ -1381,352 +1427,37 @@ jobs:
 
   # ─── Fleet gates: the ONLY place the fleet's verdicts become enforceable ──
   #
-  # These two jobs compute the fleet's gates on GitHub's runners against the
-  # PR's exact head commit. Nothing about them runs on the operator's laptop,
-  # and they fail closed: a job that does not run leaves its required check
-  # missing, and the merge is blocked.
+  # Both jobs compute the fleet's gates on GitHub's runners against the PR's
+  # exact commit. Nothing about them runs on the operator's laptop, and they
+  # fail closed: a job that does not run leaves its required check missing,
+  # and the merge is blocked.
   #
-  # The job NAME is the required check — `fleet/verify` / `fleet/review` in
-  # the ruleset refer to these two `name:` values, so do not rename them. The
-  # jobs post no commit status of their own: a job result already IS a check
-  # run under that name, so a same-named status would be a second copy of the
-  # same verdict, and the `statuses: write` it needed is what makes fork PRs
-  # (whose GITHUB_TOKEN is read-only) permanently unmergeable.
+  # Neither `fleet/verify` nor `fleet/review` is defined in THIS file any
+  # more — both live in their own workflow files now:
   #
-  # Both jobs run their FULL logic on every pull request — no branch-name
-  # opt-out and no path filter. A human PR has no lane, so it gets no
-  # owned-path scope check, but never-write still binds it and the non-author
-  # review still runs.
+  # - `fleet/verify` (mechanical: scope, never-write, impact, diff-targeted
+  #   tests) moved to `fleet-verify.yml` in round 3 of #844. It deliberately
+  #   executes the PR HEAD's own tests, and CodeQL's actions/cache-poisoning
+  #   query flags any job that does that if its ENCLOSING WORKFLOW also
+  #   triggers on an event with default-branch cache-write access (`push`,
+  #   `workflow_dispatch`, among others). `fleet-verify.yml`'s `on:` block is
+  #   narrower — `pull_request` and `merge_group` only — to clear the alert.
   #
-  # The ONE `if:` here is an EVENT filter, and the distinction matters: a
-  # skipped job's check reports as *skipped*, which GitHub treats as
-  # satisfying a required check, so any condition that can skip on a PULL
-  # REQUEST would be fail-open. `github.event_name == 'pull_request'` cannot:
-  # on a push to main/desktop there is no PR to gate, `origin/main...HEAD` is
-  # empty, and the review job would otherwise go red on every merge. On a
-  # pull request — the only event the ruleset acts on — both jobs always run
-  # and always report.
+  # - `fleet/review` (the non-author MODEL call) moved to `fleet-review.yml`
+  #   in this PR. Reason: it used to live here gated by a job-level `if:`
+  #   restricting it to `merge_group`/`workflow_dispatch` — but this
+  #   workflow ALSO triggers on `pull_request`, so on every ordinary PR push
+  #   the job was still instantiated and merely skipped, and GitHub treats a
+  #   *skipped* required check as satisfying it, exactly like a green one
+  #   (this is how #844 itself merged with zero model review). Moving the
+  #   job to a workflow file whose `on:` block never mentions `pull_request`
+  #   at all makes the check MISSING on an ordinary PR instead of skipped —
+  #   and a missing required check blocks a merge, same as a failing one.
+  #   See that file's own header comment for the full explanation.
   #
-  # Neither is in `ci-status`'s `needs` list, so skipping them on push does
-  # not affect it at all.
-  #
-  # Deliberately NOT in `ci-status`'s needs list: that is the repo's own CI
-  # verdict, these are the fleet's, so a reader can tell which one refused.
-  fleet-verify:
-    name: fleet/verify
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    timeout-minutes: 20
-
-    steps:
-      # The BASE commit, not the head. Everything the gate decides is computed
-      # from this tree: its git history, its orchestrator code, its lockfile,
-      # its node_modules. The commit under judgement never becomes code here.
-      - name: Checkout the PR BASE (trusted)
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-        with:
-          ref: ${{ github.event.pull_request.base.sha }}
-          fetch-depth: 0
-          persist-credentials: false
-
-      # The head arrives as DATA: fetched as an object, extracted with
-      # `git archive | tar`. No `.git`, no checkout, nothing on a module path,
-      # nothing executed. verify-ci/review-ci refuse outright if a `.git` ever
-      # appears in there — see headDirRefusal in ci.ts.
-      - name: Export the PR head as data
-        env:
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-        run: |
-          set -euo pipefail
-          git fetch --no-tags origin "$HEAD_SHA"
-          mkdir -p "$RUNNER_TEMP/head"
-          git archive "$HEAD_SHA" | tar -x -C "$RUNNER_TEMP/head"
-          test ! -e "$RUNNER_TEMP/head/.git"
-
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@4bc047ad259df6fc24a6c9b0f9a0cb08cf17fbe5 # v2.0.2
-        with:
-          bun-version: ${{ env.BUN_VERSION }}
-
-      # From the BASE lockfile, and `--ignore-scripts` on top: a postinstall is
-      # the shortest path from "PR edits a dependency" to "PR runs code inside
-      # its own judge".
-      - name: Install dependencies (base lockfile, no install scripts)
-        run: bun install --frozen-lockfile --ignore-scripts
-
-      # The head export must have no node_modules of its own. `git archive`
-      # exports whatever is committed, and a plain `ln -s` onto an existing
-      # directory does not fail — it nests the link INSIDE it, leaving the
-      # PR's own `node_modules/.bin/vitest` in place. So a committed
-      # `node_modules` (directory, file or symlink) is refused before anything
-      # is linked, and `ln -T` refuses to nest regardless.
-      #
-      # This is one of three locks on the same door: verify.ts also runs the
-      # runner by absolute path from $GITHUB_WORKSPACE (never `bunx` from the
-      # export), and refuses an export whose node_modules is not, by realpath,
-      # this trusted install. The PR supplies test files and nothing else.
-      - name: Make base dependencies available to the head export
-        run: |
-          set -euo pipefail
-          head_modules="$RUNNER_TEMP/head/node_modules"
-          if [ -e "$head_modules" ] || [ -L "$head_modules" ]; then
-            echo "::error::the commit under judgement contains node_modules — refusing to judge it with a runner it could supply"
-            exit 1
-          fi
-          ln -s -T "$GITHUB_WORKSPACE/node_modules" "$head_modules"
-
-      # Two phases inside one command: scope/never-write/impact first, from
-      # the base checkout with nothing of the PR's executing; then the PR's
-      # own diff-targeted tests against the export, whose result can only AND
-      # into the verdict already computed and printed. This job holds no
-      # secrets, which is what makes running those tests acceptable at all.
-
-      # Bootstrap guard. The gate runs from the BASE checkout by design, so
-      # the FIRST pull request that introduces the gate cannot be judged by
-      # it: the base predates it. This says so, instead of surfacing as an
-      # unrelated "usage: llamenos-fleet <...>" and exit 2.
-      #
-      # It fails CLOSED, deliberately. After the gate has merged once, a base
-      # without it means someone removed it from `main` — and that must stop
-      # every PR until a human looks, never silently wave them through.
-      - name: Check the base provides the gate
-        run: |
-          set -eu
-          usage="$(bun orchestrator/src/cli.ts 2>&1 || true)"
-          case "$usage" in
-            *verify-ci*) ;;
-            *)
-              echo "::error::the base commit has no 'verify-ci' command, so it cannot judge this PR"
-              echo "The gate deliberately runs from the BASE, never from the commit it judges."
-              echo "The PR that INTRODUCES the gate therefore cannot pass it. Merge that one PR"
-              echo "with these checks not yet required by the ruleset; every later PR is judged"
-              echo "by the now-trusted, merged gate."
-              exit 1
-              ;;
-          esac
-
-      - name: Verify
-        env:
-          FLEET_CI_BRANCH: ${{ github.head_ref }}
-          FLEET_CI_PR: ${{ github.event.pull_request.number }}
-          FLEET_CI_HEAD_DIR: ${{ runner.temp }}/head
-          FLEET_CI_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-          FLEET_CI_BASE_SHA: ${{ github.event.pull_request.base.sha }}
-        run: bun orchestrator/src/cli.ts verify-ci
-
-  fleet-review:
-    name: fleet/review
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
-    permissions:
-      # contents: read and nothing else. The reviewer runs inside this job
-      # with the review key on disk, so the containment that matters is that
-      # NOTHING from the commit under judgement ever executes here: it is a
-      # `git archive` export the model reads, never a checkout, never
-      # installed, never on a module path.
-      contents: read
-    # HIGH_IMPACT_TIMEOUT_MS alone is 25 minutes (review.ts); checkout, deps,
-    # the engine download and the smoke call have to fit around it.
-    timeout-minutes: 40
-
-    steps:
-      # The BASE commit, not the head. Everything the gate decides is computed
-      # from this tree: its git history, its orchestrator code, its lockfile,
-      # its node_modules. The commit under judgement never becomes code here.
-      - name: Checkout the PR BASE (trusted)
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-        with:
-          ref: ${{ github.event.pull_request.base.sha }}
-          fetch-depth: 0
-          persist-credentials: false
-
-      # The head arrives as DATA: fetched as an object, extracted with
-      # `git archive | tar`. No `.git`, no checkout, nothing on a module path,
-      # nothing executed. verify-ci/review-ci refuse outright if a `.git` ever
-      # appears in there — see headDirRefusal in ci.ts.
-      #
-      # Agent instructions and configuration are then stripped, with every
-      # symlink: `opencode.json(c)` declares MCP servers that get spawned,
-      # `.opencode/` holds tool and plugin modules that get imported and run,
-      # `AGENTS.md`/`CONTEXT.md`/`CLAUDE.md` are prompt text an engine obeys,
-      # `.claude/` and `.agents/` carry hooks and skills. A PR controls all of
-      # them, and the reviewer runs next to the review key. A symlink would
-      # turn the reviewer's read access to this tree into read access to
-      # `~/.local/share/opencode/auth.json`. review.ts strips the same set
-      # again (REVIEWER_CONTROL_NAMES) from base code, because this workflow
-      # file is the PR's own copy on a pull_request run.
-      - name: Export the PR head as data
-        env:
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-        run: |
-          set -euo pipefail
-          git fetch --no-tags origin "$HEAD_SHA"
-          mkdir -p "$RUNNER_TEMP/head"
-          git archive "$HEAD_SHA" | tar -x -C "$RUNNER_TEMP/head"
-          test ! -e "$RUNNER_TEMP/head/.git"
-          control=( \( -iname opencode.json -o -iname opencode.jsonc -o -iname .opencode
-            -o -iname AGENTS.md -o -iname CONTEXT.md -o -iname .agents
-            -o -iname CLAUDE.md -o -iname .claude -o -type l \) )
-          find "$RUNNER_TEMP/head" -mindepth 1 "${control[@]}" -prune -print -exec rm -rf {} +
-          left="$(find "$RUNNER_TEMP/head" -mindepth 1 "${control[@]}" -print -quit)"
-          if [ -n "$left" ]; then
-            echo "::error::agent configuration survived the strip: $left"
-            exit 1
-          fi
-
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@4bc047ad259df6fc24a6c9b0f9a0cb08cf17fbe5 # v2.0.2
-        with:
-          bun-version: ${{ env.BUN_VERSION }}
-
-      # From the BASE lockfile, and `--ignore-scripts` on top: a postinstall is
-      # the shortest path from "PR edits a dependency" to "PR runs code inside
-      # its own judge".
-      - name: Install dependencies (base lockfile, no install scripts)
-        run: bun install --frozen-lockfile --ignore-scripts
-
-      # From a pinned release asset whose sha256 is recorded here — never a
-      # `curl | bash` installer, in a repo that pins every action by SHA. (The
-      # npm package `opencode-ai@1.18.30` was tried first, per the preferred
-      # option, and rejected on evidence: it ships a postinstall that fetches
-      # the real binary, which newer npm blocks by default, leaving a shim
-      # that exits `Error: opencode-ai's postinstall script was not run.` A
-      # hash a reader can re-check beats a trust-on-first-use script.)
-      #
-      # The fleet's workers are `claude`, so the reviewer is `opencode`: a
-      # model reviewing its own output shares its own blind spots, which is
-      # the entire reason this check exists.
-      - name: Install the non-author review engine
-        env:
-          OPENCODE_VERSION: "1.18.30"
-          OPENCODE_SHA256: "55007246858165496ff85ba1c2b648f7421e8e2013bf4189a680c9ff8e699d17"
-        run: |
-          set -euo pipefail
-          url="https://github.com/anomalyco/opencode/releases/download/v${OPENCODE_VERSION}/opencode-linux-x64.tar.gz"
-          curl -fsSL -o /tmp/opencode.tar.gz "$url"
-          echo "${OPENCODE_SHA256}  /tmp/opencode.tar.gz" | sha256sum -c -
-          mkdir -p "$HOME/.local/bin"
-          tar -xzf /tmp/opencode.tar.gz -C "$HOME/.local/bin"
-          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
-          "$HOME/.local/bin/opencode" --version
-
-      # opencode authenticates from `auth.json`, not an env var (there is no
-      # OPENCODE_API_KEY — see review.ts's VERIFIER_ENV_ALLOWLIST comment).
-      # Written to a file rather than passed through the environment, so the
-      # key is never in the verifier subprocess's env at all.
-      # This is the shape confirmed on the operator's own machine. No
-      # `opencode.json` is written: `kimi-for-coding` is a provider in
-      # opencode's built-in models.dev registry, verified by resolving
-      # `kimi-for-coding/k3-256k` from a HOME containing nothing but this
-      # file — so a committed provider block would only be a second copy that
-      # can drift from the registry.
-      - name: Authenticate the review engine
-        env:
-          FLEET_REVIEW_API_KEY: ${{ secrets.FLEET_REVIEW_API_KEY }}
-        run: |
-          # Guarded in shell, not in `if:` — the `secrets` context is not
-          # available in a step condition. A missing key is NOT an error here;
-          # the smoke step below is where it becomes one.
-          if [ -z "$FLEET_REVIEW_API_KEY" ]; then
-            echo "FLEET_REVIEW_API_KEY is not configured; the smoke step will fail, deliberately"
-            exit 0
-          fi
-          mkdir -p "$HOME/.local/share/opencode"
-          jq -n --arg k "$FLEET_REVIEW_API_KEY" \
-            '{"kimi-for-coding":{"type":"api","key":$k}}' \
-            > "$HOME/.local/share/opencode/auth.json"
-          chmod 600 "$HOME/.local/share/opencode/auth.json"
-
-      # Proves the engine, the key, the provider, the model id AND the
-      # reviewer's permission config all work BEFORE the real review runs — so
-      # "the reviewer is misconfigured" can never again be indistinguishable
-      # from "the reviewer read the diff and could not produce a verdict". An
-      # earlier round's model id did not exist and `--format text` was not a
-      # valid choice, so every review had silently been UNREADABLE; an
-      # array-shaped `permission` does the same thing (1.18.30 rejects it and
-      # exits 1).
-      #
-      # Invoked the way review.ts's invokeVerifierEngine invokes it: from an
-      # EMPTY project root, never from an export (a PR's `.opencode/` and
-      # `opencode.json` execute when the PR is the project root); settings
-      # only from a fresh OPENCODE_CONFIG_DIR holding the object-form deny-all
-      # permission; `--format json`. `opencode debug config` makes the binary
-      # itself validate the config shape — it exits non-zero on a shape it
-      # rejects. (review.ts additionally grants read access to the export
-      # under `external_directory`; there is no export here to grant.)
-      #
-      # Judged by the review's OWN code — `opencodeAssistantText` (assistant
-      # text parts only, never tool output or stray stdout) and `parseVerdict`
-      # (exact final line), both imported from this trusted base checkout —
-      # never a looser substring or shell comparison: an engine whose output
-      # grows colour codes or a trailing line must fail HERE, not pass the
-      # smoke step and then make every real review UNREADABLE.
-      - name: Smoke-test the review engine
-        run: |
-          set -euo pipefail
-          root="$(mktemp -d)"
-          cfg="$(mktemp -d)"
-          jq -n '{
-            "$schema": "https://opencode.ai/config.json",
-            "permission": {
-              "bash": "deny", "edit": "deny", "webfetch": "deny", "websearch": "deny",
-              "external_directory": { "*": "deny" }
-            }
-          }' > "$cfg/opencode.json"
-          export OPENCODE_CONFIG_DIR="$cfg" OPENCODE_DISABLE_PROJECT_CONFIG=1
-          (cd "$root" && opencode debug config --pure) > "$RUNNER_TEMP/opencode-config.json"
-          jq -e '.permission | .bash == "deny" and .edit == "deny" and .webfetch == "deny" and .websearch == "deny"' \
-            "$RUNNER_TEMP/opencode-config.json"
-          out="$(cd "$root" && printf 'Reply with exactly: VERDICT: PASS\n' \
-            | opencode run --pure --model kimi-for-coding/k3-256k --format json --dir "$root")"
-          printf '%s' "$out" | bun -e '
-            import { opencodeAssistantText, parseVerdict } from "./orchestrator/src/review.ts"
-            const { text, errors } = opencodeAssistantText(await Bun.stdin.text())
-            console.log(text)
-            for (const e of errors) console.log("engine error event: " + e)
-            const verdict = parseVerdict(text)
-            console.log("smoke verdict (parseVerdict of assistant text): " + verdict)
-            process.exit(verdict === "PASS" ? 0 : 1)
-          '
-
-
-      # Bootstrap guard. The gate runs from the BASE checkout by design, so
-      # the FIRST pull request that introduces the gate cannot be judged by
-      # it: the base predates it. This says so, instead of surfacing as an
-      # unrelated "usage: llamenos-fleet <...>" and exit 2.
-      #
-      # It fails CLOSED, deliberately. After the gate has merged once, a base
-      # without it means someone removed it from `main` — and that must stop
-      # every PR until a human looks, never silently wave them through.
-      - name: Check the base provides the gate
-        run: |
-          set -eu
-          usage="$(bun orchestrator/src/cli.ts 2>&1 || true)"
-          case "$usage" in
-            *review-ci*) ;;
-            *)
-              echo "::error::the base commit has no 'review-ci' command, so it cannot judge this PR"
-              echo "The gate deliberately runs from the BASE, never from the commit it judges."
-              echo "The PR that INTRODUCES the gate therefore cannot pass it. Merge that one PR"
-              echo "with these checks not yet required by the ruleset; every later PR is judged"
-              echo "by the now-trusted, merged gate."
-              exit 1
-              ;;
-          esac
-
-      - name: Review
-        env:
-          # Absent fails the job — never a skip and never a pass. A review
-          # that could not run is not a review that passed.
-          FLEET_REVIEW_API_KEY: ${{ secrets.FLEET_REVIEW_API_KEY }}
-          FLEET_CI_BRANCH: ${{ github.head_ref }}
-          FLEET_CI_PR: ${{ github.event.pull_request.number }}
-          FLEET_CI_HEAD_DIR: ${{ runner.temp }}/head
-          FLEET_CI_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-          FLEET_CI_BASE_SHA: ${{ github.event.pull_request.base.sha }}
-        run: bun orchestrator/src/cli.ts review-ci
+  # Neither job is in `ci-status`'s `needs` list: that aggregate is the
+  # repo's own CI verdict, these are the fleet's, so a reader can tell which
+  # one refused.
 
   ci-status:
     needs: [no-generated-files-in-git, verify-updater-config, build, audit, lint, crypto-tests, backend-bdd, backend-unit, desktop-unit, android-build-test, android-e2e, e2e, ios-build-test, crypto-guardrails, migration-drift, ansible-validate, docs-guard]

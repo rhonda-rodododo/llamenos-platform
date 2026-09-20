@@ -166,7 +166,7 @@ Client A (စေတနာ့ဝန်ထမ်း လုပ်ဆောင်ခ
     | hub သော့ဖြင့် ဖြစ်ရပ်ပါအကြောင်းအရာကို ကုဒ်ဝှက်သည်
     | WebSocket ဖြစ်ရပ်အဖြစ် လက်မှတ်ရေးထိုးသည် (Schnorr)
     v
-WebSocket relay (WebSocket relay / Nosflare)
+WebSocket relay
     |
     | စာရင်းသွင်းထားသူများသို့ ထုတ်လွှင့်သည်
     v

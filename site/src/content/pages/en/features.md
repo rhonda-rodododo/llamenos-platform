@@ -222,7 +222,7 @@ Llámenos is not hardcoded to any specific use case. Everything is template-driv
 
 ## Real-Time Infrastructure
 
-**WebSocket relay** — Self-hosted WebSocket relay relay (or Nosflare on Cloudflare) for real-time event distribution. All event content is encrypted with the hub key. Generic tags (`["t", "llamenos:event"]`) prevent relay-level metadata inference about event types.
+**WebSocket relay** — Self-hosted WebSocket relay (or Nosflare on Cloudflare) for real-time event distribution. All event content is encrypted with the hub key. Generic tags (`["t", "llamenos:event"]`) prevent relay-level metadata inference about event types.
 
 **Hub key** — Random 32 bytes (`crypto.getRandomValues`), HPKE-wrapped individually per hub member via `LABEL_HUB_KEY_WRAP`. Rotated on member departure — departed members cannot decrypt future events.
 
@@ -268,7 +268,7 @@ Llámenos is not hardcoded to any specific use case. Everything is template-driv
 
 ### Docker Compose (Single Server)
 
-- Full stack: Bun HTTP server, PostgreSQL, RustFS (object storage), WebSocket relay (WebSocket relay)
+- Full stack: Bun HTTP server, PostgreSQL, RustFS (object storage), WebSocket relay
 - Optional profiles: `--profile signal` (signal-cli sidecar), `--profile telephony` (Kamailio + CoTURN), `--profile inference` (LLM firehose agent), `--profile monitoring` (Prometheus + Grafana)
 - `docker-compose.dev.yml` for local development with file watching
 - `docker-compose.production.yml` overlay for production hardening

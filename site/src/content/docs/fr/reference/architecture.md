@@ -166,7 +166,7 @@ Client A (action du bénévole)
     | Chiffre le contenu de l'événement avec la clé hub
     | Signe en tant qu'événement WebSocket (Schnorr)
     v
-Relais WebSocket (WebSocket relay / Nosflare)
+Relais WebSocket
     |
     | Diffuse aux abonnés
     v
