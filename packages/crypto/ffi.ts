@@ -4,7 +4,7 @@
  * All consumers work with Uint8Array. Buffer marshaling is internal.
  * Error details are read immediately after failure via ffi_last_error().
  */
-import { dlopen, FFIType, ptr, read } from 'bun:ffi'
+import { dlopen, FFIType, ptr } from 'bun:ffi'
 import { resolve } from 'path'
 
 // Resolve library path — configurable via LLAMENOS_CRYPTO_LIB env var
