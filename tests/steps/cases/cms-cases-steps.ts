@@ -471,25 +471,24 @@ Then('the {string} tab is active', async ({ page }, tabName: string) => {
 When('I click the {string} tab', async ({ page }, tabName: string) => {
   const tabKey = tabName.toLowerCase()
 
-  // Wait for case detail panel to be loaded before clicking tabs
-  // This prevents race conditions where the tab button isn't rendered yet
+  // The case detail panel and the contact profile panel are mutually exclusive views,
+  // each rendering its own tab bar (case-tab-<key> vs contact-tab-<key>). Wait for
+  // whichever panel actually mounted, then target that panel's tab with a waiting
+  // assertion. The prior version guarded the click with isVisible({timeout}) probes —
+  // isVisible() does not poll, so under shard contention it could sample the DOM before
+  // the panel finished mounting, see nothing, and fall through to a text-based
+  // getByRole fallback that isn't guaranteed to match either (probe-race class of
+  // #669/#670).
   const detailHeader = page.getByTestId('case-detail-header')
   const contactHeader = page.getByTestId('contact-profile-header')
-  await detailHeader.or(contactHeader).first().waitFor({ state: 'visible', timeout: Timeouts.ELEMENT }).catch(() => {})
+  await expect(detailHeader.or(contactHeader).first()).toBeVisible({ timeout: Timeouts.ELEMENT })
 
-  // Try case detail tab first, then contact profile tab
-  const caseTab = page.getByTestId(`case-tab-${tabKey}`)
-  if (await caseTab.isVisible({ timeout: 3000 }).catch(() => false)) {
-    await caseTab.click()
-  } else {
-    const contactTab = page.getByTestId(`contact-tab-${tabKey}`)
-    if (await contactTab.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await contactTab.click()
-    } else {
-      // Fallback to text-based tab click
-      await page.getByRole('button', { name: new RegExp(tabName, 'i') }).first().click()
-    }
-  }
+  const isCaseDetail = (await detailHeader.count()) > 0
+  const tab = isCaseDetail
+    ? page.getByTestId(`case-tab-${tabKey}`)
+    : page.getByTestId(`contact-tab-${tabKey}`)
+  await expect(tab).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await tab.click()
 })
 
 // --- Details tab ---
