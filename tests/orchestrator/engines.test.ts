@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   statusToOutcome, parseStatusFile, buildArgs, isTerminalStatus, resolveDispatchModel,
   parseWorkerLogSignal, detectQuotaFromLog, extractResetHint, parseResetAt, QUOTA_MESSAGE_RE,
+  resolveLaunchOutcome,
 } from '../../orchestrator/src/engines.js'
 import { itemIdFromBranch, laneIdFromBranch } from '../../orchestrator/src/ci.js'
 import type { Lane } from '../../orchestrator/src/config.js'
@@ -306,5 +307,98 @@ describe('detectQuotaFromLog', () => {
     expect(detection.resetHint).toBe('6pm (America/New_York)')
     expect(detection.resetAt).toBeDefined()
     expect(new Date(detection.resetAt as number).toISOString()).toBe('2026-09-18T22:00:00.000Z')
+  })
+})
+
+// Real fixtures, issue #870 (2026-09-19): `fleet-backend-705` and
+// `fleet-desktop-775` were both dispatched (a redispatch, onto a branch that
+// already had an open PR from a prior REJECTED round) within milliseconds of
+// `fleet-infra-722` — three lanes launched in the same tick, all contending
+// for one box. `dispatch()`'s own supervising `execFileAsync(DISPATCH_SCRIPT,
+// ...)` call — bounded by a 60s timeout because dispatch-one.sh "returns
+// almost immediately" under normal load — rejected for at least two of the
+// three, with exactly this truncated `Command failed: …` text recorded on
+// the ledger row. But the WORKER kept running in dispatch-one.sh's own
+// detached tmux session regardless, and 90/50 minutes later wrote a real
+// terminal SUCCESS with a real PR to its own `.status` file — this is that
+// file's actual content, verbatim (long `notes:` line preserved in full: a
+// truncated fixture here would not prove the fix survives the size of a real
+// worker note).
+const FLEET_BACKEND_705_STATUS_TEXT = [
+  'session: fleet-backend-705',
+  'status: SUCCESS',
+  'pr: https://github.com/rhonda-rodododo/llamenos-platform/pull/860',
+  'merged_sha: none',
+  'duration_sec: 5400',
+  'notes: hono ^4.12.21 -> ^4.13.8 (+overrides.hono >=4.12.25 to dedupe the transitive copy from ' +
+    '@modelcontextprotocol/sdk via shadcn devDep); removed GHSA-88fw-hqm2-52qc from audit-allowlist.txt; ' +
+    'added named CORS regression test; bun audit clean, simulated CI audit job exits 0. Also allowlisted ' +
+    'GHSA-7q85-xj36-vmfc (adm-zip, unrelated new advisory published 2026-09-18, was blocking a clean audit ' +
+    'run independent of hono; tracked under #649). typecheck clean; test:worker:unit 198/198 files, ' +
+    '3996/3996 tests pass; test:backend:bdd 851 passed/182 skipped/2 failed (both pre-existing/environmental: ' +
+    'sip-bridge sidecar not started, unrelated caller-ban state in analytics scenario).',
+].join('\n')
+
+// The real ledger `note` for the SAME run, truncated to 300 chars by
+// `ledger.ts`'s `truncateNote` — the exact text `dispatch()`'s own launch
+// call threw before this fix.
+const FLEET_BACKEND_705_LAUNCH_ERROR =
+  'Command failed: /home/rikki/.claude/skills/supervising-dispatched-sessions/dispatch-one.sh --branch ' +
+  'fleet/backend/705 --agent backend-supervisor --owns apps/worker/,sip-bridge/,signal-notifier/,tests/steps/ ' +
+  '--effort high --rules llamenos fleet-backend-705 /home/rikki/.llamenos-fleet/briefs/fleet-bac'
+
+describe('resolveLaunchOutcome (issue #870)', () => {
+  it('records the worker\'s own real SUCCESS + PR even though the launch call itself errored', () => {
+    const status = parseStatusFile(FLEET_BACKEND_705_STATUS_TEXT)
+    const result = resolveLaunchOutcome({
+      launchError: FLEET_BACKEND_705_LAUNCH_ERROR,
+      status,
+      seed: undefined,
+      depCommit: 'abc123',
+      workerLog: undefined,
+    })
+    // This is the assertion a regression would flip: a launch-call error
+    // must NEVER by itself downgrade a real terminal SUCCESS the worker
+    // already wrote. Mutation check — replace this fix with "launchError
+    // !== undefined ? FAILED : statusToOutcome(...)" and this fails.
+    expect(result.outcome).toBe('SUCCESS')
+    expect(result.pr).toBe('https://github.com/rhonda-rodododo/llamenos-platform/pull/860')
+  })
+
+  it('still records FAILED when the launch call errored AND no status file ever appeared', () => {
+    // The genuinely-dead-launch case must be unaffected: this fixes the
+    // FALSE failure, not failure detection itself.
+    const result = resolveLaunchOutcome({
+      launchError: FLEET_BACKEND_705_LAUNCH_ERROR,
+      status: undefined,
+      seed: undefined,
+      depCommit: 'abc123',
+      workerLog: undefined,
+    })
+    expect(result.outcome).toBe('FAILED')
+  })
+
+  it('keeps the launch-call error visible in the note for a human, without it driving the outcome', () => {
+    const status = parseStatusFile(FLEET_BACKEND_705_STATUS_TEXT)
+    const result = resolveLaunchOutcome({
+      launchError: FLEET_BACKEND_705_LAUNCH_ERROR, status, seed: undefined, depCommit: 'abc123', workerLog: undefined,
+    })
+    expect(result.note).toContain('launch-call warning')
+    expect(result.note).toContain('Command failed')
+  })
+
+  it('a launch error never overrides a real terminal BLOCKED either', () => {
+    const status = parseStatusFile('status: BLOCKED\nnotes: scope conflict, needs a human\n')
+    const result = resolveLaunchOutcome({
+      launchError: 'Command failed: dispatch-one.sh timed out', status, seed: undefined, depCommit: 'abc', workerLog: undefined,
+    })
+    expect(result.outcome).toBe('BLOCKED')
+  })
+
+  it('with no launchError at all, behaves exactly as before (pure pass-through of the status file)', () => {
+    const status = parseStatusFile(FLEET_BACKEND_705_STATUS_TEXT)
+    const result = resolveLaunchOutcome({ launchError: undefined, status, seed: undefined, depCommit: 'abc', workerLog: undefined })
+    expect(result.outcome).toBe('SUCCESS')
+    expect(result.note).not.toContain('launch-call warning')
   })
 })
