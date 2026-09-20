@@ -145,13 +145,23 @@ RUN bun run build
 # requirement) is NOT part of stock Caddy; it ships only via this plugin,
 # built with xcaddy. Without this stage Caddy refuses to start with
 # "unrecognized directive: rate_limit".
-FROM caddy:2.11.4-builder-alpine@sha256:1a1689db91cfb390b2d856a1b3774e796852822cd723fa54c475b272f82bb4b7 AS caddy-builder
+# Digest bump (issue #650, 2026-09-20): refreshes the Alpine package layer
+# (curl/c-ares/libcrypto3/libssl3 CVEs) under the same 2.11.4 tag — same Caddy
+# version, no behavior change. See the `static` stage below for the matching bump.
+FROM caddy:2.11.4-builder-alpine@sha256:2b9f32cbba6045e79212bb253f595588d20be8f7d1edf61582c519e124e0d2d8 AS caddy-builder
 RUN xcaddy build --with github.com/mholt/caddy-ratelimit
 
 # Stage 7 (`static`): Caddy image serving the built SPA. Matches the
 # `caddy:2.11.4-alpine` base pinned in docker-compose.yml, with the custom
 # rate-limiting binary swapped in and the SPA baked into /srv/app.
-FROM caddy:2.11.4-alpine@sha256:5f5c8640aae01df9654968d946d8f1a56c497f1dd5c5cda4cf95ab7c14d58648 AS static
+# Digest bump (issue #650, 2026-09-20): see caddy-builder stage above — same
+# tag, refreshed Alpine layer. Trivy re-scan of this stage went from 23 fixable
+# HIGH (curl/c-ares/libcrypto3/libssl3) to 0 on the OS layer; the xcaddy-built
+# binary's own Go-module HIGH findings (golang.org/x/*, grpc) are unaffected by
+# this bump — they come from the Caddy 2.11.4 release's resolved dependency set,
+# not the Alpine base, and need a Caddy version bump to clear (follow-up, needs
+# Caddyfile.production + caddy-ratelimit plugin compat validation first).
+FROM caddy:2.11.4-alpine@sha256:de23def33b17fb5d1290b0f6c2add1d70780e52341896c00a4c8a2a2fe9d355e AS static
 COPY --from=caddy-builder /usr/bin/caddy /usr/bin/caddy
 COPY --from=frontend-builder /app/dist/client /srv/app
 # NOTE: /srv/crypto (the Tier-4 sandboxed-crypto-iframe origin referenced by
