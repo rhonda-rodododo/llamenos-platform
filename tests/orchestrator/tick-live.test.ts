@@ -377,6 +377,38 @@ describe('tick: G1 needs-human handoff and G2 gate-trace observability', () => {
     expect(d.settle).toHaveBeenCalledWith(expect.objectContaining({ outcome: 'REJECTED', needsHuman: false }))
   })
 
+  // Issue #870: a review loop that ends UNREADABLE (the fleet's own
+  // verification — a reviewer-engine outage, a tamper halt, or an
+  // unreachable worker mid-revise — never reached a verdict) must NOT be
+  // recorded the same way as an ordinary REJECTED. REJECTED means a real
+  // reviewer read the diff and objected; UNREADABLE means this fleet never
+  // got an answer at all. Conflating the two is exactly how three
+  // genuinely-successful workers (fleet-backend-705, fleet-desktop-775,
+  // fleet-infra-722) tripped the consecutive-failure breaker on nothing but
+  // the fleet's own plumbing.
+  it('a review loop ending UNREADABLE is recorded UNVERIFIED, not REJECTED or FAILED, WITH needs-human', async () => {
+    const d = baseDeps({ secondOpinion: vi.fn(async () => ({ verdict: 'UNREADABLE' as const, text: 'reviewer engine was unreachable' })) })
+    const r = await tick(d)
+    expect(d.record).toHaveBeenCalledWith(expect.objectContaining({ outcome: 'UNVERIFIED', pr: '42', branch: 'fleet/ios/1' }))
+    expect(d.settle).toHaveBeenCalledWith(expect.objectContaining({ outcome: 'UNVERIFIED', needsHuman: true }))
+    expect(r.failed).toBe(0) // this is not a `threw` / uncaught-exception FAILED
+  })
+
+  // The actual bug this fixes: mutating `UNVERIFIED` back into `REJECTED`
+  // (or `FAILED`) here would make this pass but `circuit.test.ts`'s
+  // companion mutation-guard fail — see that file for the other half.
+  it('an UNVERIFIED outcome does not feed circuit.ts\'s consecutive-failure streak', async () => {
+    const recorded: RunRecord[] = []
+    const d = baseDeps({
+      record: vi.fn((rec: RunRecord) => recorded.push(rec)),
+      secondOpinion: vi.fn(async () => ({ verdict: 'UNREADABLE' as const, text: 'unreachable' })),
+    })
+    await tick(d)
+    const terminal = recorded.find((rec) => rec.outcome !== 'DISPATCHED')
+    expect(terminal?.outcome).toBe('UNVERIFIED')
+    expect(failureBreaker(recorded, LIMITS, 0)).toBeUndefined()
+  })
+
   it('logs one line per gate stage reached: verify and review', async () => {
     const lines: string[] = []
     const d = baseDeps({ log: (msg: string) => { lines.push(msg) } })

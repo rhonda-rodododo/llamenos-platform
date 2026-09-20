@@ -37,7 +37,13 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-    if: "!startsWith(github.event.head_commit.message, 'chore(release):')"
+    # Same guard, same scoping fix as ci.yml's `changes` job (#812) — kept in
+    # sync even though this workflow's `on:` block is currently
+    # `workflow_dispatch` only (#661), so `github.event_name` here is never
+    # `push` today. Fixing it anyway so re-enabling `pull_request`/`push`
+    # later doesn't silently reintroduce the bug this job was copy-pasted
+    # from.
+    if: "github.event_name != 'push' || !startsWith(github.event.head_commit.message, 'chore(release):')"
 
     outputs:
       ios_related: ${{ steps.filter.outputs.ios }}
@@ -109,7 +115,7 @@ jobs:
       # Both must come from the same Rust build or checksums will mismatch.
       - name: Cache crypto XCFramework + bindings
         id: xcframework-cache
-        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
             apps/ios/LlamenosCoreFFI.xcframework
