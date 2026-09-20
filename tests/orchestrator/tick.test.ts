@@ -24,6 +24,9 @@ function deps(over: Partial<TickDeps> = {}): TickDeps {
     resumedAt: () => 0,
     listItems: async () => ({ ok: true as const, items: [item('1')] }),
     readLabels: async () => ['agent-dispatchable', 'lane:ios'],
+    // No open PR by default, so the new pre-dispatch precondition never
+    // interferes with a test that isn't about it.
+    findOpenPr: async () => undefined,
     // Default dispatch resolves SUCCESS but WITHOUT pr/branch/worktree, so it
     // never falls into the verify/review pipeline unless a test opts
     // in explicitly by overriding dispatch (or the pipeline deps below).
@@ -245,6 +248,59 @@ describe('tick', () => {
     const r = await tick(d)
     expect(dispatch).toHaveBeenCalledTimes(2)
     expect(r.attempted).toBe(2)
+  })
+
+  // Issues #705/#724/#729/#775/#784/#785: six items each burned three
+  // worker attempts rediscovering a PR that was already open and simply
+  // waiting on the review gate. This is the pure precondition that stops
+  // it: an item whose branch already has an open PR is never dispatched, no
+  // matter how many attempts it has left. MUTATION GUARD (per the fleet's
+  // "audit gates by breaking them" rail): removing the `findOpenPr` check
+  // from tick.ts's dispatch loop makes this test fail — `dispatch` gets
+  // called and `rejections` comes back empty.
+  it('does not dispatch an item whose branch already has an open PR, and records the rejection', async () => {
+    const d = deps({
+      lanes: [lane('ios', 'live')],
+      findOpenPr: async (l: Lane, i: WorkItem) => (l.id === 'ios' && i.id === '1' ? '861' : undefined),
+    })
+    const r = await tick(d)
+    expect(d.dispatch).not.toHaveBeenCalled()
+    expect(r.attempted).toBe(0)
+    expect(r.rejections).toEqual([{ id: '1', reason: 'pr-already-open' }])
+  })
+
+  // The precondition applies with NO judgement about attempt count — even
+  // an item with zero prior failures (nowhere near MAX_ATTEMPTS_PER_ITEM)
+  // must still be skipped when a PR is already open. This is what makes it
+  // a hard precondition rather than something folded into the existing
+  // per-item retry-budget check.
+  it('skips on an open PR even for an item with no prior failed attempts at all', async () => {
+    const d = deps({
+      lanes: [lane('ios', 'live')],
+      readLedger: () => [],
+      findOpenPr: async () => '861',
+    })
+    await tick(d)
+    expect(d.dispatch).not.toHaveBeenCalled()
+  })
+
+  it('dispatches normally once no open PR is found for the item', async () => {
+    const d = deps({
+      lanes: [lane('ios', 'live')],
+      findOpenPr: async () => undefined,
+    })
+    const r = await tick(d)
+    expect(d.dispatch).toHaveBeenCalledTimes(1)
+    expect(r.attempted).toBe(1)
+  })
+
+  // Shadow mode never dispatches at all, so the open-PR check must not run
+  // (and must not gate) a SHADOW row either.
+  it('does not consult findOpenPr for a shadow-mode lane', async () => {
+    const findOpenPr = vi.fn(async () => undefined)
+    const d = deps({ findOpenPr })
+    await tick(d)
+    expect(findOpenPr).not.toHaveBeenCalled()
   })
 })
 

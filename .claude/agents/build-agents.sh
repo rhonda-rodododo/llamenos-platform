@@ -3,10 +3,11 @@ set -euo pipefail
 
 # Assembles self-contained supervisor agent definitions from:
 #   1. Domain-specific fragment  (.claude/agents/fragments/<name>.md)
-#   2. Shared supervisor skill   (~/.claude/skills/supervising-dispatched-sessions/SKILL.md)
-#   3. Model routing guide       (~/.claude/skills/supervising-dispatched-sessions/model-routing.md)
-#   4. Llamenos project rules    (~/.claude/skills/supervising-dispatched-sessions/prompt-rules-llamenos.md)
-#   5. Worker prompt template    (~/.claude/skills/supervising-dispatched-sessions/prompt-template.md)
+#   2. Shared worker rules       (.claude/agents/fragments/_worker-rules.md — every lane, one copy)
+#   3. Shared supervisor skill   (~/.claude/skills/supervising-dispatched-sessions/SKILL.md)
+#   4. Model routing guide       (~/.claude/skills/supervising-dispatched-sessions/model-routing.md)
+#   5. Llamenos project rules    (~/.claude/skills/supervising-dispatched-sessions/prompt-rules-llamenos.md)
+#   6. Worker prompt template    (~/.claude/skills/supervising-dispatched-sessions/prompt-template.md)
 #
 # Output: .claude/agents/<name>.md (overwritten each run)
 #
@@ -15,7 +16,15 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 FRAGMENTS_DIR="$SCRIPT_DIR/fragments"
+SHARED_FRAGMENT="$FRAGMENTS_DIR/_worker-rules.md"
 SKILL_DIR="$HOME/.claude/skills/supervising-dispatched-sessions"
+
+# Verify shared worker-rules fragment exists — it is folded into every lane, so a
+# missing file must hard-fail the build rather than silently ship lanes without it.
+if [[ ! -f "$SHARED_FRAGMENT" ]]; then
+  echo "ERROR: Shared worker-rules fragment not found: $SHARED_FRAGMENT" >&2
+  exit 1
+fi
 
 SUPERVISORS=(
   desktop-supervisor
@@ -53,6 +62,10 @@ for name in "${SUPERVISORS[@]}"; do
     cat "$fragment"
 
     echo ""
+    # 2. Shared worker rules (identical for every lane — one file, no per-lane copies)
+    cat "$SHARED_FRAGMENT"
+
+    echo ""
     echo "---"
     echo ""
     echo "# Supervisor Operating Manual"
@@ -61,7 +74,7 @@ for name in "${SUPERVISORS[@]}"; do
     echo "files or invoke any skills before starting work — everything you need is here."
     echo ""
 
-    # 2. Core supervisor skill (strip YAML frontmatter if present)
+    # 3. Core supervisor skill (strip YAML frontmatter if present)
     echo "## Core Dispatch Protocol"
     echo ""
     sed '/^---$/,/^---$/d' "$SKILL_DIR/SKILL.md"
@@ -70,7 +83,7 @@ for name in "${SUPERVISORS[@]}"; do
     echo "---"
     echo ""
 
-    # 3. Model routing
+    # 4. Model routing
     echo "## Model Routing Reference"
     echo ""
     cat "$SKILL_DIR/model-routing.md"
@@ -79,7 +92,7 @@ for name in "${SUPERVISORS[@]}"; do
     echo "---"
     echo ""
 
-    # 4. Llamenos project rules (for embedding in worker prompts)
+    # 5. Llamenos project rules (for embedding in worker prompts)
     echo "## Llamenos Worker Rules (paste into every worker prompt)"
     echo ""
     cat "$SKILL_DIR/prompt-rules-llamenos.md"
@@ -88,7 +101,7 @@ for name in "${SUPERVISORS[@]}"; do
     echo "---"
     echo ""
 
-    # 5. Worker prompt template
+    # 6. Worker prompt template
     echo "## Worker Prompt Template"
     echo ""
     cat "$SKILL_DIR/prompt-template.md"

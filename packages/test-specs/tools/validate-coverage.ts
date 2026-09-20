@@ -590,7 +590,6 @@ function checkAndroidCoverage(scenarios: Scenario[]): { covered: number; missing
     }
   }
 
-  const methodNames = new Set(allMethods.map((m) => m.name));
   console.log(
     `  Found ${allMethods.length} Android @Test methods across ${new Set(allMethods.map(m => m.file)).size} test files\n`
   );
@@ -606,10 +605,9 @@ function checkAndroidCoverage(scenarios: Scenario[]): { covered: number; missing
     }
 
     const expectedMethod = scenarioToMethodName(scenario.title);
-    const found = methodNames.has(expectedMethod);
+    const method = allMethods.find((m) => m.name === expectedMethod);
 
-    if (found) {
-      const method = allMethods.find((m) => m.name === expectedMethod)!;
+    if (method) {
       console.log(
         `    ✓ ${scenario.title}\n      ${method.className}.${method.name}`
       );
@@ -821,7 +819,6 @@ function checkIosCoverage(scenarios: Scenario[]): { covered: number; missing: nu
     allMethods.push(...parseSwiftTestFile(file));
   }
 
-  const methodNames = new Set(allMethods.map((m) => m.name));
   console.log(
     `  Found ${allMethods.length} Swift test methods across ${testFiles.length} test files\n`
   );
@@ -837,10 +834,9 @@ function checkIosCoverage(scenarios: Scenario[]): { covered: number; missing: nu
     }
 
     const expectedMethod = scenarioToSwiftMethod(scenario.title);
-    const found = methodNames.has(expectedMethod);
+    const method = allMethods.find((m) => m.name === expectedMethod);
 
-    if (found) {
-      const method = allMethods.find((m) => m.name === expectedMethod)!;
+    if (method) {
       console.log(
         `    ✓ ${scenario.title}\n      ${method.className}.${method.name}`
       );

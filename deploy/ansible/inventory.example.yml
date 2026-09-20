@@ -75,6 +75,8 @@ all:
       hosts: {}
     llamenos_signal:
       hosts: {}
+    llamenos_ntfy:
+      hosts: {}
 
 # ── Multi-Host Example ──────────────────────────────────────────
 #
