@@ -4557,6 +4557,7 @@
   "voiceStatusWebhook": "Voice Status Webhook",
   "webauthn": {
     "browserNotSupported": "Trình duyệt của bạn không hỗ trợ khóa truy cập.",
+    "credentialRequiredError": "Hãy đăng ký khóa truy cập trước khi yêu cầu khóa truy cập cho quản trị viên.",
     "deleteKey": "Xóa",
     "description": "Sử dụng sinh trắc học hoặc PIN của thiết bị để đăng nhập mà không cần khóa bí mật.",
     "label": "Tên khóa truy cập (vd: \"Điện thoại của tôi\")",

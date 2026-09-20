@@ -4557,6 +4557,7 @@
   "voiceStatusWebhook": "Voice Status Webhook",
   "webauthn": {
     "browserNotSupported": "متصفحك لا يدعم مفاتيح المرور.",
+    "credentialRequiredError": "سجّل مفتاح مرور قبل اشتراط مفاتيح المرور للمشرفين.",
     "deleteKey": "حذف",
     "description": "استخدم القياسات الحيوية أو رمز PIN لجهازك لتسجيل الدخول بدون مفتاحك السري.",
     "label": "اسم مفتاح المرور (مثال: \"هاتفي\")",

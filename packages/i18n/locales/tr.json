@@ -1864,6 +1864,7 @@
   },
   "webauthn": {
     "browserNotSupported": "Tarayıcınız geçiş anahtarlarını desteklemiyor.",
+    "credentialRequiredError": "Yöneticiler için geçiş anahtarı zorunlu kılmadan önce bir geçiş anahtarı kaydedin.",
     "deleteKey": "Sil",
     "description": "Gizli anahtarınız olmadan oturum açmak için cihaz biyometriklerinizi veya PIN kullanın.",
     "label": "Geçiş anahtarı adı (ör. \"Telefonum\")",

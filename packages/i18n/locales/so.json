@@ -1864,6 +1864,7 @@
   },
   "webauthn": {
     "browserNotSupported": "Biraawsarkaagu kuma taageerayo furayaasha amniga.",
+    "credentialRequiredError": "Diiwaangeli furaha amniga ka hor intaadan u baahan furayaasha amniga maamulayaasha.",
     "deleteKey": "Tirtir",
     "description": "Isticmaal sawirka faraha ama PIN qalabkaaga si aad ugu gasho furuhaaga sirta ah la'aantii.",
     "label": "Magaca furaha amniga (tusaale \"Taleefankayga\")",

@@ -1864,6 +1864,7 @@
   },
   "webauthn": {
     "browserNotSupported": "አሳሽዎ የመለያ ቁልፎችን አይደግፍም።",
+    "credentialRequiredError": "ለአስተዳዳሪዎች ከማስፈለጉ በፊት የመለያ ቁልፍ ይመዝገቡ።",
     "deleteKey": "ሰርዝ",
     "description": "ያለ ሚስጥራዊ ቁልፍ ለመግባት የመሣሪያዎን ባዮሜትሪክ ወይም PIN ይጠቀሙ።",
     "label": "የመለያ ቁልፍ ስም (ለምሳሌ \"ስልኬ\")",
