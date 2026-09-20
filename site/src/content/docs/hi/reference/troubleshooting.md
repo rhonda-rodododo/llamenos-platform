@@ -53,7 +53,7 @@ sudo lsof -i :9000
 
 ### Strfry relay कनेक्ट नहीं हो रहा
 
-WebSocket relay (WebSocket relay) एक मुख्य सेवा है, वैकल्पिक नहीं। यदि relay चल नहीं रही है:
+WebSocket relay एक मुख्य सेवा है, वैकल्पिक नहीं। यदि relay चल नहीं रही है:
 
 ```bash
 # relay की स्थिति जांचें

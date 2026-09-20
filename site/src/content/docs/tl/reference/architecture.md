@@ -153,7 +153,7 @@ Per-note key (random na 32 bytes)
 
 Ang mga real-time na update (mga bagong tawag, mensahe, pagbabago ng shift, presensya) ay dumadaan sa isang WebSocket relay:
 
-- **Self-hosted**: WebSocket relay relay na tumatakbo kasabay ng app sa Docker/Kubernetes
+- **Self-hosted**: WebSocket relay na tumatakbo kasabay ng app sa Docker/Kubernetes
 - **Cloudflare**: Nosflare (Cloudflare Workers-based relay)
 
 Ang lahat ng event ay ephemeral (kind 20001) at naka-encrypt gamit ang hub key. Gumagamit ang mga event ng mga generic na tag (`["t", "llamenos:event"]`) kaya hindi matukoy ng relay ang mga uri ng event. Ang field ng nilalaman ay naglalaman ng XChaCha20-Poly1305 ciphertext.
@@ -166,7 +166,7 @@ Client A (aksyon ng boluntaryo)
     | Ine-encrypt ang nilalaman ng event gamit ang hub key
     | Lumagda bilang WebSocket event (Schnorr)
     v
-WebSocket relay (WebSocket relay / Nosflare)
+WebSocket relay
     |
     | Ibinabahagi sa mga subscriber
     v

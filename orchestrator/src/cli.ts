@@ -6,7 +6,7 @@ import { promisify } from 'node:util'
 import { acquire } from './lock.js'
 import { checkHalt, halt, resume, haltedLocally } from './killswitch.js'
 import { readAll, append, since, type RunRecord } from './ledger.js'
-import { readResumedAt } from './circuit.js'
+import { readResumedAt, isQuotaHaltReason, parseQuotaResumeAt } from './circuit.js'
 import { loadLanes, LIMITS, LANE_MODES_FILE, type Lane } from './config.js'
 import { checkDispatchDependency, type DependencyReport } from './dependency.js'
 import { checkFleetEnvFile } from './fleet-env.js'
@@ -15,8 +15,9 @@ import { loadContracts, contractsFor, buildMemoryContext, augmentBrief } from '.
 import { dispatch as dispatchWorker, type EffortLevel } from './engines.js'
 import { verifyMechanical } from './verify.js'
 import { secondOpinion, postReview } from './review.js'
+import { artifactReviewCache } from './review-cache.js'
 import {
-  runVerifyCi, runReviewCi, ciContextFromEnv, ciDiff,
+  runVerifyCi, runReviewCi, decideReviewGate, ciContextFromEnv, ciDiff,
   REVIEW_JOB, REVIEW_KEY_ENV, VERIFY_JOB, itemIdFromBranch, fleetBranchFor, type CiContext, type CiVerdict,
 } from './ci.js'
 import {
@@ -47,6 +48,16 @@ function log(msg: string): void {
   const line = `${new Date().toISOString()} ${msg}\n`
   appendFileSync(LOG_FILE, line)
   process.stdout.write(line)
+}
+
+/**
+ * Rejected lanes.json entries must surface where an operator actually looks:
+ * the fleet log and stdout. Fail-closed (the lane stays off) is only safe if
+ * the rejection is also loud — a silently ignored override reads as "the dial
+ * did nothing" and gets debugged as a fleet bug.
+ */
+function rejectLogger(laneId: string, reason: string): void {
+  log(`lanes.json rejected: ${reason}`)
 }
 
 /**
@@ -110,10 +121,22 @@ export async function doctor(): Promise<number> {
     remotes.length === 1 && remotes[0] === 'origin',
     'git remote remove <name> — this repo must only ever have origin -> llamenos-platform'])
 
-  const lanes = await loadLanes(REPO_ROOT)
+  const lanes = await loadLanes(REPO_ROOT, LANE_MODES_FILE, rejectLogger)
   for (const l of lanes) {
     checks.push([`lane ${l.id} has scope paths`, l.scope.owned.length > 0,
       `check .claude/agents/fragments/${l.id}-supervisor.md "**Owned paths:**" section`])
+  }
+
+  // A live opencode lane with no opencode binary dispatches workers that all
+  // die at launch — a hard misconfiguration, surfaced as FAIL, not WARN.
+  const liveOpencode = lanes.filter((l) => l.mode === 'live' && l.engine === 'opencode')
+  if (liveOpencode.length > 0) {
+    let opencodeOk = false
+    try { execFileSync('opencode', ['--version'], { stdio: 'pipe' }); opencodeOk = true } catch { /* not on PATH */ }
+    for (const l of liveOpencode) {
+      checks.push([`lane ${l.id} is live on opencode, opencode binary on PATH`, opencodeOk,
+        'install opencode (https://opencode.ai), or set this lane\'s engine back to claude in ~/.llamenos-fleet/lanes.json'])
+    }
   }
   checks.push(['not halted', !haltedLocally(),
     existsSync(HALT_REASON_FILE) ? `halted: ${readFileSync(HALT_REASON_FILE, 'utf8').trim()} — clear with: llamenos-fleet resume` : ''])
@@ -182,8 +205,8 @@ export async function doctor(): Promise<number> {
     }
   }
 
-  const modes = lanes.map((l) => `${l.id}=${l.mode}`).join(' ')
-  process.stdout.write(`\nlanes: ${modes}\n`)
+  const modes = lanes.map((l) => `${l.id}=${l.mode}/${l.engine}${l.model !== undefined ? `/${l.model}` : ''}`).join(' ')
+  process.stdout.write(`\nlanes (mode/engine/model): ${modes}\n`)
   process.stdout.write(`lane modes file: ${LANE_MODES_FILE}${existsSync(LANE_MODES_FILE) ? '' : ' (absent — all lanes off)'}\n`)
   if (warnings > 0) {
     process.stdout.write(`\n${warnings} warning(s) above — non-fatal, see WARN lines\n`)
@@ -222,6 +245,11 @@ const BRIEFS_DIR = join(FLEET_DIR, 'briefs')
 const DEFAULT_TIMEOUT_SEC = 90 * 60
 const DEFAULT_EFFORT: EffortLevel = 'high'
 const DEFAULT_MODEL = 'sonnet'
+// An opencode lane with no model override must not fall back to the Claude
+// default — 'sonnet' would route the dispatch to the claude CLI, silently
+// defeating the engine selection. 'kimi' is dispatch-one.sh's maintained
+// opencode token (maps to kimi-for-coding/k3-256k inside the script).
+const DEFAULT_OPENCODE_MODEL = 'kimi'
 
 /** One name identifies a dispatched item everywhere: the tmux session
  *  dispatch-one.sh starts, the status file it polls, and the handle `settle`
@@ -341,7 +369,7 @@ async function realDispatch(item: WorkItem, lane: Lane): Promise<DispatchOutcome
     lane,
     briefPath,
     timeoutSec: DEFAULT_TIMEOUT_SEC,
-    model: lane.model ?? DEFAULT_MODEL,
+    model: lane.model ?? (lane.engine === 'opencode' ? DEFAULT_OPENCODE_MODEL : DEFAULT_MODEL),
     effort: DEFAULT_EFFORT,
   })
   const resolved = await resolveDispatchResult(result, branch, REPO_ROOT, defaultResolveDispatchDeps())
@@ -530,13 +558,14 @@ function defaultIssueLinkDeps(): IssueLinkDeps {
 }
 
 async function runTick(): Promise<number> {
-  const lanes = await loadLanes(REPO_ROOT)
+  const lanes = await loadLanes(REPO_ROOT, LANE_MODES_FILE, rejectLogger)
 
   const deps: TickDeps = {
     lanes,
     now: () => Date.now(),
     acquireLock: acquire,
     checkHalt,
+    resumeFleet: resume,
     readLedger: readAll,
     resumedAt: readResumedAt,
     listItems: (lane) => new GitHubSource(lane.requireLabel).list(),
@@ -586,7 +615,19 @@ function status(): number {
   const recent = since(24 * 3_600_000)
   const byOutcome = new Map<string, number>()
   for (const r of recent) byOutcome.set(r.outcome, (byOutcome.get(r.outcome) ?? 0) + 1)
-  process.stdout.write(`halted: ${haltedLocally() ? 'YES' : 'no'}\n`)
+
+  // Issue #817: a quota-shaped halt is self-healing (see tick.ts) — reporting
+  // it as the same `halted: YES` a human-declared halt gets would send an
+  // operator to run `resume` for a condition that clears itself.
+  const haltedNow = haltedLocally()
+  const haltReasonNow = haltedNow && existsSync(HALT_REASON_FILE) ? readFileSync(HALT_REASON_FILE, 'utf8').trim() : undefined
+  if (haltedNow && isQuotaHaltReason(haltReasonNow)) {
+    const resumeAt = haltReasonNow !== undefined ? parseQuotaResumeAt(haltReasonNow) : undefined
+    const until = resumeAt !== undefined ? new Date(resumeAt).toISOString() : 'unknown'
+    process.stdout.write(`status: degraded — engine quota exhausted until ${until}\n`)
+  } else {
+    process.stdout.write(`halted: ${haltedNow ? 'YES' : 'no'}\n`)
+  }
   process.stdout.write(`runs (24h): ${recent.length}\n`)
   for (const [k, v] of [...byOutcome].sort()) process.stdout.write(`  ${k}: ${v}\n`)
   process.stdout.write(`limits: ${LIMITS.maxDispatchesPerHour}/h, halt after ${LIMITS.consecutiveFailuresToHalt} consecutive failures\n`)
@@ -871,7 +912,7 @@ async function runDigest(hoursArg?: string): Promise<number> {
     hours = parsed
   }
 
-  const lanes = await loadLanes(REPO_ROOT)
+  const lanes = await loadLanes(REPO_ROOT, LANE_MODES_FILE, rejectLogger)
   const haltedNow = haltedLocally()
   const haltReason = haltedNow && existsSync(HALT_REASON_FILE)
     ? readFileSync(HALT_REASON_FILE, 'utf8').trim()
@@ -1128,6 +1169,48 @@ async function runCiGate(job: string, run: (ctx: CiContext) => Promise<CiVerdict
   return verdict.ok ? 0 : 1
 }
 
+/**
+ * `review-gate` — the step `fleet-review.yml` runs BEFORE installing the
+ * review engine, now that the job carries no job-level `if:` at all (#848's
+ * fail-open bug — a job instantiated on an event and then skipped by `if:`
+ * satisfies branch protection exactly like a green check). Its exit code is
+ * what actually enforces branch (c) of `decideReviewGate`'s three outcomes:
+ * a `not-requested` result exits 1 here, which is what stops every
+ * subsequent step (engine install, auth, the smoke test, the real review)
+ * from ever running — GitHub Actions does not run later steps after one
+ * fails unless they opt in with `if: always()`/`if: failure()`, and none of
+ * the engine steps do. `cache-hit` and `run-engine` both exit 0; the
+ * `outcome` step output is what the workflow's own `if:` on each later step
+ * reads to decide whether IT runs.
+ */
+async function runReviewGate(): Promise<number> {
+  const ctx = ciContextFromEnv(process.env, REPO_ROOT)
+  if (ctx === undefined) {
+    process.stderr.write(
+      'review-gate: FLEET_CI_BRANCH, FLEET_CI_HEAD_DIR, FLEET_CI_HEAD_SHA and FLEET_CI_BASE_SHA ' +
+      'must all be set — refusing to judge an unknown tree\n',
+    )
+    return 2
+  }
+  const outcome = await decideReviewGate({
+    ctx,
+    prDiff: () => ciDiff(ctx),
+    cache: artifactReviewCache(process.env['FLEET_REVIEW_CACHE_DIR'], ciLog),
+    requested: process.env['FLEET_REVIEW_REQUESTED'] === 'true',
+    log: ciLog,
+  })
+  const ghOutput = process.env['GITHUB_OUTPUT']
+  if (ghOutput !== undefined) appendFileSync(ghOutput, `outcome=${outcome.kind}\n`)
+  if (outcome.kind === 'not-requested') {
+    process.stderr.write(
+      `${REVIEW_JOB}: review not requested — add the \`review\` label to run the non-author review\n`,
+    )
+    return 1
+  }
+  ciLog(`${REVIEW_JOB}: gate outcome = ${outcome.kind}`)
+  return 0
+}
+
 type CommandHandler = (rest: string[]) => Promise<number> | number
 
 /**
@@ -1160,7 +1243,7 @@ const HANDLERS: Record<string, CommandHandler> = {
   digest: (rest) => runDigest(rest[0]),
   'verify-ci': () => runCiGate(VERIFY_JOB, (ctx) => runVerifyCi({
     ctx,
-    lanes: () => loadLanes(REPO_ROOT),
+    lanes: () => loadLanes(REPO_ROOT, LANE_MODES_FILE, rejectLogger),
     verify: verifyMechanical,
     pathExists: existsSync,
     log: ciLog,
@@ -1168,13 +1251,18 @@ const HANDLERS: Record<string, CommandHandler> = {
   'review-ci': () => runCiGate(REVIEW_JOB, (ctx) => runReviewCi({
     ctx,
     apiKey: process.env[REVIEW_KEY_ENV],
-    lanes: () => loadLanes(REPO_ROOT),
+    lanes: () => loadLanes(REPO_ROOT, LANE_MODES_FILE, rejectLogger),
     verify: verifyMechanical,
     pathExists: existsSync,
     log: ciLog,
     prDiff: () => ciDiff(ctx),
     secondOpinion,
+    // `FLEET_REVIEW_CACHE_DIR` unset (e.g. a local run) disables recording
+    // without disabling lookup — a lookup that finds nothing behaves
+    // identically either way, and this command still runs the engine.
+    cache: artifactReviewCache(process.env['FLEET_REVIEW_CACHE_DIR'], ciLog),
   })),
+  'review-gate': () => runReviewGate(),
   plan: () => runPlan(),
   integrate: () => runIntegrate(),
 }
