@@ -327,6 +327,11 @@ Domain skills (e.g. `bdd-feature-development`, `protocol-schema-change`) are **r
 
 `docs/epics/` contains historical planning documents for reference. New planning uses superpowers specs (`docs/superpowers/specs/`) and plans (`docs/superpowers/plans/`).
 
+**Fleet/CI determinism rules** (16 checkable invariants, each from a live failure) are
+canonical at `docs/superpowers/specs/2026-09-11-llamenos-fleet-orchestrator-design.md#determinism-invariants`
+and folded into every worker via `.claude/agents/fragments/_worker-rules.md` — read them
+there, do not re-paste them here.
+
 ### Test Philosophy
 
 1. Tests assert **behavior** (state changes, API responses, data persistence) — never assert UI element existence

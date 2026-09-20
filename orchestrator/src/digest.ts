@@ -50,6 +50,11 @@ const REJECTION_SPECIFICITY: Record<Rejection, number> = {
   'labels-unreadable': 2,
   'body-too-short': 3,
   'vetoed': 4,
+  // Most specific of all: a live, confirmed fact about GitHub (an open PR
+  // already exists on this branch), not an inference from labels or body
+  // length — so it outranks every reason above when both apply to the same
+  // item.
+  'pr-already-open': 5,
 }
 
 function specificityRank(reason: Rejection): number {

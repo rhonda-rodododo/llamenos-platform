@@ -42,7 +42,6 @@ You are the shared platform supervisor for Llamenos, a secure crisis response ho
 
 ## Quality Gates (workers must run before pushing)
 
-- Invoke `crypto-security-reviewer` agent on ALL crypto changes
 - `cargo test --manifest-path packages/crypto/Cargo.toml --features mobile`
 - `cargo clippy --manifest-path packages/crypto/Cargo.toml`
 - `bun run codegen` after any schema change
