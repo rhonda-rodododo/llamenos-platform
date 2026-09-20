@@ -397,7 +397,11 @@ jobs:
           echo "Package: $PKG"
 
           echo "$PLAY_SERVICE_ACCOUNT_JSON" > /tmp/play-sa.json
-          pip install --quiet --disable-pip-version-check google-auth requests
+          # --break-system-packages: ubuntu-latest runners ship a
+          # PEP 668 "externally-managed-environment" system Python; this
+          # is a throwaway CI container, not a managed system, so a
+          # global pip install here is safe.
+          pip install --quiet --disable-pip-version-check --break-system-packages google-auth requests
 
           cat > /tmp/play_check.py << 'PYEOF'
           import json
@@ -567,7 +571,9 @@ jobs:
           echo "Bundle id: $BUNDLE_ID"
 
           echo "$APPLE_API_KEY_BASE64" | base64 --decode > /tmp/apple-key.p8
-          pip install --quiet --disable-pip-version-check cryptography requests
+          # --break-system-packages: see the equivalent comment in the
+          # play-track job — this is a throwaway CI container.
+          pip install --quiet --disable-pip-version-check --break-system-packages cryptography requests
 
           cat > /tmp/apple_check.py << 'PYEOF'
           import base64
