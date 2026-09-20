@@ -29,7 +29,6 @@ You are the Backend supervisor for Llamenos, a secure crisis response hotline ap
 - **TelephonyAdapter**: 8 providers. Never call provider APIs directly from business logic.
 - **Signal notifier auth**: `SIGNAL_NOTIFIER_BEARER_TOKEN` must match between app and sidecar
 - **BDD test isolation**: Each scenario gets its own hub via `createTestHub()`
-- **Test selectors**: `data-testid` only
 - **Schemas**: Import from `@protocol/schemas` (not `apps/worker/schemas/`)
 - **Workers testing backend** MUST start dev server from their worktree, not main
 

@@ -349,18 +349,32 @@ before it fails the job — it never turns a bad call into a pass. Three
 causes: `engine-quota` (weekly/usage-limit language from the provider),
 `engine-auth` (401 / invalid or missing key), or `engine-unavailable`
 (anything else — a bad model id, a network error, a rejected config, or the
-engine running but never producing a valid verdict). See the comment above
-"Smoke-test the review engine" in `.github/workflows/fleet-review.yml` for
-the exact classification, which is a best-effort heuristic over the engine's
-own error text, not a structured error code `claude` exposes.
+engine running but never producing a valid verdict), or `engine-misconfigured`
+(a `--model` id `claude` itself refuses outright — see `classifyEngineFailure`
+in `orchestrator/src/review.ts`). See the comment above "Smoke-test the
+review engine" in `.github/workflows/fleet-review.yml` for the exact
+classification, which is a best-effort heuristic over the engine's own error
+text, not a structured error code `claude` exposes.
+
+This is also where #891's fail-loud lesson (determinism invariant #9, §11 —
+the Kimi subscription's weekly quota exhausting silently on 2026-09-15, with
+a stale `kimi-for-coding` fallback masking the real cause) carries forward:
+there is no `|| 'literal-default'` for anything that can go silently stale.
+`FLEET_REVIEW_MODEL` still defaults to `'sonnet'` when unset, but that is not
+the same failure shape #891 fixed — `'sonnet'` is a live, always-valid model
+tier, not a provider id that can be retired out from under the job, and a bad
+value is still caught loudly by the smoke test's `engine-misconfigured`
+classification before the real review ever runs. There is no
+`FLEET_REVIEW_PROVIDER` any more for #891's original fix to apply to: `claude`
+is the only reviewer engine (`reviewerBinaryFor` hard-fails for anything
+else), so the class of bug #891 fixed — an unconfigured, swappable provider
+silently guessed at — has no remaining surface to reintroduce it on.
 
 **`fleet/review` now lives in its own workflow file, `fleet-review.yml`, not
-`ci.yml`.** It moved there to fix a fail-open bug: `ci.yml` also triggers on
-`pull_request`, so a job living there and merely `if:`-gated to skip on that
-event was still *instantiated* on every PR — and GitHub's branch protection
-treats a skipped required check as satisfied, exactly like a green one. #844
-merged with `fleet/review` reporting "skipping" and no model review ever run,
-as a direct result.
+`ci.yml`.** `ci.yml` also triggers on `pull_request`, so a job living there
+and merely `if:`-gated to skip on that event was still *instantiated* on
+every PR — determinism invariant #1 (§11), in the flesh: #844 merged with
+`fleet/review` reporting "skipping" and no model review ever run.
 
 `fleet-review.yml`'s first version (#848) triggered on `workflow_dispatch` +
 `merge_group` only, so an ordinary PR produced no `fleet/review` context at
@@ -379,15 +393,13 @@ a `pull_request`-triggered run's check result attaches to the PR's head SHA
 automatically, the same mechanism `fleet/verify` (`fleet-verify.yml`) already
 relies on.
 
-#848's own first fix reintroduced the exact bug class it closed: it narrowed
-the `labeled` trigger back down with a job-level `if:
-github.event_name == 'workflow_dispatch' || github.event.label.name ==
-'review'`. GitHub cannot filter a `pull_request` trigger by label *value* —
-only by `types:` — so applying any *other* label (e.g. the fleet's own
-`agent-dispatchable`) still instantiated the job, which the `if:` then
-skipped, and a skipped required check satisfies branch protection with no
-review ever run. `fleet/review`'s own verdict caught this on #848 itself,
-before #848 merged.
+#848's own first fix reintroduced the same bug class: it narrowed the
+`labeled` trigger back down with a job-level `if: github.event_name ==
+'workflow_dispatch' || github.event.label.name == 'review'`. GitHub cannot
+filter a `pull_request` trigger by label *value* — only by `types:` — so
+applying any *other* label (e.g. the fleet's own `agent-dispatchable`) still
+instantiated the job, which the `if:` then skipped. `fleet/review`'s own
+verdict caught this on #848 itself, before #848 merged.
 
 The job now carries **no job-level `if:` at all** — it always runs and always
 reaches a real conclusion, on every `labeled` event. What used to be the
@@ -414,15 +426,10 @@ steps.gate.outputs.outcome == 'run-engine'`:
   job goes red, which is the correct, honest state for a PR nobody has asked
   to be reviewed yet.
 
-A step failing mid-job is not a "skipped" job: GitHub Actions still runs the
-job to a real conclusion (failure), and that conclusion is what
-`fleet/review`'s required check reports. This is the structural difference
-from the job-level `if:` bug: a job-level `if:` can make the whole job (and
-therefore its check run) never run at all while GitHub still reports
-"skipped", which branch protection treats as green; a step skipped by its
-*own* `if:` inside an always-instantiated job changes nothing about whether
-the job itself concludes. `tests/orchestrator/guards.test.ts` pins the rail
-that no job-level `if:` exists on this job again.
+A step failing mid-job still reaches a real job conclusion (failure) — unlike
+a job-level `if:`, which can make the whole job report "skipped" and pass
+branch protection regardless (invariant #1, §11). `tests/orchestrator/guards.test.ts`
+pins that no job-level `if:` exists on this job again.
 
 With no label applied at all, the workflow's `on: pull_request: types:
 [labeled]` trigger never fires and the `fleet/review` context stays ABSENT —
@@ -676,3 +683,31 @@ a one-line ask. That ask is what the blocked ping carries.
 | Agent messaging | GitHub only: issue comments for items, PR reviews for diffs. No custom bus — a git mailbox assumed a shared filesystem, and a runtime relay had no consumer |
 | Shared memory | Contracts in git (true *at a commit*); everything else on GitHub or derived |
 | Ramp | One shadow pass, then all six lanes live at cap 1 |
+
+## 11. Determinism invariants
+
+Checkable invariants, not advice — each learned from a specific live failure. Canonical
+source: `/home/rikki/tier-prompts/determinism-rules.md`; folded into every worker prompt
+via `.claude/agents/fragments/_worker-rules.md`.
+
+**Gating and merges**
+1. A skipped required check counts as SATISFIED — never gate with a job-level `if:` inside a workflow that also triggers on `pull_request` (#844 merged with `fleet/review` reporting "skipping" and no review ever run; §5.5).
+2. Freshness is keyed to the head SHA, never a time window (a clock lets a push slip past a stale PASS).
+3. Anything a gate calls must already exist on `main` — gate jobs run base-ref code (a PR adding the CLI subcommand a gate invokes would break the gate on itself if not landed first, additively).
+4. Re-run policy is exhaustive, not ad hoc: UNREADABLE verdicts and named Playwright probe-races get one re-run each; infra/network errors get one; a substantive FAIL, lint, typecheck, backend, or build failure never does (re-running is not a bypass; merging past red is).
+5. Never `--admin`, `--force`, `--approve`, `--no-verify`, or a ruleset edit to land a PR (bot-authored PRs need a code-owner approval, given only after the gate passes).
+6. A PR's changed paths decide which checks matter — required contexts stay fixed; scoping lives in `ci.yml`'s own `if:` (a skipped job still satisfies the required-check aggregate, per #1).
+
+**Fleet mechanics**
+7. Never trust a worker's self-report — branch, worktree, PR number and outcome are derived from `gh`/`git` at read time (a status file that carries branch/worktree is a claim, not an observation).
+8. Pass the branch explicitly and verify the worktree is actually on it before briefing the worker (a mismatch is a recorded failure, never a silent skip — rail 6, §5.5).
+9. Quota exhaustion is not task failure — classify it separately, halt with the reset time, auto-resume when the window elapses (the 2026-09-15 Kimi weekly-quota outage that made `fleet/review` red repo-wide with no recovery until the provider became switchable; §5.5).
+10. A verification gap is not a failure either — a worker that wrote SUCCESS and opened a PR is never recorded FAILED solely because it could not be independently verified.
+11. Engines are routed by role, not availability — implementation workers on Claude, the review gate on its own quota (sharing one subscription starves the gate exactly when it is needed most; §5.4).
+12. Workers run every command in the FOREGROUND (a backgrounded run outlives the session; the worker dies with no terminal status and the work is lost).
+13. Tests must never touch the operator's real fleet state — `FLEET_HOME` isolation is enforced in code (a test resolving the real halt file is an error, not a warning).
+
+**Code rules that keep biting**
+14. Codegen renames are bulk renames — never a typealias, never a hand-written duplicate of a generated type (a hand-written duplicate drifts the moment the schema changes).
+15. No non-waiting probe may guard a write — `isVisible()`/`.first()` used for control flow around a click/fill/toggle is a bug regardless of flakiness.
+16. Fix the app, not the test — a test that passes when its dependency is unreachable is a no-op (make it fail loudly or exclude it by tag).

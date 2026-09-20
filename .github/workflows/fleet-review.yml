@@ -265,6 +265,19 @@ jobs:
     # change moves the smoke test and the real review together. There is no
     # `FLEET_REVIEW_PROVIDER` any more — `claude`, pre-authenticated on this
     # runner, is the only provider now (see the file header).
+    #
+    # #891 banned a silent literal default for the review engine, but that
+    # was about a swappable PROVIDER id going stale and being guessed at
+    # invisibly (`kimi-for-coding`, retired twice under everyone's feet — see
+    # the comment above `DEFAULT_OPENCODE_MODEL` in `orchestrator/src/
+    # review.ts`, kept for that history even though it no longer drives this
+    # job). This job has no provider left to guess at: `claude` is the only
+    # engine (`reviewerBinaryFor` hard-fails for anything else), and
+    # `'sonnet'` is a real, always-valid model tier, not a dead id someone
+    # forgot to update — the smoke test below still classifies a bad
+    # `FLEET_REVIEW_MODEL` as `engine-misconfigured` before the real review
+    # ever runs, so an operator TYPO is still loud, just not an unconfigured
+    # variable being silently invisible the way an absent provider id was.
     env:
       FLEET_REVIEW_MODEL: ${{ vars.FLEET_REVIEW_MODEL || 'sonnet' }}
 
@@ -535,13 +548,53 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: bun orchestrator/src/cli.ts review-gate
 
+      # Bootstrap guard, the SAME shape as "Check the base provides the
+      # review gate itself" / "Check the base provides the gate" above and
+      # below — for the same underlying reason, one function narrower:
+      # `reviewerInvocationFor` (review.ts) is THIS PR's own addition, and
+      # the smoke step two steps down imports it from the BASE checkout, not
+      # from this PR's head (the gate always judges from base — see the file
+      # header). A base that predates it cannot run that import at all: `bun
+      # -e "import { reviewerInvocationFor } from ..."` fails at module-load
+      # time with bun's own uncaught `SyntaxError: Export named
+      # 'reviewerInvocationFor' not found`, before the smoke step's own
+      # `fail()` classification ever gets a chance to run — the exact opaque
+      # crash shape the two gate-bootstrap steps above already exist to
+      # replace with a named, actionable failure.
+      #
+      # This is the PR that introduces `reviewerInvocationFor` (#866 itself),
+      # so this check will FAIL on this PR's own `fleet/review` run, by
+      # construction — the identical, already-accepted bootstrap limitation
+      # "Check the base provides the gate" documents for `review-ci`: merge
+      # with this check not yet required by the ruleset (or via an
+      # authorized override), and every later PR is judged by the
+      # now-trusted, merged engine-resolution code, because base will then
+      # actually provide the symbol this checks for.
+      - name: Check the base provides reviewerInvocationFor
+        if: steps.gate.outputs.outcome == 'run-engine'
+        run: |
+          set -euo pipefail
+          if ! grep -q '^export function reviewerInvocationFor' orchestrator/src/review.ts 2>/dev/null; then
+            echo "::error::fleet/review FAILED: base-missing-reviewer-invocation-for — the base commit's orchestrator/src/review.ts has no 'reviewerInvocationFor' export, so the smoke test below (which imports it from THIS base checkout) cannot run"
+            echo "The gate deliberately runs from the BASE, never from the commit it judges."
+            echo "This is expected for the PR that INTRODUCES reviewerInvocationFor (#866) — merge"
+            echo "that one PR with this check not yet required by the ruleset; every later PR is"
+            echo "judged by the now-trusted, merged engine-resolution code."
+            exit 1
+          fi
+
       # #812: no "Install the non-author review engine" or "Authenticate the
       # review engine" step any more. `claude` is pre-installed on
       # `llamenos-review-box` and already logged in under the operator's own
       # account (that login state lives under `HOME`, which the runner sets
       # to the operator's own home directory — see `VERIFIER_ENV_ALLOWLIST`'s
       # doc comment in `orchestrator/src/review.ts`). There is nothing left
-      # to fetch or configure before the smoke test below.
+      # to fetch or configure before the smoke test below — there is no
+      # provider variable left to validate either (see the job-level `env:`
+      # comment above): `FLEET_REVIEW_MODEL` always resolves to a real value
+      # (the repo variable or the `'sonnet'` default), and a bad value is
+      # caught by the smoke test's own `engine-misconfigured` classification,
+      # not by a separate "is this set" step.
       #
       # Proves the binary, the model id AND the reviewer's non-interactive,
       # read-only posture all work BEFORE the real review runs — so "the

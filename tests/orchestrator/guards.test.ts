@@ -327,6 +327,27 @@ describe('rail: every lane starts off', () => {
  * enforce) rather than genuine misses — a session with real tools reviews
  * better than a thin per-call API hit.
  *
+ * Reconciling this with #891 (2026-09-19, "fail loud on unconfigured
+ * fleet/review engine, never a dead default"): that fix was about
+ * `vars.FLEET_REVIEW_PROVIDER` — a SWAPPABLE provider id that had already
+ * gone stale twice, silently, with a `|| 'kimi-for-coding'` literal masking
+ * the day it was retired. `#812`'s redesign removes the entire class of bug
+ * #891 fixed rather than re-solving it: there is no provider variable left
+ * to go stale, because `claude` is the only reviewer engine
+ * (`reviewerBinaryFor` hard-fails for anything else — see its doc comment in
+ * review.ts). `FLEET_REVIEW_MODEL` keeps a literal default (`'sonnet'`), but
+ * that is not the same failure shape: `'sonnet'` is a live, always-valid
+ * model tier that a claude session can actually run, not a retired id
+ * silently substituted for one that used to work. A bad value in
+ * `FLEET_REVIEW_MODEL` (typo'd, or a leftover opencode-shaped id like
+ * `kimi-code-plan-global/k3-256k` from before this PR) is still caught
+ * LOUD, before the real review ever runs: `claude` itself refuses an
+ * unrecognized `--model`, and the smoke step's `classify()` (backed by
+ * `classifyEngineFailure` in review.ts) names that failure
+ * `engine-misconfigured`, never a silent pass. See
+ * fleet-review-smoke-step.test.ts for the behavioural rail on that
+ * classification.
+ *
  * This rail asserts what survived the switch and what changed on purpose:
  *   - the model is STILL a repo variable, never a hardcoded literal — the
  *     same "a provider/model change is an operator action, not a code
@@ -395,6 +416,17 @@ describe('rail: fleet/review runs as a claude session on a self-hosted runner, w
     expect(fleetReviewJobText()).not.toMatch(/\n\s+FLEET_REVIEW_PROVIDER:\s*\$\{\{/)
   })
 
+  // #891's invariant, carried forward for the one variable left that could
+  // still go silently wrong: a bad `FLEET_REVIEW_MODEL` must fail LOUD
+  // (`engine-misconfigured`, asserted below and in
+  // fleet-review-smoke-step.test.ts), never a silent pass. There is
+  // deliberately no separate "Require review engine configuration" step any
+  // more — see the doc comment above this describe block for why an
+  // absent `FLEET_REVIEW_MODEL` is not the same failure shape #891 fixed.
+  it('has no separate "Require review engine configuration" step — an absent FLEET_REVIEW_MODEL is not a missing-provider incident any more', () => {
+    expect(fleetReviewJobText()).not.toMatch(/Require review engine configuration/)
+  })
+
   // Scoped to actual step headers / real paths, not prose — the job's own
   // comments legitimately still name these steps and paths in the past
   // tense, explaining that #812 removed them.
@@ -444,9 +476,9 @@ describe('rail: fleet/review runs as a claude session on a self-hosted runner, w
     expect(runBlock).not.toMatch(/\bopencode\b/)
   })
 
-  it('classifies a smoke-test failure as engine-quota, engine-auth, or engine-unavailable', () => {
+  it('classifies a smoke-test failure as engine-quota, engine-auth, engine-misconfigured, or engine-unavailable', () => {
     const text = fleetReviewJobText()
-    for (const cause of ['engine-quota', 'engine-auth', 'engine-unavailable']) {
+    for (const cause of ['engine-quota', 'engine-auth', 'engine-misconfigured', 'engine-unavailable']) {
       expect(text, `${cause} classification missing from the smoke-test step`).toContain(cause)
     }
   })
@@ -815,11 +847,34 @@ describe('rail: fleet/review runs once per review label, not on every push', () 
   // runner, so there is nothing left to install or authenticate here.
   it.each([
     'Smoke-test the review engine',
+    'Check the base provides reviewerInvocationFor',
     'Check the base provides the gate',
     'Review',
   ])('the "%s" step only runs when the gate said run-engine', (stepName) => {
     const block = jobBlock(fleetReviewYaml(), 'fleet-review')
     expect(stepIf(block, stepName)).toBe("steps.gate.outputs.outcome == 'run-engine'")
+  })
+
+  // #866's own bootstrap: `reviewerInvocationFor` (review.ts) is this PR's
+  // own new export, and the smoke test two steps down imports it from the
+  // BASE checkout (the gate always judges from base — see the file header).
+  // Without this check, a base that predates the export crashes the smoke
+  // step with bun's own uncaught `SyntaxError: Export named
+  // 'reviewerInvocationFor' not found` — exactly the opaque-crash shape
+  // "Check the base provides the gate" already exists to replace with a
+  // named, actionable failure for `review-ci` itself. This asserts the same
+  // treatment exists for the narrower, PR-introduced symbol.
+  it('the base-provides-reviewerInvocationFor guard runs before the smoke test and names the exact bootstrap condition', () => {
+    const block = jobBlock(fleetReviewYaml(), 'fleet-review')
+    const guardIdx = block.indexOf('- name: Check the base provides reviewerInvocationFor')
+    const smokeIdx = block.indexOf('- name: Smoke-test the review engine')
+    expect(guardIdx, 'guard step not found').toBeGreaterThan(-1)
+    expect(smokeIdx, 'smoke step not found').toBeGreaterThan(-1)
+    expect(guardIdx).toBeLessThan(smokeIdx)
+    const guardBlock = block.slice(guardIdx, smokeIdx)
+    expect(guardBlock).toContain("grep -q '^export function reviewerInvocationFor' orchestrator/src/review.ts")
+    expect(guardBlock).toContain('base-missing-reviewer-invocation-for')
+    expect(guardBlock).toContain('merge')
   })
 
   // Branch (c)'s fail-closed message, verbatim — an operator or agent
