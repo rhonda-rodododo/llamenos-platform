@@ -202,18 +202,33 @@ jobs:
     # smoke call and the cache lookup have to fit around it.
     timeout-minutes: 20
 
-    # Repo Settings > Secrets and variables > Actions > Variables, with safe
-    # defaults matching today's engine — so a quota-exhausted or revoked
-    # provider is an operator action (set two variables, rotate one secret),
-    # never a code change or a PR. Both steps below that talk to opencode
-    # (auth + smoke) key off these; so does the "Review" step, which reads
-    # `FLEET_REVIEW_MODEL` itself (review.ts's VERIFIER_ENGINE) rather than a
-    # literal, precisely so a variable change moves the smoke test and the
-    # real review together. See "Switching the review engine provider" in
+    # Repo Settings > Secrets and variables > Actions > Variables — so a
+    # quota-exhausted or revoked provider is an operator action (set two
+    # variables, rotate one secret), never a code change or a PR. Both steps
+    # below that talk to opencode (auth + smoke) key off these; so does the
+    # "Review" step, which reads `FLEET_REVIEW_MODEL` itself (review.ts's
+    # VERIFIER_ENGINE) rather than a literal, precisely so a variable change
+    # moves the smoke test and the real review together. See "Switching the
+    # review engine provider" in
     # docs/superpowers/specs/2026-09-11-llamenos-fleet-orchestrator-design.md.
+    #
+    # Deliberately NO `|| 'literal-default'` fallback here anymore. There
+    # used to be one (`kimi-for-coding` / `kimi-for-coding/k3-256k`), and it
+    # is the reason a whole night got spent chasing an opaque
+    # `UnknownError: "Unexpected server error"` across ~10 PRs: that provider
+    # id was retired on 2026-09-19, the hardcoded fallback kept silently
+    # substituting the dead id whenever the vars happened to be unset, and
+    # the ONLY thing that has kept this job green since is the repo
+    # variables having been set BY HAND to the live id — invisible
+    # configuration with no diff and no signal the day someone clears it. A
+    # provider id that can (and has, twice — see the comment above
+    # `DEFAULT_OPENCODE_MODEL` in `orchestrator/src/review.ts`)
+    # go stale must never be guessed at silently; see "Require review engine
+    # configuration" below, which turns an absent variable into a named,
+    # actionable failure instead.
     env:
-      FLEET_REVIEW_PROVIDER: ${{ vars.FLEET_REVIEW_PROVIDER || 'kimi-for-coding' }}
-      FLEET_REVIEW_MODEL: ${{ vars.FLEET_REVIEW_MODEL || 'kimi-for-coding/k3-256k' }}
+      FLEET_REVIEW_PROVIDER: ${{ vars.FLEET_REVIEW_PROVIDER }}
+      FLEET_REVIEW_MODEL: ${{ vars.FLEET_REVIEW_MODEL }}
 
     steps:
       # On `pull_request` (the labeled event), the base/head SHAs and the
@@ -439,6 +454,37 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: bun orchestrator/src/cli.ts review-gate
 
+      # `${{ vars.FLEET_REVIEW_PROVIDER }}` / `${{ vars.FLEET_REVIEW_MODEL }}`
+      # (job-level `env:` above) resolve to an EMPTY STRING, not an error,
+      # when the repo variable is unset — GitHub Actions has no concept of a
+      # required variable. Left unchecked, every later step would either
+      # silently no-op on an empty model (opencode) or, worse, quietly accept
+      # whatever ad-hoc value someone tried instead of a real fallback. This
+      # step is the only thing standing between "unset" and "opaque failure
+      # three steps later" now that this job no longer guesses at a default
+      # (see the job-level `env:` comment above for why the previous
+      # `|| 'kimi-for-coding'` fallback was the actual incident).
+      - name: Require review engine configuration
+        if: steps.gate.outputs.outcome == 'run-engine'
+        run: |
+          set -euo pipefail
+          missing=()
+          if [ -z "$FLEET_REVIEW_PROVIDER" ]; then
+            missing+=("FLEET_REVIEW_PROVIDER (opencode provider id, e.g. kimi-code-plan-global)")
+          fi
+          if [ -z "$FLEET_REVIEW_MODEL" ]; then
+            missing+=("FLEET_REVIEW_MODEL (opencode provider/model id, e.g. kimi-code-plan-global/k3-256k)")
+          fi
+          if [ "${#missing[@]}" -gt 0 ]; then
+            echo "::error::fleet/review has no review engine configured. Set the following under Settings > Secrets and variables > Actions > Variables:"
+            for m in "${missing[@]}"; do
+              echo "::error::  - $m"
+            done
+            echo "::error::the reviewer's current live id is documented at orchestrator/src/review.ts's DEFAULT_OPENCODE_MODEL — read the comment above it before choosing a value, it has already gone stale twice."
+            exit 1
+          fi
+          echo "review engine configuration present (provider=$FLEET_REVIEW_PROVIDER model=$FLEET_REVIEW_MODEL)"
+
       # From a pinned release asset whose sha256 is recorded here — never a
       # `curl | bash` installer, in a repo that pins every action by SHA. (The
       # npm package `opencode-ai@1.18.30` was tried first, per the preferred
@@ -564,9 +610,10 @@ jobs:
           }' > "$cfg/opencode.json"
           export OPENCODE_CONFIG_DIR="$cfg" OPENCODE_DISABLE_PROJECT_CONFIG=1
 
-          # $1: engine-quota | engine-auth | engine-unavailable. $2: the raw
-          # engine text to print for a human, then always exits 1 — this
-          # function is the only way the step fails, and it always fails.
+          # $1: engine-quota | engine-auth | engine-misconfigured |
+          # engine-unavailable. $2: the raw engine text to print for a human,
+          # then always exits 1 — this function is the only way the step
+          # fails, and it always fails.
           fail() {
             echo "review engine smoke test FAILED: $1 (provider=$FLEET_REVIEW_PROVIDER model=$FLEET_REVIEW_MODEL)"
             printf '%s\n' "$2"
@@ -577,7 +624,10 @@ jobs:
           # not authoritative, because opencode does not expose a structured error
           # code here. Weekly/usage-limit language is engine-quota; 401/invalid-key
           # or missing-credential language is engine-auth; anything else the
-          # engine said is engine-unavailable.
+          # engine said is engine-unavailable. Deliberately never returns
+          # engine-misconfigured: that classification requires an actual
+          # registry lookup (below), not a guess from error text, so it is
+          # never reachable through this heuristic.
           classify() {
             local text="$1"
             if printf '%s' "$text" | grep -qiE 'quota|rate.?limit|usage.?limit|too many requests|\b429\b'; then
@@ -600,7 +650,29 @@ jobs:
           run_status=$?
           run_err="$(cat "$RUNNER_TEMP/opencode-run-stderr.log" 2>/dev/null || true)"
           if [ "$run_status" -ne 0 ]; then
-            fail "$(classify "$run_out"$'\n'"$run_err")" "$run_out"$'\n'"$run_err"
+            combined="$run_out"$'\n'"$run_err"
+            # The same registry check `invokeVerifierEngine` (review.ts) runs
+            # before the real review — reused here via `checkOpencodeModelKnown`,
+            # never reimplemented, so a bad provider/model id is named
+            # `engine-misconfigured` in this smoke test exactly the way it is
+            # named for the real review, instead of collapsing into the same
+            # opaque `engine-unavailable` a genuine outage produces (this is
+            # the actual bug this whole fix exists for — `UnknownError:
+            # "Unexpected server error"` looked identical for both). The
+            # `opencode run` call just above is what populates opencode's own
+            # local models.dev cache (`opencodeModelsCachePath`), so this is
+            # a warm-cache check, not a guess against an empty one — matching
+            # `checkOpencodeModelKnown`'s own "indeterminate" contract: a
+            # cold/missing cache here falls through to the ordinary
+            # `classify()` heuristic below, never a false positive.
+            known="$(bun -e '
+              import { checkOpencodeModelKnown } from "./orchestrator/src/review.ts"
+              console.log(await checkOpencodeModelKnown(process.env["FLEET_REVIEW_MODEL"] ?? ""))
+            ' 2>/dev/null)"
+            if [ "$known" = "unknown" ]; then
+              fail "engine-misconfigured" "$combined"
+            fi
+            fail "$(classify "$combined")" "$combined"
           fi
 
           verdict_out="$(printf '%s' "$run_out" | bun -e '
