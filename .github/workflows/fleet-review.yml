@@ -645,12 +645,60 @@ jobs:
             "$RUNNER_TEMP/opencode-config.json" \
             || fail "engine-unavailable" "opencode debug config did not round-trip the deny-all permission block"
 
-          run_out="$(cd "$root" && printf 'Reply with exactly: VERDICT: PASS\n' \
-            | opencode run --pure --model "$FLEET_REVIEW_MODEL" --format json --dir "$root" 2>"$RUNNER_TEMP/opencode-run-stderr.log")"
-          run_status=$?
-          run_err="$(cat "$RUNNER_TEMP/opencode-run-stderr.log" 2>/dev/null || true)"
+          # Bounded retries around the ENGINE CALL ONLY — cold-start registry
+          # resolution flakiness, not a real outage. CI extracts a brand-new
+          # opencode binary with an EMPTY models.dev cache on every run;
+          # confirmed locally (extract the pinned tarball above into a clean
+          # prefix, empty $XDG_CACHE_HOME, run this exact invocation): the
+          # FIRST `opencode run` on a box fetches and writes
+          # $XDG_CACHE_HOME/opencode/models.json — byte-identical in size to
+          # a direct `curl https://models.dev/api.json` — before it can
+          # resolve anything, stacking a second network dependency in front
+          # of the provider call itself on a runner with no warm state. The
+          # operator's own long-lived install (warm cache) sees none of this
+          # and passes 3/3 back to back; CI fails here roughly 10 times in
+          # 24 since #891 fixed the stale-provider-id problem. Spacing
+          # reruns 45s apart did not reliably fix it either, which argues
+          # against a quota/rate-limit wait and toward exactly this: a cold
+          # resolve a same-minute retry can plausibly clear on its own.
+          #
+          # Retries ONLY a failed CALL (opencode exiting non-zero) — never a
+          # call that exited 0 but returned the wrong verdict text. A wrong
+          # verdict is the engine answering and being wrong: a real signal
+          # worth keeping, not infra flakiness to paper over. Retrying THAT
+          # would blur into the one thing this whole file must never do to
+          # the actual "Review" step below: ask again until the answer is
+          # liked. The PROBE may retry; the VERDICT may not — the "Review"
+          # step has no retry loop of its own, by design.
+          #
+          # Small and bounded, not a wait-out-the-outage loop:
+          # smoke_run_max_attempts attempts total, a short flat backoff
+          # between them. A persistent failure still fails — `fail()` below
+          # is reached unconditionally once attempts are exhausted, and
+          # every message it prints now names how many attempts were made,
+          # so a real outage reads as "failed after N/N attempts", never
+          # disguised as a slow success.
+          smoke_run_max_attempts=3
+          smoke_run_backoff_seconds=2
+          smoke_run_attempt=1
+          while :; do
+            run_out="$(cd "$root" && printf 'Reply with exactly: VERDICT: PASS\n' \
+              | opencode run --pure --model "$FLEET_REVIEW_MODEL" --format json --dir "$root" 2>"$RUNNER_TEMP/opencode-run-stderr.log")"
+            run_status=$?
+            run_err="$(cat "$RUNNER_TEMP/opencode-run-stderr.log" 2>/dev/null || true)"
+            if [ "$run_status" -eq 0 ]; then
+              break
+            fi
+            if [ "$smoke_run_attempt" -ge "$smoke_run_max_attempts" ]; then
+              break
+            fi
+            echo "review engine smoke test: engine call attempt $smoke_run_attempt/$smoke_run_max_attempts failed (exit $run_status) — retrying in ${smoke_run_backoff_seconds}s (cold-start registry resolution is the leading known cause)"
+            sleep "$smoke_run_backoff_seconds"
+            smoke_run_attempt=$((smoke_run_attempt + 1))
+          done
           if [ "$run_status" -ne 0 ]; then
             combined="$run_out"$'\n'"$run_err"
+            attempt_note=" (engine call failed after $smoke_run_attempt/$smoke_run_max_attempts attempts)"
             # The same registry check `invokeVerifierEngine` (review.ts) runs
             # before the real review — reused here via `checkOpencodeModelKnown`,
             # never reimplemented, so a bad provider/model id is named
@@ -658,21 +706,25 @@ jobs:
             # named for the real review, instead of collapsing into the same
             # opaque `engine-unavailable` a genuine outage produces (this is
             # the actual bug this whole fix exists for — `UnknownError:
-            # "Unexpected server error"` looked identical for both). The
-            # `opencode run` call just above is what populates opencode's own
-            # local models.dev cache (`opencodeModelsCachePath`), so this is
-            # a warm-cache check, not a guess against an empty one — matching
-            # `checkOpencodeModelKnown`'s own "indeterminate" contract: a
-            # cold/missing cache here falls through to the ordinary
-            # `classify()` heuristic below, never a false positive.
+            # "Unexpected server error"` looked identical for both). Each
+            # `opencode run` attempt above populates opencode's own local
+            # models.dev cache (`opencodeModelsCachePath`) further, so by the
+            # LAST attempt this is a warm-cache check, not a guess against an
+            # empty one — matching `checkOpencodeModelKnown`'s own
+            # "indeterminate" contract: a cold/missing cache here falls
+            # through to the ordinary `classify()` heuristic below, never a
+            # false positive.
             known="$(bun -e '
               import { checkOpencodeModelKnown } from "./orchestrator/src/review.ts"
               console.log(await checkOpencodeModelKnown(process.env["FLEET_REVIEW_MODEL"] ?? ""))
             ' 2>/dev/null)"
             if [ "$known" = "unknown" ]; then
-              fail "engine-misconfigured" "$combined"
+              fail "engine-misconfigured" "$combined$attempt_note"
             fi
-            fail "$(classify "$combined")" "$combined"
+            fail "$(classify "$combined")" "$combined$attempt_note"
+          fi
+          if [ "$smoke_run_attempt" -gt 1 ]; then
+            echo "review engine smoke test: engine call recovered after a transient failure — succeeded on attempt $smoke_run_attempt/$smoke_run_max_attempts"
           fi
 
           verdict_out="$(printf '%s' "$run_out" | bun -e '
