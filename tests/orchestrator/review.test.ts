@@ -4,8 +4,9 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, 
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
-  checkOpencodeModelKnown, DEFAULT_OPENCODE_MODEL, opencodeAssistantText, opencodeModelsCachePath,
-  parseVerdict, stripReviewerControlFiles, verifierFor,
+  checkOpencodeModelKnown, classifyEngineFailure, DEFAULT_OPENCODE_MODEL, opencodeAssistantText,
+  opencodeModelsCachePath, parseVerdict, reviewerBinaryFor, reviewerInvocationFor, stripReviewerControlFiles,
+  verifierFor,
 } from '../../orchestrator/src/review.js'
 
 describe('verifierFor', () => {
@@ -257,6 +258,69 @@ describe('checkOpencodeModelKnown', () => {
   it('is "indeterminate" for an id with no slash — nothing to split into provider/model', async () => {
     writeRegistry({ 'kimi-code-plan-global': { models: { 'k3-256k': {} } } })
     await expect(checkOpencodeModelKnown('kimi-code-plan-global')).resolves.toBe('indeterminate')
+  })
+})
+
+// `classifyEngineFailure` is `checkOpencodeModelKnown`'s counterpart for the
+// `claude` reviewer path: `opencode`'s bad-model-id case is caught by
+// checking a local registry cache BEFORE the engine ever runs; `claude` has
+// no such cache, so a bad `--model` id can only be told apart from a real
+// outage by reading the engine's own refusal text AFTER it runs. Both feed
+// the same `EngineFailureKind` — see review.ts's comment above
+// `classifyEngineFailure` for why that type is not duplicated here.
+describe('classifyEngineFailure', () => {
+  it('reads claude\'s own "unrecognized model" text as engine-misconfigured, not engine-unavailable', () => {
+    // Verbatim (stdout + stderr) from the installed claude binary given
+    // `--model this-is-not-a-real-model`.
+    const stdout = "There's an issue with the selected model (this-is-not-a-real-model). " +
+      'It may not exist or you may not have access to it. Run --model to pick a different model.'
+    const stderr = '"this-is-not-a-real-model" isn\'t described by this version\'s model catalog; ' +
+      '[claude-code:unrecognized_model] {"model":"this-is-not-a-real-model","query_source":"sdk"}'
+    expect(classifyEngineFailure(`${stdout}\n${stderr}`)).toBe('engine-misconfigured')
+  })
+
+  it('reads an ordinary crash/timeout/outage as engine-unavailable', () => {
+    expect(classifyEngineFailure('spawn ENOENT')).toBe('engine-unavailable')
+    expect(classifyEngineFailure('simulated: Unexpected server error from provider')).toBe('engine-unavailable')
+    expect(classifyEngineFailure('')).toBe('engine-unavailable')
+  })
+})
+
+// `reviewerBinaryFor` / `reviewerInvocationFor` are new, additive exports —
+// see review.ts's comments above them. Neither is called from this file's
+// own production code yet (that wiring, and the change that makes `claude`
+// the reviewer for every author engine, is a separate, larger change this
+// PR deliberately does not make — see this PR's description). Today
+// `verifierFor` still resolves the OTHER engine (tested above: `verifierFor
+// ('claude') === 'opencode'`), so these tests exercise both branches
+// `reviewerBinaryFor` actually has: a supported engine resolves cleanly, and
+// an unsupported one is refused outright — the "which engine reviews a
+// PR authored by X" question and the "does anything actually run that
+// engine" question are deliberately kept separate here.
+describe('reviewerBinaryFor / reviewerInvocationFor', () => {
+  it('resolves the wired binary for the one supported engine', () => {
+    expect(reviewerBinaryFor('claude')).toBe('claude')
+  })
+
+  it('refuses (throws) an engine with no wired invocation — misconfiguration, never a silent fallback', () => {
+    expect(() => reviewerBinaryFor('opencode')).toThrow(/no wired reviewer invocation/)
+  })
+
+  it('returns the full invocation when engine resolution lands on the supported engine', () => {
+    // verifierFor('opencode') === 'claude' (verified above), so an author
+    // engine of 'opencode' resolves, today, to a fully wired invocation.
+    expect(reviewerInvocationFor('opencode')).toEqual({ engine: 'claude', binary: 'claude', model: expect.any(String) })
+  })
+
+  it('surfaces an unresolvable engine resolution as the same misconfiguration reviewerBinaryFor reports directly', () => {
+    // verifierFor('claude') === 'opencode' (verified above), and 'opencode'
+    // has no wired invocation in reviewerBinaryFor — so resolving a
+    // 'claude'-authored PR through this function throws today, exactly as
+    // calling reviewerBinaryFor('opencode') does directly above. This is
+    // expected and inert: nothing in this file's production code calls
+    // reviewerInvocationFor yet, so the throw has no live effect on
+    // fleet/review today.
+    expect(() => reviewerInvocationFor('claude')).toThrow(/no wired reviewer invocation/)
   })
 })
 

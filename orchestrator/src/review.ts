@@ -345,6 +345,108 @@ export async function checkOpencodeModelKnown(modelId: string): Promise<'known' 
 }
 
 /**
+ * `claude`'s own, stable error text for a `--model` id its build does not
+ * recognise (verified against the installed binary: `claude --model
+ * <bogus>` exits 1, printing "There's an issue with the selected model…" to
+ * stdout and "…isn't described by this version's model catalog… [claude-
+ * code:unrecognized_model]" to stderr, before any assistant text).
+ * `checkOpencodeModelKnown` above answers the identical question — "is the
+ * configured model id something the engine actually recognises, before we
+ * spawn it and let a bad id collapse into an opaque UNREADABLE" — for the
+ * `opencode` reviewer path; this is the equivalent check for `claude`,
+ * which has no local registry cache to query and instead has to read the
+ * engine's own refusal text. It reuses the SAME `EngineFailureKind` type
+ * above rather than inventing a parallel one: a misconfigured model id is
+ * `'engine-misconfigured'` regardless of which engine's own diagnostic
+ * shape told us so.
+ *
+ * Heuristic, not authoritative — `claude` does not expose a structured
+ * error code here, the same caveat `checkOpencodeModelKnown` already
+ * carries for its own registry-cache read.
+ *
+ * Not wired into `invokeVerifierEngine`'s `claude` branch below (that
+ * branch is dormant today — `verifierFor` resolves every configured lane's
+ * `claude` author to the `opencode` reviewer, so the `claude`-as-reviewer
+ * path only runs for a lane authored with `opencode` instead). Exported so
+ * a caller that fully resolves and invokes a `claude` reviewer — see
+ * `reviewerInvocationFor` below — can classify its failures the same way,
+ * without duplicating the regex.
+ */
+export function classifyEngineFailure(text: string): EngineFailureKind {
+  if (/unrecognized_model|isn'?t described by this version'?s model catalog|issue with the selected model/i.test(text)) {
+    return 'engine-misconfigured'
+  }
+  return 'engine-unavailable'
+}
+
+/** The binary and model a fully-resolved reviewer engine actually runs —
+ *  see `reviewerInvocationFor`, the one function that produces this shape. */
+export interface ReviewerInvocation { readonly engine: EngineId; readonly binary: string; readonly model: string }
+
+/**
+ * The one place that maps a resolved reviewer `EngineId` to a runnable
+ * binary for callers OUTSIDE this file (see `reviewerInvocationFor`).
+ * `invokeVerifierEngine`'s own internal `VERIFIER_ENGINE` lookup above is
+ * untouched by this function and remains what actually drives today's
+ * review calls — this is a second, narrower resolver, not a replacement.
+ *
+ * Deliberately narrower than `VERIFIER_ENGINE`: it recognises only
+ * `'claude'` today and throws — loudly, immediately, never a silent
+ * fallback — for anything else. `opencode` is still a live reviewer engine
+ * elsewhere in this file (`VERIFIER_ENGINE`, `invokeVerifierEngine`) as of
+ * this PR; this function's narrower contract is deliberate preparation for
+ * a planned follow-up that retires `opencode` as a reviewer engine entirely
+ * and moves every review to a `claude` session on a dedicated runner — at
+ * which point this becomes the only resolution path this file needs, and
+ * `VERIFIER_ENGINE`'s `opencode` branch goes away along with the "narrower
+ * than VERIFIER_ENGINE" caveat above.
+ *
+ * Until that lands, this function and `reviewerInvocationFor` below are not
+ * called anywhere in this file's own production paths, so a throw here is
+ * currently unreachable outside this file's own tests.
+ */
+export function reviewerBinaryFor(engine: EngineId): string {
+  if (engine !== 'claude') {
+    throw new Error(
+      `reviewerInvocationFor: engine "${engine}" has no wired reviewer invocation in this function — only ` +
+      '"claude" is supported here; this is a hard failure, never a silent fallback',
+    )
+  }
+  return 'claude'
+}
+
+/**
+ * The model a fully-resolved `claude` reviewer invocation runs, for
+ * `reviewerInvocationFor` below — independent of `VERIFIER_ENGINE.claude
+ * .model` above (still a fixed `'sonnet'`, driving today's dormant
+ * `claude`-as-reviewer path), and independent of `dispatch-one.sh`'s own
+ * model aliasing for long-running worker sessions. Read from
+ * `FLEET_REVIEW_MODEL` (env), falling back to `sonnet` when unset — the
+ * same variable `VERIFIER_ENGINE.opencode.model` already reads, so the day
+ * the planned follow-up above makes `claude` the only reviewer, raising its
+ * tier is one repo variable, never a code change.
+ */
+export const REVIEWER_MODEL = process.env['FLEET_REVIEW_MODEL'] || 'sonnet'
+
+/**
+ * Combines `verifierFor` (which engine reviews this author), `reviewerBinaryFor`
+ * (what binary runs it), and `REVIEWER_MODEL` (what model it runs) into the
+ * one answer a caller outside this file needs: "what would actually run,
+ * right now, to review a PR authored by `authorEngine`."
+ *
+ * Not called anywhere yet — this PR only adds the export. The purpose is to
+ * give a later change (a CI step that needs to independently verify what a
+ * review job would invoke, before trusting a smoke test's own hardcoded
+ * literal) exactly one function to import, so that check and the real
+ * review can never independently drift the way two hand-kept literals
+ * could.
+ */
+export function reviewerInvocationFor(authorEngine: EngineId): ReviewerInvocation {
+  const engine = verifierFor(authorEngine)
+  return { engine, binary: reviewerBinaryFor(engine), model: REVIEWER_MODEL }
+}
+
+/**
  * A single pass, not an investigation. `fleet/review` moved to running once
  * per PR (on `merge_group`, at #812) instead of on every push, which fixed
  * the call-volume side of the provider's weekly quota — but a 20-turn /
