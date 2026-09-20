@@ -76,7 +76,12 @@ export function extractVerifiedSha(note: string | undefined): string | undefined
   return sha
 }
 
-const OUTCOMES_MEANING_A_PR_WAS_LEFT_FOR_A_HUMAN: ReadonlySet<Outcome> = new Set<Outcome>(['SUCCESS', 'BLOCKED'])
+// Mirrors digest.ts's own set of the same name (see its longer comment) —
+// UNVERIFIED (issue #870) added alongside SUCCESS/BLOCKED for the same
+// reason: a PR this fleet's own plumbing failed to confirm one way or the
+// other is exactly a PR left open for a human, not a settled outcome.
+const OUTCOMES_MEANING_A_PR_WAS_LEFT_FOR_A_HUMAN: ReadonlySet<Outcome> =
+  new Set<Outcome>(['SUCCESS', 'BLOCKED', 'UNVERIFIED'])
 
 /**
  * Pure: every fact this needs is already gathered in `facts`. No `gh` call,

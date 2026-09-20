@@ -268,7 +268,7 @@ Llámenos برای هیچ مورد استفاده خاصی سخت‌کدگذار
 
 ### Docker Compose (سرور واحد)
 
-- پشته کامل: سرور HTTP Bun، PostgreSQL، RustFS (ذخیره‌سازی اشیاء)، رله WebSocket (WebSocket relay)
+- پشته کامل: سرور HTTP Bun، PostgreSQL، RustFS (ذخیره‌سازی اشیاء)، رله WebSocket
 - پروفایل‌های اختیاری: `--profile signal` (سایدکار signal-cli)، `--profile telephony` (Kamailio + CoTURN)، `--profile inference` (عامل شلنگ آتشین LLM)، `--profile monitoring` (Prometheus + Grafana)
 - `docker-compose.dev.yml` برای توسعه محلی با تماشای فایل
 - پوشش `docker-compose.production.yml` برای سخت‌افزاری تولید
