@@ -8,8 +8,9 @@ import { generateRegOptions, verifyRegResponse, generateAuthOptions, verifyAuthR
 import { auth as authMiddleware } from '../middleware/auth'
 import { rateLimit } from '../middleware/rate-limit'
 import { audit } from '../services/audit'
+import { permissionGranted } from '@shared/permissions'
 import { authenticateBodySchema, addCredentialBodySchema, registerCredentialBodySchema, webauthnOptionsResponseSchema, webauthnLoginResponseSchema, webauthnCredentialsListResponseSchema } from '@protocol/schemas/webauthn'
-import { okResponseSchema } from '@protocol/schemas/common'
+import { okResponseSchema, errorResponseSchema } from '@protocol/schemas/common'
 import { publicErrors, authErrors } from '../openapi/helpers'
 
 const webauthn = new Hono<AppEnv>()
@@ -257,13 +258,43 @@ webauthn.delete('/credentials/:credId',
         },
       },
       400: { description: 'Invalid credential ID' },
+      409: {
+        description: 'Caller is an admin whose last passkey would be removed while requireForAdmins is on (code WEBAUTHN_CREDENTIAL_REQUIRED)',
+        content: {
+          'application/json': {
+            schema: resolver(errorResponseSchema),
+          },
+        },
+      },
     },
   }),
   async (c) => {
     const services = c.get('services')
     const pubkey = c.get('pubkey')
+    const permissions = c.get('permissions')
     const credId = decodeURIComponent(c.req.param('credId'))
     if (!credId) return c.json({ error: 'Invalid credential ID' }, 400)
+
+    // Self-lockout guard (#680, sibling of #672): once requireForAdmins is on, the auth
+    // middleware 403s every admin without a registered credential on every route except
+    // GET /auth/me, logout, and /webauthn/*. Deleting an admin's last remaining credential
+    // while that policy is active would lock them out with no way back in. Reject instead.
+    const isAdmin = permissionGranted(permissions, 'settings:manage')
+    if (isAdmin) {
+      const webauthnSettings = await services.identity.getWebAuthnSettings()
+      if (webauthnSettings.requireForAdmins === true) {
+        const { credentials } = await services.identity.getWebAuthnCredentials(pubkey)
+        const isLastCredential = credentials.some(cr => cr.id === credId) &&
+          credentials.filter(cr => cr.id !== credId).length === 0
+        if (isLastCredential) {
+          return c.json({
+            error: 'Cannot delete your last passkey while passkeys are required for admins',
+            code: 'WEBAUTHN_CREDENTIAL_REQUIRED',
+          }, 409)
+        }
+      }
+    }
+
     await services.identity.deleteWebAuthnCredential(pubkey, credId)
     await audit(services.audit, 'webauthnDeleted', pubkey, { credId }, { request: c.req.raw, hmacSecret: c.env.HMAC_SECRET })
     return c.json({ ok: true })
