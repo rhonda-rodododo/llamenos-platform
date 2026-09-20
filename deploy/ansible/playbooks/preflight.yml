@@ -338,20 +338,29 @@
         success_msg: "bridge_secret: [set, {{ bridge_secret | length }} chars]"
       when: (llamenos_asterisk_enabled | default(false) | bool) or (llamenos_sip_bridge_enabled | default(false) | bool)
 
-    - name: Assert ntfy_auth_token is set when ntfy is enabled
+    - name: Assert ntfy_domain is set when ntfy is enabled
       ansible.builtin.assert:
         that:
-          - ntfy_auth_token is defined
-          - ntfy_auth_token | length > 0
+          - ntfy_domain is defined
+          - ntfy_domain | length > 0
         fail_msg: |
-          REQUIRED: 'ntfy_auth_token' must be set when ntfy push relay is enabled.
+          REQUIRED: 'ntfy_domain' must be set when ntfy push relay is enabled.
+          This is the public hostname Caddy and Android devices use to reach
+          the broker (see roles/llamenos-ntfy).
 
-          Current value: {{ ntfy_auth_token | default('NOT SET') }}
+          Current value: {{ ntfy_domain | default('NOT SET') }}
 
-          To generate:
-            openssl rand -hex 32
-        success_msg: "ntfy_auth_token: [set, {{ ntfy_auth_token | length }} chars]"
+          Example:
+            ntfy_domain: "push.{{ domain }}"
+        success_msg: "ntfy_domain: {{ ntfy_domain | default('NOT SET') }}"
       when: llamenos_ntfy_enabled | default(false) | bool
+
+    # Unlike bridge_secret/signal_notifier_bearer_token below, ntfy_auth_token
+    # is intentionally NOT asserted here: ntfy only accepts bearer tokens it
+    # mints itself, so an operator-chosen value would be useless anyway.
+    # roles/llamenos-ntfy generates it on first deploy — see that role's
+    # tasks/main.yml — and it runs after preflight, so a hard requirement
+    # here would make every fresh ntfy-enabled deploy fail before it starts.
 
     - name: Assert signal_notifier_bearer_token is set when Signal is enabled
       ansible.builtin.assert:

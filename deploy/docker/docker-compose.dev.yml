@@ -105,7 +105,11 @@ services:
   # ── Optional: Ollama local inference (inference profile) ──
   # Start with: docker compose -f deploy/docker/docker-compose.dev.yml --profile inference up -d
   ollama:
-    image: ollama/ollama:0.6  # TODO: pin digest — run scripts/update-image-digests.sh once tag is published
+    # NOTE: "0.6" was never a published tag (see #722) — pinned to 0.6.0, the
+    # earliest published patch in the 0.6.x line. scripts/update-image-digests.sh
+    # is owned by a different lane and still lists the old ref; needs a
+    # follow-up from that lane so refreshes don't revert this pin.
+    image: ollama/ollama:0.6.0@sha256:5ff3909f83e01e5a13a0caa8269b484059e841abd9cfe9a86b079b5eae315866  # pinned 2026-09-19
     profiles: ["inference"]
     ports:
       - "11434:11434"
