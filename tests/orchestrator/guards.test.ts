@@ -780,6 +780,109 @@ describe('rail: fleet/review runs once per review label, not on every push', () 
 })
 
 /**
+ * #812: a release PR (knope, title `chore(release): v...`) was permanently
+ * unmergeable. `changes` (ci.yml) and its ios-e2e.yml twin both carried
+ * `if: "!startsWith(github.event.head_commit.message, 'chore(release):')"`,
+ * unconditionally, on a workflow that ALSO triggers on `pull_request` and
+ * `merge_group`. `github.event.head_commit` only exists on a `push`
+ * payload — on every other event it is `null`, and `startsWith(null, ...)`
+ * coerces to `startsWith('', ...)`, which is `false`, so the negated guard
+ * happened to evaluate to "run" there. That is an accident of null
+ * coercion, not a scoped condition: the day this job (or one shaped like
+ * it) gains any OTHER push-shaped trigger, or GitHub's null-coercion
+ * behavior for a removed context field ever changes, the same starvation
+ * reappears from a different angle. `ci-status`, `gitleaks`, `fleet/verify`
+ * and `fleet/review` are all REQUIRED contexts (ruleset 15885614); a
+ * required context that never reports blocks a merge exactly like a red
+ * one, and unlike a plain bug this one is invisible in a diff review — the
+ * guard reads correct in isolation, it only starves on the specific event
+ * type its author never pictured a release commit arriving as.
+ *
+ * The fix pins the scope explicitly instead of relying on the coercion:
+ * `github.event_name != 'push' || !startsWith(...)`. On `push`, behavior is
+ * unchanged (the original, since-#812 intent — see commit 60b1e6c69,
+ * `fix(security): audit R6 medium`, which introduced this exact guard on
+ * the (now-removed) `audit` job to skip its own then-adjacent `version` job
+ * on the automated release commit — knope's PR-based release flow, and
+ * therefore any `pull_request` shape for a release commit, did not exist
+ * yet). On every other event, the first clause short-circuits the guard to
+ * always-run, by construction rather than by what a missing field happens
+ * to coerce to.
+ */
+describe('rail: the release-commit guard never starves a pull_request/merge_group run (#812)', () => {
+  const workflowYaml = (file: string): string =>
+    readFileSync(join(process.cwd(), '.github', 'workflows', file), 'utf8')
+
+  /** Job block extraction — same convention as the other describe blocks in
+   *  this file: from a job's `  <name>:` header to the next job at the same
+   *  two-space indentation. */
+  function jobBlock(text: string, name: string): string {
+    const jobHeaderRe = /\n {2}([a-zA-Z0-9_-]+):\n/g
+    const starts: { name: string; index: number }[] = []
+    for (const m of text.matchAll(jobHeaderRe)) starts.push({ name: m[1] as string, index: m.index })
+    const at = starts.findIndex((s) => s.name === name)
+    if (at === -1) throw new Error(`no "${name}:" job found in this workflow file — the grep must not pass vacuously`)
+    const end = at + 1 < starts.length ? starts[at + 1]?.index : text.length
+    return text.slice(starts[at]?.index, end)
+  }
+
+  /** The JOB-level `if:` — four-space indentation, before `steps:`, matching
+   *  this file's other `jobLevelIf` helpers. */
+  function jobLevelIf(block: string): string {
+    const beforeSteps = block.split(/\n {4}steps:\n/)[0] ?? block
+    return beforeSteps.match(/\n {4}if:\s*(.+)/)?.[1] ?? ''
+  }
+
+  /**
+   * Evaluates ONLY the exact two-clause shape this guard is pinned to
+   * (`github.event_name != '<event>' || !startsWith(github.event.head_
+   * commit.message, '<prefix>')`), against a literal (event, message) pair.
+   * `headCommitMessage: null` models a payload where `head_commit` does not
+   * exist at all (every non-`push` event) — GitHub Actions' own null
+   * coercion for `startsWith` treats that as `''`, reproduced here rather
+   * than re-invoked, since no GitHub Actions expression engine is available
+   * in a unit test.
+   *
+   * Throwing when the shape doesn't match is deliberate, not a missing
+   * feature: re-adding the old unscoped guard (no `event_name` clause at
+   * all) must fail this rail, not silently pass it by falling through to
+   * some looser match.
+   */
+  function evalReleaseGuard(ifLine: string, eventName: string, headCommitMessage: string | null): boolean {
+    const m = ifLine.match(/^"?github\.event_name != '(\w+)' \|\| !startsWith\(github\.event\.head_commit\.message, '([^']+)'\)"?$/)
+    if (m === null) throw new Error(`"${ifLine}" does not match the expected two-clause, push-scoped guard shape`)
+    const pushEvent = m[1] as string
+    const prefix = m[2] as string
+    if (eventName !== pushEvent) return true
+    return !(headCommitMessage ?? '').startsWith(prefix)
+  }
+
+  for (const file of ['ci.yml', 'ios-e2e.yml']) {
+    it(`${file}'s "changes" job guard names github.event_name — not just the message`, () => {
+      const ifLine = jobLevelIf(jobBlock(workflowYaml(file), 'changes'))
+      expect(ifLine, `no if: found on ${file}'s changes job`).not.toBe('')
+      expect(ifLine).toContain("github.event_name != 'push'")
+    })
+
+    it(`${file}: a "chore(release):"-titled commit still yields a run on pull_request and merge_group (mutation: re-add the unscoped guard → this fails)`, () => {
+      const ifLine = jobLevelIf(jobBlock(workflowYaml(file), 'changes'))
+      // Original push-only intent preserved: a real release commit landing
+      // via push still skips this job.
+      expect(evalReleaseGuard(ifLine, 'push', 'chore(release): v1.2.3')).toBe(false)
+      // Any other push commit message still runs it.
+      expect(evalReleaseGuard(ifLine, 'push', 'fix: something')).toBe(true)
+      // pull_request, merge_group and workflow_dispatch never carry
+      // head_commit at all — the job must run regardless of what a
+      // release-shaped title would have said.
+      for (const eventName of ['pull_request', 'merge_group', 'workflow_dispatch']) {
+        expect(evalReleaseGuard(ifLine, eventName, null)).toBe(true)
+        expect(evalReleaseGuard(ifLine, eventName, 'chore(release): v1.2.3')).toBe(true)
+      }
+    })
+  }
+})
+
+/**
  * CodeQL `actions/cache-poisoning/poisonable-step` (3 HIGH alerts, PR #844
  * round 3, originally at the "Install dependencies", "Check the base
  * provides the gate" and "Verify" steps of `fleet-verify` back when it lived
@@ -1284,5 +1387,93 @@ describe('rail: decideReviewGate enforces the three fleet/review branches (cache
       ctx: { ...ctx(), pr: '7' }, prDiff: async () => diff, cache, requested: false, log: () => {},
     })
     expect(outcome.kind).toBe('not-requested')
+  })
+})
+
+/**
+ * `decideReviewGate` itself was never the bug (the suite above already
+ * proved every one of its branches, including a throwing cache lookup,
+ * degrades correctly). The real, observed failure — run 35403493398 on
+ * #630, and the same run class on #626 — was one step earlier: `bun
+ * orchestrator/src/cli.ts review-gate` a few steps into `fleet-review.yml`
+ * assumes the BASE checkout it runs from has both `orchestrator/src/cli.ts`
+ * and a `review-gate` command registered in it. GitHub does not refresh an
+ * open PR's `base.sha` on every push to the base branch — only on a
+ * synchronize/update event on the PR itself — so a PR nobody has touched in
+ * days (dependabot PRs routinely sit for weeks) can carry a `base.sha` from
+ * well before either landed on main, with nothing on the PR side having
+ * removed anything.
+ *
+ * #630's base predated `orchestrator/src/cli.ts` entirely → bun's own
+ * uncaught `error: Module not found`, no `outcome` output, job goes red
+ * with no diagnostic. #626's base had `cli.ts` but predated `review-gate`
+ * being registered in `HANDLERS` → `usage: llamenos-fleet <doctor|tick|...>`
+ * (no `review-gate` in the list), exit 2, same result. Because the crash
+ * happens INSIDE the gate step, the existing "Check the base provides the
+ * gate" step (guarding `review-ci`, further down, `if:
+ * steps.gate.outputs.outcome == 'run-engine'`) can never be reached to
+ * explain either case — `outcome` was never set.
+ *
+ * This rail pins the fix: a NEW, unconditional step — "Check the base
+ * provides the review gate itself" — runs BEFORE "Decide whether to run the
+ * review engine" and checks both failure shapes in bash (the only language
+ * that can run before bun has even confirmed `cli.ts` exists), turning a
+ * bare crash into one clear, actionable message.
+ */
+describe('rail: a base-provides-the-gate check runs BEFORE the gate step ever invokes bun', () => {
+  const fleetReviewYaml = (): string =>
+    readFileSync(join(process.cwd(), '.github', 'workflows', 'fleet-review.yml'), 'utf8')
+
+  const GUARD_STEP = '- name: Check the base provides the review gate itself'
+  const GATE_STEP = '- name: Decide whether to run the review engine'
+
+  function guardBlock(yaml: string): string {
+    const guardIdx = yaml.indexOf(GUARD_STEP)
+    const gateIdx = yaml.indexOf(GATE_STEP)
+    expect(guardIdx, 'bootstrap guard step not found — the grep must not pass vacuously').toBeGreaterThan(-1)
+    expect(gateIdx, 'gate step not found — the grep must not pass vacuously').toBeGreaterThan(-1)
+    expect(guardIdx, 'the guard must run BEFORE the gate step it protects').toBeLessThan(gateIdx)
+    return yaml.slice(guardIdx, gateIdx)
+  }
+
+  it('the guard step exists and precedes the gate step', () => {
+    // guardBlock() itself asserts both existence and ordering — a non-throw
+    // here already proves the property; this test names it explicitly so a
+    // failure reads as "ordering broke", not as an assertion buried in a
+    // helper used by every other test in this suite.
+    expect(() => guardBlock(fleetReviewYaml())).not.toThrow()
+  })
+
+  it('the guard checks cli.ts exists BEFORE ever invoking bun on it — the exact shape of the #630 crash', () => {
+    const block = guardBlock(fleetReviewYaml())
+    const fileCheckIdx = block.indexOf('if [ ! -f orchestrator/src/cli.ts ]')
+    const firstBunCallIdx = block.indexOf('bun orchestrator/src/cli.ts')
+    expect(fileCheckIdx, 'no file-existence check found').toBeGreaterThan(-1)
+    expect(firstBunCallIdx, 'no bun invocation found in the guard').toBeGreaterThan(-1)
+    expect(fileCheckIdx).toBeLessThan(firstBunCallIdx)
+  })
+
+  it('the guard checks the base\'s usage output for "review-gate" — the exact shape of the #626 crash', () => {
+    const block = guardBlock(fleetReviewYaml())
+    expect(block).toContain('*review-gate*')
+  })
+
+  // Never itself gated — same reasoning as "Decide whether to run the
+  // review engine" (see the rail on that step in the `describe` above): a
+  // guard that only runs conditionally could be skipped exactly when a
+  // stale base needs it most.
+  it('the guard step carries no step-level if: of its own — it must always run', () => {
+    const block = guardBlock(fleetReviewYaml())
+    expect(block).not.toMatch(/\n {8}if:/)
+  })
+
+  it('the guard fails closed with an actionable message naming the review label re-apply step, for both crash shapes', () => {
+    const block = guardBlock(fleetReviewYaml())
+    expect(block).toMatch(/exit 1/)
+    // Backtick-escaped in the YAML source itself (double-quoted bash
+    // string), so the raw file text carries a literal backslash before each
+    // backtick — matched here against that raw text, not the string bash
+    // would ultimately print.
+    expect(block).toContain('re-apply the \\`review\\` label')
   })
 })
