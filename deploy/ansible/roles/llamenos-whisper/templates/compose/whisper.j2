@@ -2,7 +2,7 @@ name: llamenos-whisper
 
 services:
   whisper:
-    image: {{ llamenos_whisper_image | default('fedirz/faster-whisper-server:0.4.1') }}
+    image: {{ llamenos_whisper_image | default('fedirz/faster-whisper-server:0.4.0-cpu@sha256:f77aaf85e2e811aae96a60b04c85ff7cb0e0f2be6729c6fd7600340842412539') }}
     restart: unless-stopped
     environment:
       - WHISPER__MODEL={{ whisper_model | default('Systran/faster-whisper-base') }}
