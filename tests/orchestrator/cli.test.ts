@@ -224,6 +224,13 @@ describe('systemd unit files reference real CLI subcommands', () => {
     expect(COMMANDS).toContain('plan')
     expect(COMMANDS).toContain('integrate')
   })
+
+  // `review-and-merge` is an OPERATOR command, run by hand against one named
+  // PR — never invoked by systemd, for the same reason `plan` isn't: this
+  // only asserts the CLI actually implements it.
+  it('review-and-merge is wired into the CLI dispatch table', () => {
+    expect(COMMANDS).toContain('review-and-merge')
+  })
 })
 
 const item = (id: string, title = `item ${id}`): WorkItem => ({ id, title, body: 'x', url: 'u', labels: [] })
