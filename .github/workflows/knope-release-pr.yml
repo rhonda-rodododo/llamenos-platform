@@ -3,16 +3,25 @@
 # with the next version bump and a CHANGELOG.md entry. Merging that PR
 # triggers release.yml to cut the actual release.
 #
-# Uses GITHUB_TOKEN with explicit write permissions on contents and
-# pull-requests. Requires the repo setting "Allow GitHub Actions to
-# create and approve pull requests" to be enabled.
+# Uses RELEASE_BOT_TOKEN (a fine-grained PAT with Contents:write and
+# Pull requests:write), NOT GITHUB_TOKEN.
 #
-# Caveat: PRs opened by GITHUB_TOKEN do NOT trigger downstream
-# `pull_request` workflow runs (GitHub anti-recursion rule), so CI will
-# not run on the release PR automatically. That's OK for this workflow
-# because the release PR's only diffs are package.json + CHANGELOG.md
-# on top of main, so main's CI state IS the release PR's effective CI
-# state. Verify main is green before merging the release PR.
+# Why: the repo's fork-PR approval policy is `all_external_contributors`,
+# which is load-bearing — this is a public repo and nearly every other
+# workflow runs on self-hosted runners, so that policy is what stops a fork
+# PR from executing code on our own infrastructure. GitHub counts
+# `github-actions[bot]` as an external contributor under that policy, so a
+# GITHUB_TOKEN-authored release PR parks all of its runs in `action_required`
+# and needs a manual "Approve and run" click before the required checks
+# (ci-status, gitleaks, CodeQL, fleet/verify) can even start. Authoring the
+# PR as a real collaborator via PAT sidesteps that gate without weakening it
+# for forks. It also retires the old anti-recursion caveat: a PAT-authored
+# PR triggers `pull_request` workflows normally.
+#
+# The PAT currently belongs to a human maintainer, which means release PRs
+# are self-authored. It moves to the fleet machine user (#773); that is a
+# rotation of this secret's value plus the git identity below, not a
+# workflow change.
 
 name: Knope — Prepare Release PR
 
@@ -25,9 +34,10 @@ concurrency:
   group: knope-prepare
   cancel-in-progress: true
 
+# GITHUB_TOKEN is only used to fetch the knope release binary; every write
+# goes through RELEASE_BOT_TOKEN.
 permissions:
-  contents: write
-  pull-requests: write
+  contents: read
 
 jobs:
   prepare-release:
@@ -42,19 +52,38 @@ jobs:
     # on at least one runner — the failure is per-runner/PATH, not "missing
     # binary". Same class of $HOME/PATH mismatch as the gitleaks, ansible-lint,
     # and dockerfile-scan self-hosted issues (see security-audit.yml). This
-    # job needs no self-hosted resources, so keep it hosted.
+    # job needs no self-hosted resources, so keep it hosted. The token
+    # preflight below also depends on `gh` being present.
     runs-on: ubuntu-latest
     steps:
+      # A PAT expires. Without this, an expired token would surface as a
+      # knope failure swallowed by the continue-on-error below, and the
+      # release PR would silently stop updating while this job stayed green.
+      - name: Verify release token
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_BOT_TOKEN }}
+        run: |
+          if [ -z "${GH_TOKEN}" ]; then
+            echo "::error::RELEASE_BOT_TOKEN is not set. Create a fine-grained PAT on this repo with Contents:write and Pull requests:write, then: gh secret set RELEASE_BOT_TOKEN"
+            exit 1
+          fi
+          if ! gh api user -q .login; then
+            echo "::error::RELEASE_BOT_TOKEN is set but rejected by the API — most likely expired or revoked. Reissue it and re-set the secret."
+            exit 1
+          fi
+
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.RELEASE_BOT_TOKEN }}
 
+      # Must match the account owning RELEASE_BOT_TOKEN; moves to the
+      # machine user when #773 lands.
       - name: Configure git identity
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config user.name "rhonda-rodododo"
+          git config user.email "rikki.schulte@gmail.com"
 
       - name: Install knope
         uses: knope-dev/action@19617851f9f13ab2f27a05989c55efb18aca3675 # v2.1.2
@@ -64,9 +93,10 @@ jobs:
 
       - name: Prepare release PR
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.RELEASE_BOT_TOKEN }}
         # continue-on-error so this job passes when there are no
         # version-bumping commits since the last release (knope errors
-        # out when PrepareRelease finds nothing to release).
+        # out when PrepareRelease finds nothing to release). Auth failures
+        # are caught by the Verify release token step above.
         continue-on-error: true
         run: knope prepare-release --verbose
