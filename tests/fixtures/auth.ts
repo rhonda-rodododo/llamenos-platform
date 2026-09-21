@@ -1,9 +1,19 @@
 /**
- * Per-role Playwright auth fixtures.
+ * Per-role Playwright auth fixtures — Playwright's standard session-reuse
+ * pattern (see https://playwright.dev/docs/auth): a real login happens exactly
+ * once per role, in the "bootstrap" project (tests/bootstrap.spec.ts), which
+ * saves storageState (encrypted device key in localStorage) to
+ * tests/storage/<role>.json. Every test that just needs to *be* logged in as
+ * that role consumes the cache here instead of re-driving the full login UI.
  *
- * Each role fixture provides an authenticated `page` via cached storageState
- * (localStorage + cookies from the bootstrap project). PIN entry happens per-test
- * for full isolation — no shared state between tests.
+ * This does NOT skip PIN entry: the app is zero-knowledge (device private keys
+ * are decrypted in memory only, via Rust/mock CryptoState, and that memory does
+ * not survive a fresh page — see docs/KNOWN_FLAKES.md#login-pin-race for the
+ * full explanation of why). What it DOES skip is the expensive PBKDF2 (600K
+ * iteration) cold-import that a from-scratch login requires — restoring the
+ * already-derived encrypted key from cache and unlocking it with the cached PIN
+ * is materially faster and removes a whole slow/racy code path. Each fixture
+ * still creates a FRESH browser context per test — full test isolation.
  *
  * Usage:
  *   import { test, expect } from '../fixtures/auth'
@@ -42,42 +52,28 @@ async function createAuthenticatedPage(
   })
   const page = await context.newPage()
 
-  // Block the token refresh endpoint initially to prevent restoreSession from getting
-  // an access token before we can enter the PIN. This ensures the app stays on the
-  // login page with the PIN form visible instead of auto-redirecting to dashboard.
-  let refreshBlocked = true
-  await page.route('**/api/auth/token/refresh', async (route) => {
-    if (refreshBlocked) {
-      await route.fulfill({
-        status: 401,
-        contentType: 'application/json',
-        body: '{"error":"blocked-during-setup"}',
-      })
-    } else {
-      await route.continue()
-    }
-  })
-
-  // Navigate to app
   await page.goto('/', { waitUntil: 'domcontentloaded' })
 
   const pinInput = page.getByTestId(TestIds.PIN_INPUT).locator('input')
   const pageTitle = page.getByTestId(TestIds.PAGE_TITLE)
   const profileSetupBtn = page.getByRole('button', { name: /complete setup/i })
+  const sidebar = page.getByTestId(TestIds.NAV_SIDEBAR)
 
-  // With refresh blocked, the app should show the login/PIN screen
+  // The cached localStorage always contains an *encrypted* key, so the app
+  // always needs a PIN to decrypt it into memory — there is no code path where
+  // it lands straight on the dashboard without one. Race pin/dashboard/profile
+  // anyway rather than assuming 'pin', so a genuine app regression (e.g. the
+  // cached key being rejected outright) surfaces as a clear state name instead
+  // of a raw locator timeout.
   const firstState = await Promise.race([
     pinInput.waitFor({ state: 'visible', timeout: 45000 }).then(() => 'pin' as const),
     pageTitle.waitFor({ state: 'visible', timeout: 45000 }).then(() => 'dashboard' as const),
     profileSetupBtn.waitFor({ state: 'visible', timeout: 45000 }).then(() => 'profile' as const),
+    sidebar.waitFor({ state: 'visible', timeout: 45000 }).then(() => 'dashboard' as const),
   ])
-
-  // Unblock refresh so the PIN unlock flow can call refreshToken and getUserInfo
-  refreshBlocked = false
 
   if (firstState === 'pin') {
     await enterPin(page, TEST_PIN)
-    // After PIN: PBKDF2 runs, then navigates to dashboard or profile-setup
     const afterPin = await Promise.race([
       pageTitle.waitFor({ state: 'visible', timeout: Timeouts.AUTH }).then(() => 'dashboard' as const),
       profileSetupBtn.waitFor({ state: 'visible', timeout: Timeouts.AUTH }).then(() => 'profile' as const),
@@ -89,11 +85,8 @@ async function createAuthenticatedPage(
     await completeProfileSetup(page)
   }
 
-  // Clean up the route handler
-  await page.unroute('**/api/auth/token/refresh')
-
   // Wait for the sidebar to confirm full auth is complete
-  await page.getByTestId(TestIds.NAV_SIDEBAR).waitFor({ state: 'visible', timeout: Timeouts.AUTH })
+  await sidebar.waitFor({ state: 'visible', timeout: Timeouts.AUTH })
 
   return { context, page }
 }

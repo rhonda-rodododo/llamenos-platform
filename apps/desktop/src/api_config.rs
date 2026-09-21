@@ -12,15 +12,21 @@
 //! `net.rs` reads the same value to enforce the network allowlist, so the
 //! address the user confirmed and the address traffic is allowed to reach can
 //! never diverge.
+//!
+//! Alongside the origin, this module persists the TLS certificate pins
+//! captured for it (#775, `cert_pin.rs`): `apiCertPins`, written atomically
+//! with `apiBaseUrl` by `api_config_set` and deleted together with it by
+//! `clear()`, so the two can never drift independently.
 
 use std::net::{Ipv4Addr, Ipv6Addr};
 
-use tauri::AppHandle;
+use tauri::{AppHandle, Manager};
 use tauri_plugin_store::StoreExt;
 use url::{Host, Url};
 
 const CONFIG_STORE: &str = "llamenos-api-config.json";
 const CONFIG_KEY: &str = "apiBaseUrl";
+const CONFIG_PINS_KEY: &str = "apiCertPins";
 
 /// Plain `http://` to a loopback host is permitted only in debug builds
 /// (`tauri:dev` against a local backend). A release build accepts `https://` only.
@@ -101,32 +107,70 @@ pub fn configured_origin(app: &AppHandle) -> Result<Option<Url>, String> {
     }
 }
 
+/// The stored certificate pins for the configured backend, or `None` if the
+/// key was never written — a corrupt or pre-#775 legacy config, which
+/// `net::load_or_reset_pinned_net` treats as invalid and clears. An empty
+/// array is valid: it means "no TLS pinning", the only case being the
+/// debug-only loopback `http://` backend (see `cert_pin::capture_pins`).
+pub fn configured_pins(app: &AppHandle) -> Result<Option<Vec<String>>, String> {
+    let store = app
+        .store(CONFIG_STORE)
+        .map_err(|e| format!("could not open config store: {e}"))?;
+    let Some(value) = store.get(CONFIG_PINS_KEY) else {
+        return Ok(None);
+    };
+    let pins: Vec<String> = serde_json::from_value(value)
+        .map_err(|e| format!("stored certificate pins are corrupt: {e}"))?;
+    for pin in &pins {
+        if !is_plausible_spki_pin(pin) {
+            return Err(format!(
+                "stored certificate pin does not look like a base64 SHA-256 hash: {pin}"
+            ));
+        }
+    }
+    Ok(Some(pins))
+}
+
+/// A base64 (standard) SHA-256 digest is always 44 characters — 43
+/// alphanumeric/`+`/`/` plus one trailing `=` pad. Mirrors
+/// `scripts/extract-cert-pins.sh`'s own `validate_pin`.
+fn is_plausible_spki_pin(pin: &str) -> bool {
+    pin.len() == 44
+        && pin.ends_with('=')
+        && pin.as_bytes()[..43]
+            .iter()
+            .all(|b| b.is_ascii_alphanumeric() || *b == b'+' || *b == b'/')
+}
+
 fn clear(app: &AppHandle) -> Result<(), String> {
     let store = app
         .store(CONFIG_STORE)
         .map_err(|e| format!("could not open config store: {e}"))?;
     store.delete(CONFIG_KEY);
+    store.delete(CONFIG_PINS_KEY);
     store
         .save()
         .map_err(|e| format!("could not save config store: {e}"))
 }
 
-/// Returns the configured backend origin, or `None` on first run. A stored
-/// value that fails validation is removed (and logged), returning the app to
-/// the first-run screen instead of leaving it wedged on an address it will
-/// refuse to contact.
+/// Logs `reason` and clears the stored config — the shared fail-closed path
+/// for an origin or pin set that no longer validates. Public so `net.rs` can
+/// reach it from `load_or_reset_pinned_net` without duplicating the log +
+/// clear pattern.
+pub(crate) fn warn_and_clear(app: &AppHandle, reason: &str) -> Result<(), String> {
+    tauri_plugin_log::log::warn!(
+        "{reason}; clearing it so the app returns to first-run configuration"
+    );
+    clear(app)
+}
+
+/// Returns the configured backend origin, or `None` on first run. Delegates
+/// to `net::load_or_reset_pinned_net`, which validates both the origin and
+/// its pins together and clears the whole config (returning to first-run)
+/// if either fails validation — see that function's docs.
 #[tauri::command]
 pub fn api_config_get(app: AppHandle) -> Result<Option<String>, String> {
-    match configured_origin(&app) {
-        Ok(origin) => Ok(origin.map(|u| u.origin().ascii_serialization())),
-        Err(e) => {
-            tauri_plugin_log::log::warn!(
-                "{e}; clearing it so the app returns to first-run configuration"
-            );
-            clear(&app)?;
-            Ok(None)
-        }
-    }
+    crate::net::load_or_reset_pinned_net(&app)
 }
 
 /// First-run gate shared by `api_config_set` and `net_probe_health`: both are
@@ -145,24 +189,46 @@ pub fn require_unconfigured(stored: Option<&str>) -> Result<(), String> {
 /// changing servers means `api_config_clear` first (which the frontend pairs
 /// with ending the session), so an address can never be swapped underneath a
 /// live session.
+///
+/// Also TOFU-pins the backend's TLS certificate (#775): before anything is
+/// persisted, `net::capture_and_install_pins` makes one connection, requires
+/// a real `2xx` from `/api/health`, and records the certificate's SPKI
+/// hash(es). If that fails — unreachable backend, or a plaintext scheme this
+/// build refuses — nothing is stored, matching the existing "invalid address"
+/// rejection path. Origin and pins are then written together in one
+/// `store.save()`, so they can never be observed out of sync.
 #[tauri::command]
-pub fn api_config_set(app: AppHandle, url: String) -> Result<String, String> {
+pub async fn api_config_set(app: AppHandle, url: String) -> Result<String, String> {
     require_unconfigured(stored_address(&app)?.as_deref())?;
     let origin = validate_backend_origin(&url, ALLOW_LOOPBACK_HTTP)?;
+    let target = Url::parse(&origin).map_err(|e| format!("invalid backend address: {e}"))?;
+
+    let pins = crate::net::capture_and_install_pins(&app, &target)
+        .await
+        .map_err(|e| format!("could not verify the backend's certificate: {e}"))?;
+
     let store = app
         .store(CONFIG_STORE)
         .map_err(|e| format!("could not open config store: {e}"))?;
     store.set(CONFIG_KEY, origin.clone());
+    store.set(
+        CONFIG_PINS_KEY,
+        serde_json::to_value(&pins)
+            .map_err(|e| format!("could not serialize certificate pins: {e}"))?,
+    );
     store
         .save()
         .map_err(|e| format!("could not save config store: {e}"))?;
     Ok(origin)
 }
 
-/// Forgets the backend address, returning the app to first-run configuration.
+/// Forgets the backend address (and its pins), returning the app to
+/// first-run configuration.
 #[tauri::command]
 pub fn api_config_clear(app: AppHandle) -> Result<(), String> {
-    clear(&app)
+    clear(&app)?;
+    app.state::<crate::net::PinnedNet>().clear();
+    Ok(())
 }
 
 #[cfg(test)]
