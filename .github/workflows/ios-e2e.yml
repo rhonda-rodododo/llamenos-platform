@@ -27,6 +27,12 @@ env:
 
 jobs:
   # ─── Detect Changed Files ─────────────────────────────────────
+  # Delegates to the SAME path map ci.yml's `changes` job uses — see
+  # .github/scripts/detect-changed-platforms.sh for the single source of
+  # truth (#664). Consolidated from what used to be this workflow's own
+  # `ios_related` regex. This workflow stays on `workflow_dispatch` only
+  # (see the header comment above `on:`) — that is an independent, deliberate
+  # decision pending #661, unrelated to the path-map consolidation here.
   changes:
     runs-on: ubuntu-latest
     permissions:
@@ -40,31 +46,37 @@ jobs:
     if: "github.event_name != 'push' || !startsWith(github.event.head_commit.message, 'chore(release):')"
 
     outputs:
-      ios_related: ${{ steps.filter.outputs.ios_related }}
+      ios_related: ${{ steps.filter.outputs.ios }}
 
     steps:
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
-          fetch-depth: 2
+          fetch-depth: 0
 
       - name: Detect changes
         id: filter
         run: |
-          CHANGED=$(git diff --name-only HEAD^ HEAD 2>/dev/null || git diff --name-only HEAD)
-          echo "Changed files:"
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            BASE="${{ github.event.pull_request.base.sha }}"
+            HEAD="${{ github.event.pull_request.head.sha }}"
+          else
+            BASE="${{ github.event.before }}"
+            HEAD="${{ github.event.after }}"
+          fi
+
+          if [[ -z "$BASE" ]] || ! git cat-file -e "$BASE" 2>/dev/null; then
+            BASE="HEAD^"
+          fi
+          if [[ -z "$HEAD" ]] || ! git cat-file -e "$HEAD" 2>/dev/null; then
+            HEAD="HEAD"
+          fi
+
+          CHANGED=$(git diff --name-only "$BASE" "$HEAD" 2>/dev/null || git diff --name-only HEAD)
+          echo "Changed files ($BASE..$HEAD):"
           echo "$CHANGED"
 
-          IOS_RELATED="false"
-          while IFS= read -r file; do
-            [[ -z "$file" ]] && continue
-            if echo "$file" | grep -qE "^apps/ios/|^packages/crypto/|^packages/protocol/|^packages/i18n/|^apps/worker/|^packages/shared/"; then
-              IOS_RELATED="true"
-              echo "iOS-related file changed: $file"
-            fi
-          done <<< "$CHANGED"
-
-          echo "ios_related=$IOS_RELATED" >> "$GITHUB_OUTPUT"
+          printf '%s\n' "$CHANGED" | bash .github/scripts/detect-changed-platforms.sh | tee -a "$GITHUB_OUTPUT"
 
   # ─── Build App + Backend Once ──────────────────────────────────
   ios-e2e-build:
@@ -112,7 +124,7 @@ jobs:
 
       - name: Install Rust stable (for crypto xcframework)
         if: steps.xcframework-cache.outputs.cache-hit != 'true'
-        uses: dtolnay/rust-toolchain@67ef31d5b988238dd797d409d6f9574278e20537 # stable
+        uses: dtolnay/rust-toolchain@02cb101ec7c40f2c49e1d9714d64511d8e1b74de # stable
         with:
           toolchain: stable
           targets: aarch64-apple-ios,aarch64-apple-ios-sim

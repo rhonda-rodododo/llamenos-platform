@@ -16,6 +16,7 @@ import { dispatch as dispatchWorker, type EffortLevel } from './engines.js'
 import { verifyMechanical } from './verify.js'
 import { secondOpinion, postReview } from './review.js'
 import { artifactReviewCache } from './review-cache.js'
+import { runReviewAndMerge, defaultReviewAndMergeDeps, describeOutcome } from './review-and-merge.js'
 import {
   runVerifyCi, runReviewCi, decideReviewGate, ciContextFromEnv, ciDiff,
   REVIEW_JOB, REVIEW_KEY_ENV, VERIFY_JOB, itemIdFromBranch, fleetBranchFor, legacyFleetBranchFor,
@@ -34,6 +35,7 @@ import { tick, type TickDeps, type TickResult, type SettleInput, type DispatchOu
 import type { WorkItem } from './source.js'
 import { renderDigest, resumeCommand, waitingOnHuman, type DigestInput, type LaneStatus } from './digest.js'
 import { deriveItemStatus, renderItemStatus, type PrFacts, type PrState } from './status.js'
+import { runBoard } from './board.js'
 import { notify } from './notify.js'
 import { FLEET_DIR, LOG_FILE, HALT_REASON_FILE, DISPATCH_SCRIPT, FLEET_ENV_FILE } from './paths.js'
 import { REPO, gh, ghJson } from './gh.js'
@@ -1260,6 +1262,28 @@ async function runReviewGate(): Promise<number> {
   return 0
 }
 
+/**
+ * `llamenos-fleet review-and-merge <pr>` — see review-and-merge.ts's own
+ * module comment for the full design. This wrapper is deliberately thin:
+ * argv parsing and the exit code only, everything else lives in
+ * `runReviewAndMerge` over injected deps so it is unit-tested without a real
+ * `gh`/`git`/`claude` in sight.
+ *
+ * Exit 0 only for `merged` and `already-merged` — every other outcome
+ * (`needs-codeowner`, `not-mergeable`) is a REFUSAL to merge, stated on
+ * stdout via `describeOutcome`, and must read as non-zero to a caller
+ * scripting around this command.
+ */
+async function runReviewAndMergeCommand(pr: string | undefined): Promise<number> {
+  if (pr === undefined) {
+    process.stderr.write('usage: llamenos-fleet review-and-merge <pr>\n')
+    return 2
+  }
+  const outcome = await runReviewAndMerge(pr, defaultReviewAndMergeDeps(REPO_ROOT, log))
+  process.stdout.write(`${describeOutcome(outcome)}\n`)
+  return outcome.kind === 'merged' || outcome.kind === 'already-merged' ? 0 : 1
+}
+
 type CommandHandler = (rest: string[]) => Promise<number> | number
 
 /**
@@ -1312,8 +1336,14 @@ const HANDLERS: Record<string, CommandHandler> = {
     cache: artifactReviewCache(process.env['FLEET_REVIEW_CACHE_DIR'], ciLog),
   })),
   'review-gate': () => runReviewGate(),
+  'review-and-merge': (rest) => runReviewAndMergeCommand(rest[0]),
   plan: () => runPlan(),
   integrate: () => runIntegrate(),
+  // The deterministic gate decision table (board.ts) — read-only: derives
+  // every PR's action live from `gh` and the fleet's own halt state, never
+  // labels/approves/merges/re-runs anything. `--porcelain` anywhere in argv
+  // selects the machine-readable form.
+  board: (rest) => runBoard(rest),
 }
 
 /** Every subcommand name this CLI actually implements — see `HANDLERS`. */

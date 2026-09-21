@@ -82,6 +82,22 @@ describe('CORS production defaults', () => {
     expect(res.headers.get('Access-Control-Allow-Origin')).toBeNull()
   })
 
+  // Regression test for GHSA-88fw-hqm2-52qc (hono/cors reflecting any Origin
+  // with credentials when `origin` defaults to the wildcard). This app never
+  // uses hono's built-in `cors()` middleware — it has its own allow-list
+  // implementation above — but this test asserts the boundary directly so a
+  // future refactor toward hono/cors (or a regression in this file) cannot
+  // silently reintroduce the same class of bug: a disallowed Origin must
+  // never be reflected back, and must never receive credentialed CORS.
+  it('does not reflect a disallowed Origin and does not grant credentials (GHSA-88fw-hqm2-52qc boundary)', async () => {
+    const { app, env } = makeApp()
+    const res = await req(app, env, 'https://evil.com')
+    expect(res.headers.get('Access-Control-Allow-Origin')).not.toBe('https://evil.com')
+    expect(res.headers.get('Access-Control-Allow-Origin')).toBeNull()
+    expect(res.headers.get('Access-Control-Allow-Credentials')).not.toBe('true')
+    expect(res.headers.get('Access-Control-Allow-Credentials')).toBeNull()
+  })
+
   it('rejects http downgrade of allowed origin', async () => {
     const { app, env } = makeApp()
     const res = await req(app, env, 'http://app.llamenos.org')

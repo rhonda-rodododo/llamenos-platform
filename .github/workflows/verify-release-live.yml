@@ -1,0 +1,688 @@
+# Verify Release Live — asserts the Internal Availability distribution
+# surface actually works, end to end, against deployed/live state.
+#
+# Every distribution failure found in the release audit — the swallowed
+# dispatch (#711), the broken Android build steps (#757), the no-op
+# TestFlight upload (#743) — persisted undetected because CI was green
+# throughout. None of ci.yml's 17 jobs touch distribution; they check that
+# the SOURCE builds and tests, never that a tester can install anything.
+# This workflow is the missing check (#721).
+#
+# Four independent surfaces, four independent jobs:
+#   1. desktop-updater — the canonical Tauri updater manifest resolves,
+#      and every platform binary it points at downloads and matches the
+#      published CHECKSUMS.txt.
+#   2. staging-backend — the staging backend's health probes are up and
+#      /api/config reports demoMode: true.
+#   3. play-track — the Play Console internal track's live versionCode
+#      matches what the most recent mobile-release.yml run targeted for
+#      the most recent GitHub Release (recorded as android-build-meta.json
+#      on that release).
+#   4. testflight — same idea for the TestFlight build number, via
+#      ios-build-meta.json.
+#
+# Hard rule (project memory "audit gates by breaking them" + this issue's
+# AC): a check that cannot run because a credential or a required target
+# is not configured FAILS. It never reports green by skipping — that is
+# exactly the shape of bug this workflow exists to catch.
+#
+# The `*_override` / fixture inputs below exist ONLY to prove this
+# workflow's own logic is correct before real infra exists to point it
+# at (see #721's "audit gates by breaking them" evidence requirement).
+# Scheduled runs never set them, so scheduled runs always evaluate real
+# production state with real credentials.
+
+name: Verify Release Live
+
+on:
+  schedule:
+    - cron: "23 */6 * * *"
+  workflow_dispatch:
+    inputs:
+      updater_url:
+        description: "Override the desktop updater manifest URL (testing only; a http://127.0.0.1 URL also spins up a matching local CHECKSUMS.txt fixture)"
+        required: false
+        type: string
+      staging_base_url:
+        description: "Override the staging backend base URL (testing only)"
+        required: false
+        type: string
+      play_api_base_url:
+        description: "Override the Android Publisher API base URL (testing only, points at a local fixture server)"
+        required: false
+        type: string
+      play_service_account_json:
+        description: "Override the Play service account JSON contents (testing only — production uses secrets.PLAY_SERVICE_ACCOUNT)"
+        required: false
+        type: string
+      expected_versioncode_override:
+        description: "Override the expected Play versionCode instead of reading it from the latest release's android-build-meta.json (testing only)"
+        required: false
+        type: string
+      appstoreconnect_api_base_url:
+        description: "Override the App Store Connect API base URL (testing only, points at a local fixture server)"
+        required: false
+        type: string
+      apple_api_key_base64:
+        description: "Override the base64 App Store Connect P8 key (testing only — production uses secrets.APPLE_API_KEY_BASE64)"
+        required: false
+        type: string
+      apple_api_key_id:
+        description: "Override the App Store Connect key id (testing only — production uses secrets.APPLE_API_KEY_ID)"
+        required: false
+        type: string
+      apple_api_issuer_id:
+        description: "Override the App Store Connect issuer id (testing only — production uses secrets.APPLE_API_ISSUER_ID)"
+        required: false
+        type: string
+      expected_build_number_override:
+        description: "Override the expected TestFlight build number instead of reading it from the latest release's ios-build-meta.json (testing only)"
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  # ─── Surface 1: Desktop updater ──────────────────────────────────
+  desktop-updater:
+    name: "Surface 1 — Desktop updater artifacts"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Start local fixture server (testing only)
+        if: ${{ inputs.updater_url != '' && startsWith(inputs.updater_url, 'http://127.0.0.1') }}
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/fixture/desktop/v9.9.9
+          cd /tmp/fixture/desktop
+          echo "fixture desktop binary payload $$" > v9.9.9/llamenos_9.9.9_amd64.AppImage
+          SHA=$(sha256sum v9.9.9/llamenos_9.9.9_amd64.AppImage | awk '{print $1}')
+          printf '%s  llamenos_9.9.9_amd64.AppImage\n' "$SHA" > v9.9.9/CHECKSUMS.txt
+          cat > latest.json << 'EOF'
+          {
+            "version": "9.9.9",
+            "notes": "fixture — verify-release-live.yml self-test",
+            "pub_date": "2026-01-01T00:00:00Z",
+            "platforms": {
+              "linux-x86_64": {
+                "signature": "fixture",
+                "url": "http://127.0.0.1:8931/v9.9.9/llamenos_9.9.9_amd64.AppImage"
+              }
+            }
+          }
+          EOF
+          nohup python3 -m http.server 8931 --directory /tmp/fixture/desktop >/tmp/fixture-desktop.log 2>&1 &
+          for _ in $(seq 1 20); do
+            curl -sf http://127.0.0.1:8931/latest.json -o /dev/null && break
+            sleep 0.25
+          done
+          # CHECKSUMS.txt lives alongside latest.json on the same fixture
+          # server, so the check step's default base URL just needs to
+          # point at this host instead of the real llamenos-releases repo.
+          echo "CHECKSUMS_BASE=http://127.0.0.1:8931" >> "$GITHUB_ENV"
+
+      - name: Fetch canonical latest.json and verify every platform artifact
+        env:
+          UPDATER_URL: ${{ inputs.updater_url || 'https://updates.llamenos.org/desktop/latest.json' }}
+          CHECKSUMS_BASE: ${{ env.CHECKSUMS_BASE || 'https://raw.githubusercontent.com/rhonda-rodododo/llamenos-releases/main/desktop' }}
+        run: |
+          set -euo pipefail
+          echo "Manifest: $UPDATER_URL"
+
+          if ! curl -fsS --max-time 20 "$UPDATER_URL" -o manifest.json; then
+            echo "::error::SURFACE BROKEN: desktop updater — $UPDATER_URL is not reachable"
+            exit 1
+          fi
+
+          VERSION=$(jq -r '.version // empty' manifest.json)
+          if [ -z "$VERSION" ]; then
+            echo "::error::SURFACE BROKEN: desktop updater — manifest has no .version field"
+            exit 1
+          fi
+          echo "Manifest version: $VERSION"
+
+          CHECKSUMS_URL="${CHECKSUMS_BASE}/v${VERSION}/CHECKSUMS.txt"
+          echo "Checksums: $CHECKSUMS_URL"
+          if ! curl -fsS --max-time 20 "$CHECKSUMS_URL" -o CHECKSUMS.txt; then
+            echo "::error::SURFACE BROKEN: desktop updater — CHECKSUMS.txt not found at $CHECKSUMS_URL for version $VERSION"
+            exit 1
+          fi
+
+          PLATFORMS=$(jq -r '.platforms | keys[]' manifest.json)
+          if [ -z "$PLATFORMS" ]; then
+            echo "::error::SURFACE BROKEN: desktop updater — manifest has no platforms entries"
+            exit 1
+          fi
+
+          FAILED=0
+          while IFS= read -r PLATFORM; do
+            URL=$(jq -r --arg p "$PLATFORM" '.platforms[$p].url // empty' manifest.json)
+            if [ -z "$URL" ]; then
+              echo "::error::SURFACE BROKEN: desktop updater — platform $PLATFORM has no url"
+              FAILED=1
+              continue
+            fi
+            FILE=$(basename "$URL")
+            echo "  [$PLATFORM] $URL"
+
+            HTTP_CODE=$(curl -sS -o "$FILE" --max-time 120 -w '%{http_code}' "$URL" || echo "000")
+            if [ "$HTTP_CODE" != "200" ]; then
+              echo "::error::SURFACE BROKEN: desktop updater — $PLATFORM artifact returned HTTP $HTTP_CODE ($URL)"
+              FAILED=1
+              continue
+            fi
+
+            EXPECTED=$(awk -v f="$FILE" '$2==f {print $1; exit}' CHECKSUMS.txt)
+            if [ -z "$EXPECTED" ]; then
+              echo "::error::SURFACE BROKEN: desktop updater — no CHECKSUMS.txt entry for $FILE (platform $PLATFORM)"
+              FAILED=1
+              continue
+            fi
+
+            ACTUAL=$(sha256sum "$FILE" | awk '{print $1}')
+            if [ "$ACTUAL" != "$EXPECTED" ]; then
+              echo "::error::SURFACE BROKEN: desktop updater — $FILE sha256 mismatch for $PLATFORM (expected $EXPECTED, got $ACTUAL)"
+              FAILED=1
+              continue
+            fi
+            echo "    OK: $FILE sha256 matches CHECKSUMS.txt"
+            rm -f "$FILE"
+          done <<< "$PLATFORMS"
+
+          if [ "$FAILED" != "0" ]; then
+            exit 1
+          fi
+          echo "All platform artifacts verified against CHECKSUMS.txt."
+
+  # ─── Surface 2: Staging backend ──────────────────────────────────
+  staging-backend:
+    name: "Surface 2 — Staging backend health + demo mode"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Start local fixture server (testing only)
+        if: ${{ inputs.staging_base_url != '' && startsWith(inputs.staging_base_url, 'http://127.0.0.1') }}
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/fixture
+          cat > /tmp/fixture/staging_server.py << 'PYEOF'
+          import http.server
+          import json
+
+
+          class Handler(http.server.BaseHTTPRequestHandler):
+              def do_GET(self):
+                  if self.path in ("/health/ready", "/health/live"):
+                      body = json.dumps({"status": "ok"}).encode()
+                  elif self.path == "/api/config":
+                      body = json.dumps({"demoMode": True}).encode()
+                  else:
+                      self.send_response(404)
+                      self.end_headers()
+                      return
+                  self.send_response(200)
+                  self.send_header("Content-Type", "application/json")
+                  self.send_header("Content-Length", str(len(body)))
+                  self.end_headers()
+                  self.wfile.write(body)
+
+              def log_message(self, *args):
+                  pass
+
+
+          http.server.HTTPServer(("127.0.0.1", 8932), Handler).serve_forever()
+          PYEOF
+          nohup python3 /tmp/fixture/staging_server.py >/tmp/fixture-staging.log 2>&1 &
+          for _ in $(seq 1 20); do
+            curl -sf http://127.0.0.1:8932/health/ready -o /dev/null && break
+            sleep 0.25
+          done
+
+      - name: Verify /health/ready, /health/live, and /api/config demoMode
+        env:
+          STAGING_BASE_URL: ${{ inputs.staging_base_url || vars.STAGING_BASE_URL }}
+        run: |
+          set -euo pipefail
+          if [ -z "${STAGING_BASE_URL:-}" ]; then
+            echo "::error::SURFACE BROKEN: staging backend — no staging base URL is configured (vars.STAGING_BASE_URL is unset); refusing to report green without checking"
+            exit 1
+          fi
+          BASE="${STAGING_BASE_URL%/}"
+          FAILED=0
+
+          for path in /health/ready /health/live; do
+            CODE=$(curl -sS -o /tmp/health-resp.json --max-time 15 -w '%{http_code}' "${BASE}${path}" || echo "000")
+            if [ "$CODE" != "200" ]; then
+              echo "::error::SURFACE BROKEN: staging backend — ${path} returned HTTP $CODE"
+              FAILED=1
+            else
+              echo "OK: ${path} -> 200"
+            fi
+          done
+
+          CODE=$(curl -sS -o /tmp/config-resp.json --max-time 15 -w '%{http_code}' "${BASE}/api/config" || echo "000")
+          if [ "$CODE" != "200" ]; then
+            echo "::error::SURFACE BROKEN: staging backend — /api/config returned HTTP $CODE"
+            FAILED=1
+          else
+            DEMO_MODE=$(jq -r '.demoMode // empty' /tmp/config-resp.json 2>/dev/null || echo "")
+            if [ "$DEMO_MODE" != "true" ]; then
+              echo "::error::SURFACE BROKEN: staging backend — /api/config demoMode is '${DEMO_MODE:-<missing>}', expected true"
+              FAILED=1
+            else
+              echo "OK: /api/config demoMode=true"
+            fi
+          fi
+
+          if [ "$FAILED" != "0" ]; then
+            exit 1
+          fi
+
+  # ─── Surface 3: Play Console internal track ──────────────────────
+  play-track:
+    name: "Surface 3 — Play internal track versionCode"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (package name only)
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          sparse-checkout: |
+            apps/android/fastlane/Appfile
+          sparse-checkout-cone-mode: false
+
+      - name: Start local fixture Play API server (testing only)
+        if: ${{ inputs.play_api_base_url != '' }}
+        env:
+          FIXTURE_VERSION_CODE: ${{ inputs.expected_versioncode_override || '424242' }}
+        run: |
+          set -euo pipefail
+          cat > /tmp/mock_play.py << 'PYEOF'
+          import http.server
+          import json
+          import os
+
+          VERSION_CODE = os.environ["FIXTURE_VERSION_CODE"]
+
+
+          class Handler(http.server.BaseHTTPRequestHandler):
+              def _send(self, obj, code=200):
+                  body = json.dumps(obj).encode()
+                  self.send_response(code)
+                  self.send_header("Content-Type", "application/json")
+                  self.send_header("Content-Length", str(len(body)))
+                  self.end_headers()
+                  self.wfile.write(body)
+
+              def do_POST(self):
+                  if self.path == "/token":
+                      self._send({"access_token": "fixture", "token_type": "Bearer", "expires_in": 3600})
+                  elif self.path.endswith("/edits"):
+                      self._send({"id": "fixture-edit", "expiryTimeSeconds": "3600"})
+                  else:
+                      self._send({"error": "not found"}, 404)
+
+              def do_GET(self):
+                  if self.path.endswith("/tracks/internal"):
+                      self._send({"track": "internal", "releases": [
+                          {"status": "completed", "versionCodes": [VERSION_CODE]},
+                      ]})
+                  else:
+                      self._send({"error": "not found"}, 404)
+
+              def do_DELETE(self):
+                  self.send_response(204)
+                  self.end_headers()
+
+              def log_message(self, *args):
+                  pass
+
+
+          http.server.HTTPServer(("127.0.0.1", 8933), Handler).serve_forever()
+          PYEOF
+          nohup python3 /tmp/mock_play.py >/tmp/mock-play.log 2>&1 &
+          for _ in $(seq 1 20); do
+            curl -sf -X POST http://127.0.0.1:8933/token -o /dev/null && break
+            sleep 0.25
+          done
+
+      - name: Determine expected versionCode from the latest GitHub Release
+        id: expected
+        env:
+          GH_TOKEN: ${{ github.token }}
+          OVERRIDE: ${{ inputs.expected_versioncode_override }}
+        run: |
+          set -euo pipefail
+          if [ -n "$OVERRIDE" ]; then
+            echo "tag=fixture" >> "$GITHUB_OUTPUT"
+            echo "version_code=$OVERRIDE" >> "$GITHUB_OUTPUT"
+            echo "Using overridden expected versionCode: $OVERRIDE (testing only)"
+            exit 0
+          fi
+
+          TAG=$(gh release list --repo "$GITHUB_REPOSITORY" --limit 1 --json tagName --jq '.[0].tagName')
+          if [ -z "$TAG" ]; then
+            echo "::error::SURFACE BROKEN: Play internal track — no GitHub Release exists to compare against"
+            exit 1
+          fi
+
+          mkdir -p /tmp/relmeta
+          if ! gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern android-build-meta.json --dir /tmp/relmeta --clobber 2>/tmp/dl.err; then
+            echo "::error::SURFACE BROKEN: Play internal track — release $TAG has no android-build-meta.json; mobile-release.yml never recorded what versionCode it targeted for this release"
+            cat /tmp/dl.err || true
+            exit 1
+          fi
+
+          VC=$(jq -r '.versionCode' /tmp/relmeta/android-build-meta.json)
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version_code=$VC" >> "$GITHUB_OUTPUT"
+          echo "Latest release $TAG targeted versionCode $VC"
+
+      - name: Query live Play Console internal track and compare
+        env:
+          PLAY_API_BASE: ${{ inputs.play_api_base_url || 'https://androidpublisher.googleapis.com' }}
+          PLAY_SERVICE_ACCOUNT_JSON: ${{ inputs.play_service_account_json || secrets.PLAY_SERVICE_ACCOUNT }}
+          EXPECTED_VC: ${{ steps.expected.outputs.version_code }}
+          EXPECTED_TAG: ${{ steps.expected.outputs.tag }}
+        run: |
+          set -euo pipefail
+          if [ -z "${PLAY_SERVICE_ACCOUNT_JSON:-}" ]; then
+            echo "::error::SURFACE BROKEN: Play internal track — no Play service account credential is configured (secrets.PLAY_SERVICE_ACCOUNT is unset); refusing to report green without checking"
+            exit 1
+          fi
+
+          PKG=$(grep -oE 'package_name\("[^"]+"\)' apps/android/fastlane/Appfile | sed -E 's/package_name\("([^"]+)"\)/\1/')
+          if [ -z "$PKG" ]; then
+            echo "::error::SURFACE BROKEN: Play internal track — could not determine the Android package name from apps/android/fastlane/Appfile"
+            exit 1
+          fi
+          echo "Package: $PKG"
+
+          echo "$PLAY_SERVICE_ACCOUNT_JSON" > /tmp/play-sa.json
+          # --break-system-packages: ubuntu-latest runners ship a
+          # PEP 668 "externally-managed-environment" system Python; this
+          # is a throwaway CI container, not a managed system, so a
+          # global pip install here is safe.
+          pip install --quiet --disable-pip-version-check --break-system-packages google-auth requests
+
+          cat > /tmp/play_check.py << 'PYEOF'
+          import json
+          import sys
+
+          from google.auth.transport.requests import AuthorizedSession
+          from google.oauth2 import service_account
+
+          pkg, api_base = sys.argv[1], sys.argv[2]
+
+          info = json.load(open("/tmp/play-sa.json"))
+          creds = service_account.Credentials.from_service_account_info(
+              info, scopes=["https://www.googleapis.com/auth/androidpublisher"]
+          )
+          session = AuthorizedSession(creds)
+          base = f"{api_base}/androidpublisher/v3/applications/{pkg}"
+
+          resp = session.post(f"{base}/edits", timeout=20)
+          resp.raise_for_status()
+          edit_id = resp.json()["id"]
+
+          resp = session.get(f"{base}/edits/{edit_id}/tracks/internal", timeout=20)
+          resp.raise_for_status()
+          releases = resp.json().get("releases", [])
+
+          try:
+              session.delete(f"{base}/edits/{edit_id}", timeout=20)
+          except Exception:
+              pass  # best-effort cleanup; unpublished edits auto-expire
+
+          codes = [int(v) for rel in releases for v in rel.get("versionCodes", [])]
+          if not codes:
+              print("no releases/versionCodes on the internal track", file=sys.stderr)
+              sys.exit(1)
+          print(max(codes))
+          PYEOF
+
+          set +e
+          ACTUAL_VC=$(python3 /tmp/play_check.py "$PKG" "$PLAY_API_BASE" 2>/tmp/play_check.err)
+          RC=$?
+          set -e
+          if [ "$RC" != "0" ]; then
+            echo "::error::SURFACE BROKEN: Play internal track — could not query the Play Console API ($(tail -1 /tmp/play_check.err))"
+            exit 1
+          fi
+
+          echo "Live internal track versionCode: $ACTUAL_VC (expected $EXPECTED_VC from release $EXPECTED_TAG)"
+          if [ "$ACTUAL_VC" != "$EXPECTED_VC" ]; then
+            echo "::error::SURFACE BROKEN: Play internal track — live versionCode $ACTUAL_VC != expected $EXPECTED_VC (release $EXPECTED_TAG)"
+            exit 1
+          fi
+          echo "OK: Play internal track versionCode matches release $EXPECTED_TAG"
+
+  # ─── Surface 4: TestFlight ────────────────────────────────────────
+  testflight:
+    name: "Surface 4 — TestFlight build number"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (bundle identifier only)
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          sparse-checkout: |
+            apps/ios/fastlane/Appfile
+          sparse-checkout-cone-mode: false
+
+      - name: Start local fixture App Store Connect API server (testing only)
+        if: ${{ inputs.appstoreconnect_api_base_url != '' }}
+        env:
+          FIXTURE_BUILD_NUMBER: ${{ inputs.expected_build_number_override || '424242' }}
+        run: |
+          set -euo pipefail
+          cat > /tmp/mock_apple.py << 'PYEOF'
+          import http.server
+          import json
+          import os
+          from urllib.parse import urlparse
+
+          BUILD_NUMBER = os.environ["FIXTURE_BUILD_NUMBER"]
+
+
+          class Handler(http.server.BaseHTTPRequestHandler):
+              def _send(self, obj, code=200):
+                  body = json.dumps(obj).encode()
+                  self.send_response(code)
+                  self.send_header("Content-Type", "application/json")
+                  self.send_header("Content-Length", str(len(body)))
+                  self.end_headers()
+                  self.wfile.write(body)
+
+              def do_GET(self):
+                  path = urlparse(self.path).path
+                  if path == "/v1/apps":
+                      self._send({"data": [{"id": "fixture-app", "type": "apps"}]})
+                  elif path == "/v1/builds":
+                      self._send({"data": [{
+                          "id": "fixture-build",
+                          "type": "builds",
+                          "attributes": {"version": BUILD_NUMBER},
+                      }]})
+                  else:
+                      self._send({"error": "not found"}, 404)
+
+              def log_message(self, *args):
+                  pass
+
+
+          http.server.HTTPServer(("127.0.0.1", 8934), Handler).serve_forever()
+          PYEOF
+          nohup python3 /tmp/mock_apple.py >/tmp/mock-apple.log 2>&1 &
+          for _ in $(seq 1 20); do
+            curl -sf http://127.0.0.1:8934/v1/apps -o /dev/null && break
+            sleep 0.25
+          done
+
+      - name: Determine expected build number from the latest GitHub Release
+        id: expected
+        env:
+          GH_TOKEN: ${{ github.token }}
+          OVERRIDE: ${{ inputs.expected_build_number_override }}
+        run: |
+          set -euo pipefail
+          if [ -n "$OVERRIDE" ]; then
+            echo "tag=fixture" >> "$GITHUB_OUTPUT"
+            echo "build_number=$OVERRIDE" >> "$GITHUB_OUTPUT"
+            echo "Using overridden expected build number: $OVERRIDE (testing only)"
+            exit 0
+          fi
+
+          TAG=$(gh release list --repo "$GITHUB_REPOSITORY" --limit 1 --json tagName --jq '.[0].tagName')
+          if [ -z "$TAG" ]; then
+            echo "::error::SURFACE BROKEN: TestFlight — no GitHub Release exists to compare against"
+            exit 1
+          fi
+
+          mkdir -p /tmp/relmeta
+          if ! gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern ios-build-meta.json --dir /tmp/relmeta --clobber 2>/tmp/dl.err; then
+            echo "::error::SURFACE BROKEN: TestFlight — release $TAG has no ios-build-meta.json; mobile-release.yml never recorded what build number it targeted for this release"
+            cat /tmp/dl.err || true
+            exit 1
+          fi
+
+          BN=$(jq -r '.buildNumber' /tmp/relmeta/ios-build-meta.json)
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "build_number=$BN" >> "$GITHUB_OUTPUT"
+          echo "Latest release $TAG targeted build number $BN"
+
+      - name: Query live TestFlight build and compare
+        env:
+          ASC_API_BASE: ${{ inputs.appstoreconnect_api_base_url || 'https://api.appstoreconnect.apple.com' }}
+          APPLE_API_KEY_BASE64: ${{ inputs.apple_api_key_base64 || secrets.APPLE_API_KEY_BASE64 }}
+          APPLE_API_KEY_ID: ${{ inputs.apple_api_key_id || secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER_ID: ${{ inputs.apple_api_issuer_id || secrets.APPLE_API_ISSUER_ID }}
+          EXPECTED_BN: ${{ steps.expected.outputs.build_number }}
+          EXPECTED_TAG: ${{ steps.expected.outputs.tag }}
+        run: |
+          set -euo pipefail
+          if [ -z "${APPLE_API_KEY_BASE64:-}" ] || [ -z "${APPLE_API_KEY_ID:-}" ] || [ -z "${APPLE_API_ISSUER_ID:-}" ]; then
+            echo "::error::SURFACE BROKEN: TestFlight — no App Store Connect API credential is fully configured (secrets.APPLE_API_KEY_BASE64 / APPLE_API_KEY_ID / APPLE_API_ISSUER_ID); refusing to report green without checking"
+            exit 1
+          fi
+
+          BUNDLE_ID=$(grep -oE 'app_identifier\("[^"]+"\)' apps/ios/fastlane/Appfile | sed -E 's/app_identifier\("([^"]+)"\)/\1/')
+          if [ -z "$BUNDLE_ID" ]; then
+            echo "::error::SURFACE BROKEN: TestFlight — could not determine the iOS bundle identifier from apps/ios/fastlane/Appfile"
+            exit 1
+          fi
+          echo "Bundle id: $BUNDLE_ID"
+
+          echo "$APPLE_API_KEY_BASE64" | base64 --decode > /tmp/apple-key.p8
+          # --break-system-packages: see the equivalent comment in the
+          # play-track job — this is a throwaway CI container.
+          pip install --quiet --disable-pip-version-check --break-system-packages cryptography requests
+
+          cat > /tmp/apple_check.py << 'PYEOF'
+          import base64
+          import json
+          import sys
+          import time
+
+          import requests
+          from cryptography.hazmat.primitives import hashes, serialization
+          from cryptography.hazmat.primitives.asymmetric import ec, utils
+
+          key_id, issuer_id, bundle_id, api_base = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
+
+          with open("/tmp/apple-key.p8", "rb") as f:
+              private_key = serialization.load_pem_private_key(f.read(), password=None)
+
+
+          def b64url(data: bytes) -> str:
+              return base64.urlsafe_b64encode(data).rstrip(b"=").decode()
+
+
+          header = {"alg": "ES256", "kid": key_id, "typ": "JWT"}
+          now = int(time.time())
+          payload = {"iss": issuer_id, "iat": now, "exp": now + 1190, "aud": "appstoreconnect-v1"}
+
+          signing_input = (
+              b64url(json.dumps(header, separators=(",", ":")).encode())
+              + "."
+              + b64url(json.dumps(payload, separators=(",", ":")).encode())
+          )
+          der_sig = private_key.sign(signing_input.encode(), ec.ECDSA(hashes.SHA256()))
+          r, s = utils.decode_dss_signature(der_sig)
+          raw_sig = r.to_bytes(32, "big") + s.to_bytes(32, "big")
+          jwt = f"{signing_input}.{b64url(raw_sig)}"
+          headers = {"Authorization": f"Bearer {jwt}"}
+
+          resp = requests.get(
+              f"{api_base}/v1/apps",
+              params={"filter[bundleId]": bundle_id},
+              headers=headers,
+              timeout=20,
+          )
+          resp.raise_for_status()
+          apps = resp.json().get("data", [])
+          if not apps:
+              print(f"no app found for bundle id {bundle_id}", file=sys.stderr)
+              sys.exit(1)
+          app_id = apps[0]["id"]
+
+          resp = requests.get(
+              f"{api_base}/v1/builds",
+              params={
+                  "filter[app]": app_id,
+                  "sort": "-uploadedDate",
+                  "limit": 1,
+                  "fields[builds]": "version",
+              },
+              headers=headers,
+              timeout=20,
+          )
+          resp.raise_for_status()
+          builds = resp.json().get("data", [])
+          if not builds:
+              print("no builds found in App Store Connect", file=sys.stderr)
+              sys.exit(1)
+          print(builds[0]["attributes"]["version"])
+          PYEOF
+
+          set +e
+          ACTUAL_BN=$(python3 /tmp/apple_check.py "$APPLE_API_KEY_ID" "$APPLE_API_ISSUER_ID" "$BUNDLE_ID" "$ASC_API_BASE" 2>/tmp/apple_check.err)
+          RC=$?
+          set -e
+          if [ "$RC" != "0" ]; then
+            echo "::error::SURFACE BROKEN: TestFlight — could not query the App Store Connect API ($(tail -1 /tmp/apple_check.err))"
+            exit 1
+          fi
+
+          echo "Live TestFlight build number: $ACTUAL_BN (expected $EXPECTED_BN from release $EXPECTED_TAG)"
+          if [ "$ACTUAL_BN" != "$EXPECTED_BN" ]; then
+            echo "::error::SURFACE BROKEN: TestFlight — live build number $ACTUAL_BN != expected $EXPECTED_BN (release $EXPECTED_TAG)"
+            exit 1
+          fi
+          echo "OK: TestFlight build number matches release $EXPECTED_TAG"
+
+  # ─── Aggregate: name exactly which surface broke ─────────────────
+  report:
+    name: Summary
+    runs-on: ubuntu-latest
+    needs: [desktop-updater, staging-backend, play-track, testflight]
+    if: always()
+    steps:
+      - name: Name which surface(s) broke
+        env:
+          DESKTOP_RESULT: ${{ needs.desktop-updater.result }}
+          STAGING_RESULT: ${{ needs.staging-backend.result }}
+          PLAY_RESULT: ${{ needs.play-track.result }}
+          TESTFLIGHT_RESULT: ${{ needs.testflight.result }}
+        run: |
+          set -euo pipefail
+          BROKEN=()
+          [ "$DESKTOP_RESULT" != "success" ] && BROKEN+=("desktop-updater=$DESKTOP_RESULT")
+          [ "$STAGING_RESULT" != "success" ] && BROKEN+=("staging-backend=$STAGING_RESULT")
+          [ "$PLAY_RESULT" != "success" ] && BROKEN+=("play-track=$PLAY_RESULT")
+          [ "$TESTFLIGHT_RESULT" != "success" ] && BROKEN+=("testflight=$TESTFLIGHT_RESULT")
+
+          if [ "${#BROKEN[@]}" -eq 0 ]; then
+            echo "Internal Availability: all 4 surfaces verified live (desktop updater, staging backend, Play internal track, TestFlight)."
+            exit 0
+          fi
+
+          echo "::error::Internal Availability BROKEN: ${BROKEN[*]}"
+          exit 1
