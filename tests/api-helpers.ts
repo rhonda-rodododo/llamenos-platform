@@ -1344,6 +1344,11 @@ export async function createContactByNameViaApi(
 
   return createContactViaApi(request, {
     encryptedSummary,
+    // Pass the SAME contentKey used to encrypt encryptedSummary above, so
+    // createContactViaApi wraps this key in the reader envelope instead of
+    // generating an unrelated one — otherwise the admin device can never
+    // decrypt this contact (issue #796).
+    contentKey,
     identifierHashes: [`name_${Date.now()}_${Math.random().toString(36).slice(2)}`],
     contactTypeHash: contactType,
     nameHash,
@@ -1391,14 +1396,27 @@ export async function createContactViaApi(
     nameHash?: string
     trigramTokens?: string[]
     encryptedSummary?: string
+    /**
+     * The content key `encryptedSummary` was encrypted under, when the caller
+     * pre-encrypted the summary themselves (e.g. createContactByNameViaApi).
+     * Required whenever `encryptedSummary` is supplied by the caller — without
+     * it, the envelope below would wrap an unrelated, freshly generated key,
+     * making the contact permanently undecryptable (the ciphertext and the
+     * wrapped key would never match). See issue #796.
+     */
+    contentKey?: Uint8Array
     contactTypeHash?: string
     hubId?: string
   },
   seedHex = ADMIN_SEED,
 ): Promise<Record<string, unknown>> {
-  const contentKey = generateContentKey()
+  // Use the caller's content key (when they pre-encrypted encryptedSummary
+  // themselves) so the envelope wraps the SAME key the ciphertext requires.
+  // Only fall back to a fresh key when nothing was pre-encrypted.
+  const contentKey = options?.contentKey ?? generateContentKey()
   const summaryText = options?.encryptedSummary ?? 'test contact summary'
-  const encryptedSummary = encryptContent(summaryText, contentKey, LABEL_NOTE_KEY)
+  const encryptedSummary = options?.encryptedSummary
+    ?? encryptContent(summaryText, contentKey, LABEL_NOTE_KEY)
   const envelope = await realEnvelope(contentKey, seedHex)
   const { status, data } = await apiPost<Record<string, unknown>>(
     request,
@@ -1408,7 +1426,7 @@ export async function createContactViaApi(
       identifierHashes: options?.identifierHashes ?? [`idhash_${Date.now()}_${Math.random().toString(36).slice(2)}`],
       nameHash: options?.nameHash,
       trigramTokens: options?.trigramTokens,
-      encryptedSummary: options?.encryptedSummary ?? encryptedSummary,
+      encryptedSummary,
       summaryEnvelopes: [envelope],
       contactTypeHash: options?.contactTypeHash,
       tagHashes: [],
