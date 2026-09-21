@@ -315,6 +315,93 @@ describe('SettingsService.updateIvrLanguages', () => {
 })
 
 // ---------------------------------------------------------------------------
+// Per-hub IVR language override (#732)
+// ---------------------------------------------------------------------------
+
+describe('SettingsService.getHubIvrLanguages (per-hub override cascade)', () => {
+  it('returns the hub override when hub_settings.settings.ivrLanguages is set', async () => {
+    const { service } = setup()
+    vi.spyOn(service, 'getHubSettings').mockResolvedValue({ ivrLanguages: ['fr', 'de'] })
+
+    const result = await service.getHubIvrLanguages('hub-1')
+    expect(result).toEqual(['fr', 'de'])
+  })
+
+  it('falls back to the instance-wide list when the hub has no override', async () => {
+    const { db, service } = setup()
+    vi.spyOn(service, 'getHubSettings').mockResolvedValue({})
+    db.$setSelectResult([makeSettingsRow({ ivrLanguages: ['en', 'es'] })])
+
+    const result = await service.getHubIvrLanguages('hub-1')
+    expect(result).toEqual(['en', 'es'])
+  })
+
+  it('falls back to the IVR_LANGUAGES constant when neither hub nor instance has a list', async () => {
+    const { db, service } = setup()
+    vi.spyOn(service, 'getHubSettings').mockResolvedValue({})
+    db.$setSelectResult([makeSettingsRow({ ivrLanguages: null })])
+
+    const result = await service.getHubIvrLanguages('hub-1')
+    expect(result.length).toBeGreaterThan(0)
+    expect(result).toContain('en')
+  })
+})
+
+describe('SettingsService.updateIvrLanguages — provider speakability (#732)', () => {
+  it('rejects a hub override naming a language the hub-specific provider cannot speak', async () => {
+    const { service } = setup()
+    vi.spyOn(service, 'getHubTelephonyProvider').mockResolvedValue({
+      type: 'vonage',
+      phoneNumber: '+15551234567',
+    } as any)
+
+    // Vonage's catalog has no entry for 'ht' (Haitian Creole) — see vonage.ts.
+    await expect(
+      service.updateIvrLanguages({ enabledLanguages: ['en', 'ht'] }, 'hub-1'),
+    ).rejects.toMatchObject({ status: 400 })
+  })
+
+  it('accepts a hub override where every language is in the provider catalog', async () => {
+    const { service } = setup()
+    vi.spyOn(service, 'getHubTelephonyProvider').mockResolvedValue({
+      type: 'vonage',
+      phoneNumber: '+15551234567',
+    } as any)
+
+    const result = await service.updateIvrLanguages(
+      { enabledLanguages: ['en', 'es'] },
+      'hub-1',
+    )
+    expect(result.enabledLanguages).toEqual(['en', 'es'])
+  })
+
+  it('falls back to the global provider when the hub has none configured', async () => {
+    const { service } = setup()
+    vi.spyOn(service, 'getHubTelephonyProvider').mockResolvedValue(null)
+    vi.spyOn(service, 'getTelephonyProvider').mockResolvedValue({
+      type: 'vonage',
+      phoneNumber: '+15551234567',
+    } as any)
+
+    await expect(
+      service.updateIvrLanguages({ enabledLanguages: ['en', 'ht'] }, 'hub-1'),
+    ).rejects.toMatchObject({ status: 400 })
+  })
+
+  it('does not constrain by provider speakability when no provider is configured yet', async () => {
+    const { service } = setup()
+    vi.spyOn(service, 'getHubTelephonyProvider').mockResolvedValue(null)
+    vi.spyOn(service, 'getTelephonyProvider').mockResolvedValue(null)
+
+    const result = await service.updateIvrLanguages(
+      { enabledLanguages: ['en', 'ht'] },
+      'hub-1',
+    )
+    expect(result.enabledLanguages).toEqual(['en', 'ht'])
+  })
+})
+
+// ---------------------------------------------------------------------------
 // getFallbackGroup / setFallbackGroup
 // ---------------------------------------------------------------------------
 

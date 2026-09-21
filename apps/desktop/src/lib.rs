@@ -1,11 +1,12 @@
 mod api_config;
+mod cert_pin;
 mod crypto;
 mod net;
 
 use tauri::{Emitter, Manager};
 
 use crate::crypto::CryptoState;
-use crate::net::{ProbeLimiter, WsRegistry};
+use crate::net::{PinnedNet, ProbeLimiter, WsRegistry};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -52,13 +53,22 @@ pub fn run() {
         .manage(WsRegistry::default())
         // One-per-second budget for first-run health probes (#739)
         .manage(ProbeLimiter::default())
+        // Pinned HTTP client + WebSocket TLS connector for the configured
+        // backend (#775) — populated below, once a backend is configured.
+        .manage(PinnedNet::default())
         .setup(|app| {
+            // Rehydrate the pinned TLS client/connector from whatever backend
+            // was already configured on a previous run (#775). Must happen
+            // before the webview can call `net_fetch`/`net_ws_connect`.
+            if let Err(e) = net::load_or_reset_pinned_net(app.handle()) {
+                tauri_plugin_log::log::warn!("could not load pinned backend config: {e}");
+            }
+
             // System tray setup
             use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
             use tauri::tray::TrayIconBuilder;
 
-            let show_hide =
-                MenuItem::with_id(app, "show_hide", "Show / Hide", true, None::<&str>)?;
+            let show_hide = MenuItem::with_id(app, "show_hide", "Show / Hide", true, None::<&str>)?;
             #[cfg(feature = "updater")]
             let check_updates = MenuItem::with_id(
                 app,
@@ -80,11 +90,17 @@ pub fn run() {
             #[cfg(feature = "updater")]
             let menu = Menu::with_items(
                 app,
-                &[&show_hide, &separator, &check_updates, &about, &separator, &quit],
+                &[
+                    &show_hide,
+                    &separator,
+                    &check_updates,
+                    &about,
+                    &separator,
+                    &quit,
+                ],
             )?;
             #[cfg(not(feature = "updater"))]
-            let menu =
-                Menu::with_items(app, &[&show_hide, &separator, &about, &separator, &quit])?;
+            let menu = Menu::with_items(app, &[&show_hide, &separator, &about, &separator, &quit])?;
 
             TrayIconBuilder::new()
                 .menu(&menu)
