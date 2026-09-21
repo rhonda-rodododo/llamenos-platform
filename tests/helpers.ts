@@ -40,14 +40,66 @@ export * from './pages/index'
  *
  * After typing, we verify the input value matches expectations before pressing
  * Enter to trigger onComplete.
+ *
+ * Failure reporting: this is the single most common login-adjacent flake in the
+ * suite (30+ call sites, each an independent chance for a CI-load timing race to
+ * fire). A raw Playwright timeout here surfaces as a generic locator error
+ * attributed to whatever *feature* spec happened to call this first — the true
+ * fault (login) gets misdiagnosed as a regression in the feature under test. Each
+ * step below is wrapped so the thrown error names the login step that failed,
+ * not just "timeout", matching the pattern already used by #872/#929.
+ *
+ * Deliberately does NOT assert what happens after Enter (navigation, error
+ * message, dialog close, etc.) — callers intentionally submit wrong PINs
+ * expecting to stay in place (see pin-challenge-steps.ts, pin-lockout-steps.ts),
+ * so "no navigation" is not a universal failure signal here. Callers own that
+ * postcondition with their own, correctly-scoped assertion.
  */
 export async function enterPin(page: Page, pin: string) {
   const pinInput = page.getByTestId('pin-input').locator('input')
-  await pinInput.waitFor({ state: 'visible', timeout: 10000 })
-  await pinInput.clear()
-  await pinInput.pressSequentially(pin, { delay: 10 })
-  // Verify React state has caught up before pressing Enter
-  await expect(pinInput).toHaveValue(pin, { timeout: 5000 })
+
+  // CI evidence (fleet PR #934, e2e shard 2, 3 consecutive runs: 4/2/3 failures)
+  // shows this exact waitFor timing out under CI load — the PIN screen simply
+  // hadn't rendered yet, not the state-commit race described below. CI containers
+  // share the box with other workers/shards; 10s was tuned for an idle machine.
+  // Use the same AUTH budget as every other CI-load-sensitive wait in this file.
+  try {
+    await pinInput.waitFor({ state: 'visible', timeout: Timeouts.AUTH })
+  } catch (cause) {
+    throw new Error(
+      `[enterPin] login: PIN input never appeared within ${Timeouts.AUTH}ms. ` +
+        `The app never reached the PIN screen — this is a login/navigation failure, ` +
+        `not a bug in whatever scenario called enterPin().`,
+      { cause: cause as Error },
+    )
+  }
+
+  // Playwright's pressSequentially() already waits for the element to be visible,
+  // enabled and stable before each keystroke (standard actionability checks) — no
+  // separate "wait for enabled" is needed on top of that. What we must verify
+  // ourselves is React state, which Playwright's actionability model knows
+  // nothing about: PinInput is a controlled input, and handleKeyDown's
+  // `value.length >= minLength` check reads the `value` *prop* captured in its
+  // closure at render time. If Enter fires before React re-renders with the
+  // final keystroke, handleKeyDown sees a stale (too-short) value and silently
+  // skips onComplete — no error, no visible symptom, just a PIN screen that
+  // appears to do nothing. Blocking on toHaveValue (which polls the live DOM,
+  // itself only updated by the same render pass that updates the closure)
+  // guarantees the render has landed before Enter is pressed.
+  try {
+    await pinInput.clear()
+    await pinInput.pressSequentially(pin, { delay: 10 })
+    await expect(pinInput).toHaveValue(pin, { timeout: Timeouts.ELEMENT })
+  } catch (cause) {
+    throw new Error(
+      `[enterPin] login: typed PIN value never committed to the input (expected ` +
+        `${pin.length} characters to settle within ${Timeouts.ELEMENT}ms). Either the ` +
+        `input never became interactive, or React never re-rendered with the final ` +
+        `keystroke — pressing Enter now would hit the known stale-closure race.`,
+      { cause: cause as Error },
+    )
+  }
+
   await pinInput.press('Enter')
 }
 
@@ -201,8 +253,30 @@ export async function reenterPinAfterReload(page: Page): Promise<void> {
 }
 
 /**
- * Login as admin: imports the Ed25519 seed via the IPC mock,
- * persists to store, then enters PIN to unlock.
+ * Login as admin: restores the admin's encrypted device key from the
+ * `tests/storage/admin.json` session cache and enters PIN to unlock.
+ *
+ * Session reuse (fleet flake fix, see docs/KNOWN_FLAKES.md#login-pin-race): this
+ * cache is written exactly once per full test run, by the "bootstrap" Playwright
+ * project (tests/bootstrap.spec.ts), which is a hard `dependencies: ["bootstrap"]`
+ * of every project that calls this function. Playwright always runs a project's
+ * dependencies to completion first — including when filtering to a single spec
+ * file — so the cache is guaranteed present by the time this runs. Consuming it
+ * means every loginAsAdmin() call restores a pre-derived key (fast, deterministic)
+ * instead of re-running a full PBKDF2 (600K iteration) import (slow, and CI
+ * containers make PBKDF2 significantly slower — see Timeouts.AUTH above).
+ *
+ * This function used to also contain a "legacy" fallback that re-derived the key
+ * from ADMIN_SEED via a second, slower reload+enterPin path whenever the cache
+ * looked stale. That fallback never actually fires: `/api/test-reset` (the only
+ * reset endpoint called anywhere between bootstrap and a loginAsAdmin() call — see
+ * tests/screenshots.spec.ts) re-seeds the SAME admin identity by the SAME fixed
+ * ADMIN_PUBKEY (apps/worker/routes/dev.ts `ensureInit`), so the cached key stays
+ * valid. Keeping a silent, untested fallback path was itself a flake risk — a
+ * second, divergent code path through enterPin() that only real breakage would
+ * ever exercise, at exactly the worst time to discover it doesn't work. If the
+ * cache genuinely is missing or the admin identity it encodes is rejected, this
+ * now fails loudly with an actionable message instead.
  */
 export async function loginAsAdmin(page: Page) {
   const storagePath = 'tests/storage/admin.json'
@@ -212,8 +286,16 @@ export async function loginAsAdmin(page: Page) {
     const fs = await import('fs/promises')
     const content = await fs.readFile(storagePath, 'utf-8')
     storageState = JSON.parse(content)
-  } catch {
-    storageState = null
+  } catch (cause) {
+    throw new Error(
+      `[loginAsAdmin] ${storagePath} is missing or unreadable. This file is written ` +
+        `once by the "bootstrap" Playwright project (tests/bootstrap.spec.ts) and is a ` +
+        `hard dependency of every project that calls loginAsAdmin() — Playwright runs ` +
+        `project dependencies automatically unless invoked with --no-deps. If you ran ` +
+        `with --no-deps, or ran this file in isolation some other way, include ` +
+        `--project=bootstrap so the cache gets created first.`,
+      { cause: cause as Error },
+    )
   }
 
   await page.goto('/login')
@@ -227,85 +309,48 @@ export async function loginAsAdmin(page: Page) {
     localStorage.removeItem('__test_pin_lockout_state')
   })
 
-  let usingLegacy = false
-  if (storageState) {
-    await page.evaluate((state) => {
-      sessionStorage.clear()
-      localStorage.clear()
-      for (const origin of state.origins || []) {
-        for (const item of origin.localStorage || []) {
-          localStorage.setItem(item.name, item.value)
-        }
+  await page.evaluate((state) => {
+    sessionStorage.clear()
+    localStorage.clear()
+    // `state` is null when no saved session exists (first run, or the cache
+    // file was cleared) — clearing storage is then the whole job.
+    if (!state) return
+    for (const origin of state.origins || []) {
+      for (const item of origin.localStorage || []) {
+        localStorage.setItem(item.name, item.value)
       }
-    }, storageState)
-
-    await page.reload()
-    await page.waitForLoadState('domcontentloaded')
-    await enterPin(page, TEST_PIN)
-
-    const url = page.url()
-    if (url.includes('/login')) {
-      console.log('[TEST] Bootstrap admin keys stale (test-reset cleared sessions). Falling back to ADMIN_SEED.')
-      usingLegacy = true
-      try {
-        const fs = await import('fs/promises')
-        await fs.unlink(storagePath)
-      } catch {}
-      await page.evaluate(() => {
-        sessionStorage.clear()
-        localStorage.clear()
-        localStorage.removeItem('llamenos:llamenos-encrypted-device-keys')
-        localStorage.removeItem('llamenos:llamenos-encrypted-key')
-        localStorage.removeItem('llamenos-encrypted-key')
-      })
-      await page.context().clearCookies()
-      await page.evaluate(async () => {
-        const dbs = await window.indexedDB.databases?.().catch(() => [] as Array<{ name?: string }>) ?? []
-        for (const db of dbs) {
-          if (db.name) window.indexedDB.deleteDatabase(db.name)
-        }
-      })
-      await page.reload()
-      await page.waitForLoadState('domcontentloaded')
     }
-  } else {
-    usingLegacy = true
+  }, storageState)
+
+  await page.reload()
+  await page.waitForLoadState('domcontentloaded')
+  await enterPin(page, TEST_PIN)
+
+  // enterPin() only confirms Enter was pressed — the actual unlock + login API
+  // round trip that moves the app off /login happens asynchronously afterward.
+  // The code this replaced checked `page.url()` synchronously right here, with
+  // no wait at all: a real race, not a staleness check, and very likely the
+  // actual root cause of the CI evidence this PR is fixing (see
+  // docs/KNOWN_FLAKES.md#login-pin-race) — it would only ever "detect
+  // staleness" faster than the login round trip could complete under load,
+  // and the (now-removed) legacy ADMIN_SEED fallback silently absorbed every
+  // false positive by being slow enough for the real login to have caught up.
+  // A proper wait replaces both that synchronous check and the wait that used
+  // to follow it.
+  try {
+    await page.waitForURL(url => !url.toString().includes('/login'), { timeout: Timeouts.AUTH })
+  } catch (cause) {
+    throw new Error(
+      `[loginAsAdmin] Entering the cached PIN did not leave /login within ` +
+        `${Timeouts.AUTH}ms. Either the identity encoded in ${storagePath} was ` +
+        `rejected by the server (ADMIN_PUBKEY changed, or the admin was deleted by ` +
+        `test-reset-no-admin after bootstrap wrote this cache -- delete ` +
+        `${storagePath} and re-run with --project=bootstrap so it regenerates), or ` +
+        `the login request itself is hanging (check the backend is reachable and ` +
+        `healthy).`,
+      { cause: cause as Error },
+    )
   }
-
-  if (usingLegacy) {
-    await page.evaluate(() => {
-      sessionStorage.clear()
-      localStorage.clear()
-      localStorage.removeItem('llamenos:llamenos-encrypted-device-keys')
-      localStorage.removeItem('llamenos:llamenos-encrypted-key')
-      localStorage.removeItem('llamenos-encrypted-key')
-    })
-    await page.context().clearCookies()
-    await page.evaluate(async () => {
-      const dbs = await window.indexedDB.databases?.().catch(() => [] as Array<{ name?: string }>) ?? []
-      for (const db of dbs) {
-        if (db.name) window.indexedDB.deleteDatabase(db.name)
-      }
-    })
-    await page.reload()
-    await page.waitForLoadState('domcontentloaded')
-
-    await page.waitForFunction(() => !!(window as any).__TEST_PLATFORM, { timeout: Timeouts.AUTH })
-
-    const secretHex = ADMIN_SEED
-    await page.evaluate(async ({ secretHex, pin }) => {
-      const platform = (window as any).__TEST_PLATFORM
-      const encrypted = await platform.deviceImportAndLoad(secretHex, pin, crypto.randomUUID())
-      await platform.persistAndUnlockDeviceKeys(encrypted, pin)
-      await platform.lockCrypto()
-    }, { secretHex, pin: TEST_PIN })
-
-    await page.reload()
-    await page.waitForLoadState('domcontentloaded')
-    await enterPin(page, TEST_PIN)
-  }
-
-  await page.waitForURL(url => !url.toString().includes('/login'), { timeout: Timeouts.AUTH })
   // Ensure hub context is ready before asserting page content — prevents race
   // where components fetch data before ConfigProvider sets activeHubId.
   await page.waitForFunction(() => {
