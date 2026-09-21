@@ -183,22 +183,38 @@ jobs:
       - name: Upload Android artifacts to GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RUN_NUMBER: ${{ github.run_number }}
         run: |
           TAG="v${VERSION}"
+
+          # Create the release if it doesn't exist yet — needed for both the
+          # binaries below and the build-metadata record further down, which
+          # must land even on runs that produce no APK (e.g. an upload
+          # failure), so the live-verification workflow (#721) can tell
+          # "no build metadata recorded" apart from "metadata says X but
+          # Play Console shows Y".
+          if ! gh release view "${TAG}" --repo "${GITHUB_REPOSITORY}" &>/dev/null; then
+            gh release create "${TAG}" --repo "${GITHUB_REPOSITORY}" --title "${TAG}" --generate-notes --draft
+          fi
 
           # Find the APK and checksum
           APK=$(find apps/android/app/build/outputs/apk/release -name "*.apk" | head -1)
           CHECKSUM=$(find apps/android/app/build/outputs/apk/release -name "*.sha256" | head -1)
           if [ -n "$APK" ]; then
-            # Create release if it doesn't exist
-            if ! gh release view "${TAG}" --repo "${GITHUB_REPOSITORY}" &>/dev/null; then
-              gh release create "${TAG}" --repo "${GITHUB_REPOSITORY}" --title "${TAG}" --generate-notes --draft
-            fi
             gh release upload "${TAG}" "$APK" --clobber
             if [ -n "$CHECKSUM" ]; then
               gh release upload "${TAG}" "$CHECKSUM" --clobber
             fi
           fi
+
+          # Record which versionCode this run targeted for this release, so
+          # verify-release-live.yml (#721) can compare it against whatever
+          # versionCode is actually LIVE on the Play Console internal track
+          # — the only way to tell a successful Play upload apart from a
+          # swallowed one after the fact.
+          jq -n --arg version "$VERSION" --argjson versionCode "$RUN_NUMBER" \
+            '{version: $version, versionCode: $versionCode}' > android-build-meta.json
+          gh release upload "${TAG}" android-build-meta.json --clobber
 
   # ─── iOS Release ──────────────────────────────────────────────
   build-ios:
@@ -206,7 +222,7 @@ jobs:
     name: Build (iOS)
     timeout-minutes: 45
     permissions:
-      contents: read
+      contents: write   # needed for gh release upload of build metadata (#721)
 
     env:
       HAS_APPLE_CERTIFICATE: ${{ secrets.IOS_CERTIFICATE_BASE64 != '' }}
@@ -354,6 +370,33 @@ jobs:
               --apiKey "$APPLE_API_KEY_ID" \
               --apiIssuer "$APPLE_API_ISSUER_ID"
           fi
+
+      - name: Record iOS build metadata to GitHub Release
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RUN_NUMBER: ${{ github.run_number }}
+        run: |
+          # Records which build number (CFBundleVersion) this run targeted
+          # for this release, so verify-release-live.yml (#721) can compare
+          # it against whatever build number is actually LIVE on
+          # TestFlight — the only way to tell a successful upload apart
+          # from a no-op one (#743) after the fact. Runs even if the
+          # archive/export/upload steps above failed, so a swallowed
+          # upload shows up as "metadata says N, TestFlight has stale M"
+          # rather than silently having no record to check against.
+          VERSION="$INPUT_VERSION"
+          if [ -z "$VERSION" ]; then
+            echo "No version resolved (workflow_dispatch ran without a version input) — nothing to record."
+            exit 0
+          fi
+          TAG="v${VERSION}"
+          if ! gh release view "${TAG}" --repo "${GITHUB_REPOSITORY}" &>/dev/null; then
+            gh release create "${TAG}" --repo "${GITHUB_REPOSITORY}" --title "${TAG}" --generate-notes --draft
+          fi
+          jq -n --arg version "$VERSION" --argjson buildNumber "$RUN_NUMBER" \
+            '{version: $version, buildNumber: $buildNumber}' > ios-build-meta.json
+          gh release upload "${TAG}" ios-build-meta.json --clobber
 
       - name: Cleanup keychain
         if: always()

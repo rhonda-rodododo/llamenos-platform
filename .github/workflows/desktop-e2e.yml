@@ -3,24 +3,29 @@
 # Backend services (PostgreSQL, RustFS, WebSocket relay) via Docker Compose — globalSetup
 # requires a running backend for state reset and admin bootstrap.
 #
-# Trigger: PRs touching apps/desktop/, src/client/, tests/, or packages/, manual dispatch.
+# Trigger: every pull request; the `changes` job below decides whether the
+# `desktop` platform is actually relevant and gates `build`/`test`
+# accordingly. Manual dispatch always runs.
 # Epic 88: Desktop & Mobile E2E Tests.
 #
 # Note: Windows matrix removed — Docker Compose backend is not reliably available
 # on Windows GHA runners. The ci.yml e2e job provides Linux coverage on ALL PRs;
-# this workflow adds path-filtered coverage with the test-desktop.sh pipeline.
+# this workflow adds broader (non-BDD chromium) coverage gated on the same
+# `desktop` platform flag ci.yml computes.
+#
+# This workflow is NOT currently a required check — folding it into
+# `ci.yml`'s `ci-status` aggregate is tracked separately. It still needs to
+# report `skipped` rather than never trigger at all once it IS made required,
+# though (#664): a required check whose *workflow* never triggers on a given
+# PR never reports, and the PR becomes unmergeable. That is why this trigger
+# is unfiltered `pull_request` with the platform decision made by a job-level
+# `if:` instead of `on.pull_request.paths:` — a workflow-level `paths:`
+# filter is exactly the shape that breaks a required check.
 
 name: Desktop E2E Tests
 
 on:
   pull_request:
-    paths:
-      - 'apps/desktop/**'
-      - 'packages/crypto/**'
-      - 'packages/protocol/**'
-      - 'packages/shared/**'
-      - 'tests/**'
-      - 'src/client/**'
   workflow_dispatch:
 
 permissions:
@@ -31,9 +36,54 @@ env:
   TEST_ADMIN_PUBKEY: "79215a4c04f08fcd817c6f820c87169beb8cddf96dfa590a1315556b78af9183"
 
 jobs:
+  # ─── Detect Changed Files ─────────────────────────────────────
+  # Delegates to the SAME path map ci.yml's `changes` job uses — see
+  # .github/scripts/detect-changed-platforms.sh for the single source of
+  # truth (#664). Consolidated from what used to be this workflow's own
+  # `on.pull_request.paths:` list.
+  changes:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    outputs:
+      desktop: ${{ steps.filter.outputs.desktop }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0
+
+      - name: Detect changes
+        id: filter
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            BASE="${{ github.event.pull_request.base.sha }}"
+            HEAD="${{ github.event.pull_request.head.sha }}"
+          else
+            BASE="${{ github.event.before }}"
+            HEAD="${{ github.event.after }}"
+          fi
+
+          if [[ -z "$BASE" ]] || ! git cat-file -e "$BASE" 2>/dev/null; then
+            BASE="HEAD^"
+          fi
+          if [[ -z "$HEAD" ]] || ! git cat-file -e "$HEAD" 2>/dev/null; then
+            HEAD="HEAD"
+          fi
+
+          CHANGED=$(git diff --name-only "$BASE" "$HEAD" 2>/dev/null || git diff --name-only HEAD)
+          echo "Changed files ($BASE..$HEAD):"
+          echo "$CHANGED"
+
+          printf '%s\n' "$CHANGED" | bash .github/scripts/detect-changed-platforms.sh | tee -a "$GITHUB_OUTPUT"
+
   # ─── Build (codegen + typecheck + vite build) ─────────────────
   # Separated from test so the 45-min test timeout is not eaten by build steps.
   build:
+    needs: changes
+    if: needs.changes.outputs.desktop == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -70,7 +120,8 @@ jobs:
 
   # ─── Test (Playwright E2E) ────────────────────────────────────
   test:
-    needs: build
+    needs: [changes, build]
+    if: needs.changes.outputs.desktop == 'true'
     strategy:
       fail-fast: false
       matrix:
