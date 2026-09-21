@@ -22,23 +22,12 @@ async function enterBootstrapPin(page: import('@playwright/test').Page, pin: str
 
 /**
  * After loading storage state and navigating to /, handle PIN entry.
- * Blocks refresh to force PIN screen, enters PIN, waits for dashboard.
+ * The cached localStorage holds an encrypted key, so the app always shows the
+ * PIN screen (decrypting it into memory happens fresh on every page load —
+ * see tests/fixtures/auth.ts for the full explanation). Enters PIN, waits for
+ * dashboard.
  */
 async function unlockAndNavigateToDashboard(page: import('@playwright/test').Page) {
-  // Block the automatic restoreSession refresh so the PIN screen appears first.
-  let refreshBlocked = true
-  await page.route('**/api/auth/token/refresh', async (route) => {
-    if (refreshBlocked) {
-      await route.fulfill({
-        status: 401,
-        contentType: 'application/json',
-        body: '{"error":"blocked-during-setup"}',
-      })
-    } else {
-      await route.continue()
-    }
-  })
-
   await page.goto('/', { waitUntil: 'domcontentloaded' })
 
   const pinInput = page.getByTestId(TestIds.PIN_INPUT).locator('input')
@@ -50,9 +39,6 @@ async function unlockAndNavigateToDashboard(page: import('@playwright/test').Pag
     pageTitle.waitFor({ state: 'visible', timeout: 45000 }).then(() => 'dashboard' as const),
     profileSetupBtn.waitFor({ state: 'visible', timeout: 45000 }).then(() => 'profile' as const),
   ])
-
-  // Unblock refresh so the PIN unlock flow can call refreshToken and getUserInfo
-  refreshBlocked = false
 
   if (firstVisible === 'pin') {
     await enterPin(page, TEST_PIN)
@@ -66,8 +52,6 @@ async function unlockAndNavigateToDashboard(page: import('@playwright/test').Pag
   } else if (firstVisible === 'profile') {
     await completeProfileSetup(page)
   }
-
-  await page.unroute('**/api/auth/token/refresh')
 
   // Ensure sidebar is visible (confirms full auth)
   await page.getByTestId(TestIds.NAV_SIDEBAR).waitFor({ state: 'visible', timeout: Timeouts.AUTH })
