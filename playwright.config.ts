@@ -14,13 +14,6 @@ const desktopStepDirs = [
 
 export default defineConfig({
   testDir: "./tests",
-  // Playwright specs are `*.spec.ts`. `*.test.ts` files under tests/ are Bun
-  // tests (they `import { test } from "bun:test"`) — Node's ESM loader has no
-  // `bun:` scheme, so matching them here fails the whole run at load time
-  // before any spec executes. Seen as:
-  //   Only URLs with a scheme in: file, data, and node are supported by the
-  //   default ESM loader. Received protocol 'bun:'
-  testMatch: "**/*.spec.ts",
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
@@ -57,7 +50,13 @@ export default defineConfig({
       use: { ...devices["Desktop Chrome"] },
       // Exclude bootstrap tests and screenshots — bootstrap runs in its own project above,
       // screenshots are on-demand only (run via `bun run test:screenshots`).
-      testIgnore: ["**/live/**", "**/desktop/**", "**/integration/**", "**/orchestrator/**", "**/bootstrap.spec.ts", "**/screenshots.*", "**/screenshots.spec.ts"],
+      testIgnore: ["**/live/**", "**/desktop/**", "**/integration/**", "**/orchestrator/**", "**/bootstrap.spec.ts", "**/screenshots.*", "**/screenshots.spec.ts", "**/*.test.ts"],
+      // `**/*.test.ts` are Bun tests (they `import { test } from "bun:test"`).
+      // Node's ESM loader has no `bun:` scheme, so collecting one aborts the
+      // entire run at load time before any spec executes — see #936. A global
+      // `testMatch` cannot be used here: defineBddProject sets its own testDir
+      // and emits generated `.feature.spec.js`, which a `*.spec.ts` matcher
+      // starves ("No tests found" on backend-bdd).
       // Wait for bootstrap tests to complete and restore admin before parallel tests run.
       dependencies: ["bootstrap"],
     },

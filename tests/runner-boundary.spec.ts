@@ -17,8 +17,8 @@
  * nothing pointing at the offending file, which is why the real cause took
  * several cycles to find.
  *
- * `testMatch` in playwright.config.ts is the fix; this is the guard that keeps
- * it true. Without it the boundary is a naming convention, and the next Bun
+ * The `**\/*.test.ts` entry in the chromium project's testIgnore is the fix;
+ * this is the guard that keeps it true. Without it the boundary is a naming convention, and the next Bun
  * test added under tests/ silently breaks the suite again.
  */
 import { test, expect } from '@playwright/test'
@@ -58,9 +58,8 @@ test.describe('test runner boundary', () => {
         `bun: module, which Playwright cannot execute:\n  ${offenders.join('\n  ')}\n\n` +
         `A bun: import in a Playwright-collected file fails at LOAD time and aborts ` +
         `the entire run before any spec executes — see #936.\n\n` +
-        `Fix: a Bun test belongs in a file NOT matching **/*.spec.ts (use .test.ts), ` +
-        `so Playwright leaves it to \`bun test\`. Do not add it to testIgnore — the ` +
-        `suffix is what separates the two runners.`,
+        `Fix: name a Bun test *.test.ts, not *.spec.ts — the chromium project's ` +
+        `testIgnore excludes that suffix so Playwright leaves it to \`bun test\`.`,
     ).toBe(true)
   })
 })
