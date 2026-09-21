@@ -53,6 +53,12 @@ env:
 
 jobs:
   # ─── Detect Changed Files ─────────────────────────────────────
+  # A PR's changes decide which platform jobs matter (#664) — this job is the
+  # only place that decision gets made. Every heavy job below reads one of
+  # these outputs in its own `if:` rather than running on every non-docs PR.
+  # The actual path map lives in .github/scripts/detect-changed-platforms.sh
+  # (the single source of truth — see that file's header), not here; this
+  # job only resolves the correct diff range and hands the file list to it.
   changes:
     runs-on: ubuntu-latest
     permissions:
@@ -79,45 +85,54 @@ jobs:
       docs_only: ${{ steps.filter.outputs.docs_only }}
       ansible: ${{ steps.filter.outputs.ansible }}
       android: ${{ steps.filter.outputs.android }}
+      ios: ${{ steps.filter.outputs.ios }}
+      desktop: ${{ steps.filter.outputs.desktop }}
+      backend: ${{ steps.filter.outputs.backend }}
+      crypto: ${{ steps.filter.outputs.crypto }}
+      orchestrator: ${{ steps.filter.outputs.orchestrator }}
+      audit: ${{ steps.filter.outputs.audit }}
 
     steps:
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
-          fetch-depth: 2
+          fetch-depth: 0
 
       - name: Detect changes
         id: filter
         run: |
-          CHANGED=$(git diff --name-only HEAD^ HEAD 2>/dev/null || git diff --name-only HEAD)
-          echo "Changed files:"
+          # Diff against the PR's actual base, not HEAD^ — HEAD^ only agrees
+          # with the base by coincidence on `pull_request` (today's merge-ref
+          # commit happens to have the base as its parent) and is flatly
+          # wrong on `merge_group`, where HEAD is the queue's own synthetic
+          # merge commit. Mirrors the base/head resolution the `lint` job's
+          # "Determine changed files" step already uses.
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            BASE="${{ github.event.pull_request.base.sha }}"
+            HEAD="${{ github.event.pull_request.head.sha }}"
+          elif [[ "${{ github.event_name }}" == "merge_group" ]]; then
+            BASE="${{ github.event.merge_group.base_sha }}"
+            HEAD="${{ github.event.merge_group.head_sha }}"
+          else
+            BASE="${{ github.event.before }}"
+            HEAD="${{ github.event.after }}"
+          fi
+
+          # Fall back to a single-commit diff if before/base is unavailable
+          # (e.g. force-push, first commit on a branch, or workflow_dispatch
+          # with no PR/push context at all).
+          if [[ -z "$BASE" ]] || ! git cat-file -e "$BASE" 2>/dev/null; then
+            BASE="HEAD^"
+          fi
+          if [[ -z "$HEAD" ]] || ! git cat-file -e "$HEAD" 2>/dev/null; then
+            HEAD="HEAD"
+          fi
+
+          CHANGED=$(git diff --name-only "$BASE" "$HEAD" 2>/dev/null || git diff --name-only HEAD)
+          echo "Changed files ($BASE..$HEAD):"
           echo "$CHANGED"
 
-          DOCS_ONLY="true"
-          ANSIBLE_CHANGED="false"
-          ANDROID_CHANGED="false"
-          while IFS= read -r file; do
-            [[ -z "$file" ]] && continue
-            if ! echo "$file" | grep -qE "\.md$|^site/"; then
-              DOCS_ONLY="false"
-              echo "Non-docs file changed: $file"
-            fi
-            if echo "$file" | grep -qE "^deploy/ansible/"; then
-              ANSIBLE_CHANGED="true"
-              echo "Ansible file changed: $file"
-            fi
-            if echo "$file" | grep -qE "^apps/android/|^packages/crypto/|^packages/protocol/|^packages/i18n/|^apps/worker/|^packages/shared/"; then
-              ANDROID_CHANGED="true"
-              echo "Android-relevant file changed: $file"
-            fi
-          done <<< "$CHANGED"
-
-          {
-            echo "app=$([ "$DOCS_ONLY" = "false" ] && echo true || echo false)"
-            echo "docs_only=$DOCS_ONLY"
-            echo "ansible=$ANSIBLE_CHANGED"
-            echo "android=$ANDROID_CHANGED"
-          } >> "$GITHUB_OUTPUT"
+          printf '%s\n' "$CHANGED" | bash .github/scripts/detect-changed-platforms.sh | tee -a "$GITHUB_OUTPUT"
 
   # ─── Guard: No Generated Files In Git ────────────────────
   no-generated-files-in-git:
@@ -286,7 +301,7 @@ jobs:
   # ─── Crypto Tests (Rust) ────────────────────────────────────
   crypto-tests:
     needs: changes
-    if: needs.changes.outputs.docs_only != 'true'
+    if: needs.changes.outputs.crypto == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -319,6 +334,10 @@ jobs:
   # ─── Dependency Vulnerability Scan ───────────────────────────
   audit:
     needs: changes
+    # Scoped to dependency-manifest changes only (#664) — a docs- or
+    # workflow-only PR must not be blocked by a pre-existing advisory it
+    # could not possibly have introduced.
+    if: needs.changes.outputs.audit == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -358,7 +377,9 @@ jobs:
   # ─── E2E + Backend BDD Tests (Docker Compose) ──────────────
   e2e:
     needs: [changes, build]
-    if: needs.changes.outputs.docs_only != 'true'
+    # Playwright E2E exercises the desktop web frontend against a live
+    # backend — relevant if either side changed (#664).
+    if: needs.changes.outputs.desktop == 'true' || needs.changes.outputs.backend == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -507,7 +528,7 @@ jobs:
   # ─── Backend BDD Tests ─────────────────────────────────────
   backend-bdd:
     needs: [changes]
-    if: needs.changes.outputs.docs_only != 'true'
+    if: needs.changes.outputs.backend == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -594,7 +615,11 @@ jobs:
   # ─── Backend Unit Tests ────────────────────────────────────
   backend-unit:
     needs: changes
-    if: needs.changes.outputs.docs_only != 'true'
+    # Also gates the fleet orchestrator's own safety-rail tests (see the
+    # "Run fleet orchestrator tests" step below) — orchestrator/ has no
+    # backend/DB dependency of its own, so it needs its own flag here rather
+    # than riding along with `backend` (#664).
+    if: needs.changes.outputs.backend == 'true' || needs.changes.outputs.orchestrator == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -637,7 +662,12 @@ jobs:
   # ─── Ansible Validation ───────────────────────────────────
   ansible-validate:
     needs: changes
-    if: needs.changes.outputs.ansible == 'true' || needs.changes.outputs.app == 'true'
+    # `backend`, not the old blanket `app` (any non-docs change): this job's
+    # "Check required env vars across templates" step cross-references
+    # apps/worker/lib/config.ts against the Ansible templates, so a backend
+    # env-var change is genuinely relevant here even without touching
+    # deploy/ansible/ itself (#664).
+    if: needs.changes.outputs.ansible == 'true' || needs.changes.outputs.backend == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -690,7 +720,7 @@ jobs:
 
   desktop-unit:
     needs: changes
-    if: needs.changes.outputs.docs_only != 'true'
+    if: needs.changes.outputs.desktop == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -724,7 +754,7 @@ jobs:
   # ─── Android Build & Test ───────────────────────────────────
   android-build-test:
     needs: changes
-    if: needs.changes.outputs.docs_only != 'true'
+    if: needs.changes.outputs.android == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -774,7 +804,7 @@ jobs:
   # ─── Android Instrumented Tests (Cucumber BDD on emulator) ──
   android-e2e:
     needs: [changes]
-    if: needs.changes.outputs.docs_only != 'true' && needs.changes.outputs.android == 'true'
+    if: needs.changes.outputs.android == 'true'
     runs-on: ubuntu-latest  # android emulator needs KVM (hosted x86_64 images provide it)
     permissions:
       contents: read
@@ -1022,7 +1052,7 @@ jobs:
 
   ios-build-test:
     needs: changes
-    if: needs.changes.outputs.docs_only != 'true'
+    if: needs.changes.outputs.ios == 'true'
     runs-on: macos-latest
     permissions:
       contents: read
@@ -1317,7 +1347,7 @@ jobs:
   # ─── Migration Drift Check ────────────────────────────────────
   migration-drift:
     needs: changes
-    if: needs.changes.outputs.docs_only != 'true'
+    if: needs.changes.outputs.backend == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
