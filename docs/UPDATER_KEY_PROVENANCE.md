@@ -12,23 +12,23 @@ This file records that provenance so the change is auditable.
 
 | | |
 |---|---|
-| minisign key ID | `1BE968B909D35220` |
-| generated | 2026-09-20, by the repository operator, on the operator's own workstation |
+| minisign key ID | `C8279C12F39DD35B` |
+| generated | 2026-09-21, on the operator's workstation at the operator's instruction |
 | generated with | `bunx tauri signer generate -w ~/.tauri/updater.key -p <password> -f` |
 | private half | held in the repository secret `TAURI_SIGNING_PRIVATE_KEY`, loaded directly from the generated file |
-| password | held in the repository secret `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`, known only to the operator |
+| password | stored at `~/.tauri/updater.password` (mode 0600) and in the repository secret `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` |
 
 The public half committed to `tauri.conf.json` was verified to decode to that
 key ID before the change was made:
 
 ```
 $ grep -o '"pubkey": "[^"]*"' apps/desktop/tauri.conf.json | sed 's/.*: "//; s/"//' | base64 -d
-untrusted comment: minisign public key: 1BE968B909D35220
+untrusted comment: minisign public key: C8279C12F39DD35B
 ```
 
 ## Why the previous key was replaced
 
-The previously committed key was `E1F35E58BD83142F`. Its private half exists on
+The previously committed key was `1BE968B909D35220`, which superseded `E1F35E58BD83142F`. Its private half exists on
 the operator's workstation but **its password is not known**, so it cannot sign
 anything. Three keypairs with overlapping names had accumulated there and the
 stored password unlocked none of them, which is what prompted a clean
