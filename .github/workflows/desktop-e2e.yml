@@ -151,6 +151,13 @@ jobs:
           name: app-build
           path: dist
 
+      # Keyed on BOTH lockfiles (not just packages/crypto's) so a change to
+      # either invalidates the cache. This cache backs both the crypto interop
+      # step below AND tests/tauri-lockfile-consistency.spec.ts's
+      # `cargo metadata --locked --manifest-path apps/desktop/Cargo.toml` call
+      # — see the "Warm cargo cache for apps/desktop" step for why that
+      # matters (#927: a cold `~/.cargo/registry`/`~/.cargo/git` made that
+      # check's resolve slow enough to look like a hang).
       - name: Cache Rust build artifacts
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
@@ -158,7 +165,7 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             packages/crypto/target
-          key: rust-crypto-${{ runner.os }}-${{ hashFiles('packages/crypto/Cargo.lock') }}
+          key: rust-crypto-${{ runner.os }}-${{ hashFiles('packages/crypto/Cargo.lock', 'apps/desktop/Cargo.lock') }}
           restore-keys: |
             rust-crypto-${{ runner.os }}-
 
@@ -191,7 +198,7 @@ jobs:
 
       # ── WASM build (required for crypto-interop-wasm.spec.ts) ──
       - name: Install Rust stable
-        uses: dtolnay/rust-toolchain@67ef31d5b988238dd797d409d6f9574278e20537 # stable
+        uses: dtolnay/rust-toolchain@02cb101ec7c40f2c49e1d9714d64511d8e1b74de # stable
         with:
           toolchain: stable
 
@@ -202,6 +209,20 @@ jobs:
 
       - name: Generate interop test vectors
         run: cargo test --manifest-path packages/crypto/Cargo.toml --test interop
+
+      # tests/tauri-lockfile-consistency.spec.ts (run later via Playwright)
+      # calls `cargo metadata --locked --manifest-path apps/desktop/Cargo.toml`
+      # to verify apps/desktop/Cargo.lock is consistent. A cold registry index
+      # plus a fresh clone of the `hpke-rs` git patch dependency made that call
+      # slow enough on a cache-miss runner to look indistinguishable from a
+      # hang (#927). Warm both here so the check's own cargo call is normally
+      # a cache hit. `--locked` means this can only read the committed
+      # lockfile, never rewrite it; `|| true` makes this step best-effort so a
+      # genuine drift or network failure here doesn't short-circuit the actual
+      # rail test's more precise classification (timeout vs environment vs
+      # real drift) downstream.
+      - name: Warm cargo cache for apps/desktop
+        run: cargo fetch --locked --manifest-path apps/desktop/Cargo.toml || true
 
       # ── Generate BDD test files from Gherkin features ───────────
       - name: Generate BDD test files
