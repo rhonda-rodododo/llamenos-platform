@@ -14,6 +14,13 @@ const desktopStepDirs = [
 
 export default defineConfig({
   testDir: "./tests",
+  // Playwright specs are `*.spec.ts`. `*.test.ts` files under tests/ are Bun
+  // tests (they `import { test } from "bun:test"`) — Node's ESM loader has no
+  // `bun:` scheme, so matching them here fails the whole run at load time
+  // before any spec executes. Seen as:
+  //   Only URLs with a scheme in: file, data, and node are supported by the
+  //   default ESM loader. Received protocol 'bun:'
+  testMatch: "**/*.spec.ts",
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
