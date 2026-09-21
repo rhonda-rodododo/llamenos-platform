@@ -75,6 +75,24 @@ spec happened to be running when it surfaced).
   clean CI runs, not one green run, to confirm — see the PR body for the local
   repeat-run counts gathered before/after.
 
+### `reports-close-btn-visibility` — intermittent close-button-visibility assertion in reports.feature
+
+- **Symptom**: discovered while gathering the 10-consecutive-run evidence for
+  `login-pin-race` above (`core/reports.feature.spec.js`, sequential single-worker
+  runs against a real backend). 2 of 10 runs failed, each with exactly one
+  failure, in two different scenarios: "Close button is not visible on waiting
+  report" (run 3) and "Close button is not visible on already closed report"
+  (run 8). Both assert a close button's *absence* based on report status. Not a
+  login failure — both runs authenticated fine and failed deep in their own
+  scenario body.
+- **Root cause**: not yet investigated — out of scope for the PR that found it
+  (login-pin-race). Worth checking first: whether the assertion is a
+  non-waiting `isVisible()`/`.not.toBeVisible()` snapshot racing a status-driven
+  re-render (the same shape as `#678` below and `#669`/`#670`), since status
+  changes after report creation are exactly the kind of async re-render that
+  bug shape catches.
+- **Status**: OPEN.
+
 ### `case-tab-click-race` — tab-click step misses the panel that hasn't mounted yet (#678)
 
 - **Symptom**: `'I click the {string} tab'` step intermittently failed to find

@@ -323,19 +323,31 @@ export async function loginAsAdmin(page: Page) {
   await page.waitForLoadState('domcontentloaded')
   await enterPin(page, TEST_PIN)
 
-  if (page.url().includes('/login')) {
+  // enterPin() only confirms Enter was pressed — the actual unlock + login API
+  // round trip that moves the app off /login happens asynchronously afterward.
+  // The code this replaced checked `page.url()` synchronously right here, with
+  // no wait at all: a real race, not a staleness check, and very likely the
+  // actual root cause of the CI evidence this PR is fixing (see
+  // docs/KNOWN_FLAKES.md#login-pin-race) — it would only ever "detect
+  // staleness" faster than the login round trip could complete under load,
+  // and the (now-removed) legacy ADMIN_SEED fallback silently absorbed every
+  // false positive by being slow enough for the real login to have caught up.
+  // A proper wait replaces both that synchronous check and the wait that used
+  // to follow it.
+  try {
+    await page.waitForURL(url => !url.toString().includes('/login'), { timeout: Timeouts.AUTH })
+  } catch (cause) {
     throw new Error(
-      `[loginAsAdmin] Entering the cached PIN did not leave /login. The identity ` +
-        `encoded in ${storagePath} was rejected by the server — most likely the ` +
-        `server's ADMIN_PUBKEY changed or the admin was deleted (test-reset-no-admin) ` +
-        `after bootstrap wrote this cache. Delete ${storagePath} and re-run with ` +
-        `--project=bootstrap so it gets regenerated; do not paper over this by ` +
-        `re-adding a fallback import path (see the docstring above for why that's a ` +
-        `worse flake risk than failing here).`,
+      `[loginAsAdmin] Entering the cached PIN did not leave /login within ` +
+        `${Timeouts.AUTH}ms. Either the identity encoded in ${storagePath} was ` +
+        `rejected by the server (ADMIN_PUBKEY changed, or the admin was deleted by ` +
+        `test-reset-no-admin after bootstrap wrote this cache -- delete ` +
+        `${storagePath} and re-run with --project=bootstrap so it regenerates), or ` +
+        `the login request itself is hanging (check the backend is reachable and ` +
+        `healthy).`,
+      { cause: cause as Error },
     )
   }
-
-  await page.waitForURL(url => !url.toString().includes('/login'), { timeout: Timeouts.AUTH })
   // Ensure hub context is ready before asserting page content — prevents race
   // where components fetch data before ConfigProvider sets activeHubId.
   await page.waitForFunction(() => {

@@ -39,7 +39,14 @@ test.describe('Session reuse via cached storageState', () => {
     try {
       const page = await context.newPage()
       await page.goto('/login', { waitUntil: 'domcontentloaded' })
+      // The mock Tauri Store (tests/mocks/tauri-store.ts) prefixes every key
+      // with `tauri-store:<name>:`, and the desktop key-manager store is named
+      // "stronghold" — so the real on-disk key is
+      // `stronghold:llamenos:llamenos-encrypted-device-keys`. Check the
+      // unprefixed legacy names too (same defensive check as
+      // pin-lockout-steps.ts's "the stored keys should be wiped" step).
       const hasEncryptedKey = await page.evaluate(() =>
+        localStorage.getItem('stronghold:llamenos:llamenos-encrypted-device-keys') !== null ||
         localStorage.getItem('llamenos:llamenos-encrypted-device-keys') !== null ||
         localStorage.getItem('llamenos:llamenos-encrypted-key') !== null
       )
