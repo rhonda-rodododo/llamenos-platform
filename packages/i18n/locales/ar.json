@@ -1457,7 +1457,9 @@
     "rateLimitTitle": "تغيير تحديد المعدل",
     "transcriptionDisable": "تعطيل نسخ المكالمات؟ لن يتم نسخ مكالمات المتطوعين تلقائياً بعد الآن.",
     "transcriptionEnable": "تفعيل نسخ المكالمات لجميع المتطوعين؟ يستخدم هذا الذكاء الاصطناعي لنسخ المكالمات في الوقت الفعلي.",
-    "transcriptionTitle": "تغيير إعداد النسخ"
+    "transcriptionTitle": "تغيير إعداد النسخ",
+    "biometricDisable": "إيقاف فتح القفل البيومتري؟ ستظل قادرًا على فتح القفل باستخدام رقم PIN.",
+    "biometricDisableTitle": "إيقاف فتح القفل البيومتري"
   },
   "connectWithOauth": "Connect with OAuth",
   "connectionFailed": "Connection failed",
@@ -3734,7 +3736,11 @@
     "transcriptionSettings": "النسخ",
     "version": "Version",
     "voicemail": "Voicemail",
-    "webrtcNotConfigured": "الاتصال عبر المتصفح غير متاح. يحتاج المسؤول إلى تفعيل WebRTC في إعدادات مزود الاتصالات."
+    "webrtcNotConfigured": "الاتصال عبر المتصفح غير متاح. يحتاج المسؤول إلى تفعيل WebRTC في إعدادات مزود الاتصالات.",
+    "biometricDesc": "افتح القفل ببصمتك أو وجهك بدلاً من كتابة رقم PIN. يظل رقم PIN يعمل ولا يتم تعطيله أبدًا.",
+    "biometricEnrolled": "فتح القفل البيومتري مفعّل على هذا الجهاز.",
+    "biometricInvalidated": "تغيّرت بيانات القياسات الحيوية على جهازك، لذا تم إيقاف فتح القفل البيومتري. أعد تفعيله أدناه أو تابع استخدام رقم PIN.",
+    "biometricPinPrompt": "أدخل رقم PIN لتفعيل فتح القفل البيومتري"
   },
   "serverAddress": {
     "checking": "Checking...",
