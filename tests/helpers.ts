@@ -312,6 +312,9 @@ export async function loginAsAdmin(page: Page) {
   await page.evaluate((state) => {
     sessionStorage.clear()
     localStorage.clear()
+    // `state` is null when no saved session exists (first run, or the cache
+    // file was cleared) — clearing storage is then the whole job.
+    if (!state) return
     for (const origin of state.origins || []) {
       for (const item of origin.localStorage || []) {
         localStorage.setItem(item.name, item.value)
