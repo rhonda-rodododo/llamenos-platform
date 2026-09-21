@@ -1386,6 +1386,12 @@ const commands: Record<string, CommandHandler> = {
   },
 
   // --- Backend address (#738) — mirrors apps/desktop/src/api_config.rs ---
+  //
+  // Does NOT simulate TLS certificate pinning (#775): that's a real-TLS-only
+  // concern the Rust side handles via a `rustls::ClientConfig` custom
+  // verifier — there is no TLS handshake to pin in a Playwright run (plain
+  // `fetch`/`WebSocket` through Vite's dev proxy), so `api_config_set` here
+  // just persists the origin, same as before #775.
 
   api_config_get: async () => {
     try {

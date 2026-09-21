@@ -404,7 +404,17 @@ export const HIGH_IMPACT_TIMEOUT_MS = 20 * 60_000
  */
 export const REVIEW_FILES_HEADING = '## Files at the PR head'
 
-function buildReviewPrompt(pr: string, diff: string, report: VerifyReport, exportDir: string): string {
+/**
+ * Exported for `review-and-merge.ts` (the `llamenos-fleet review-and-merge`
+ * operator command, see its own module comment) — the ONE other caller of
+ * this prompt outside `secondOpinion` below, and deliberately made to reuse
+ * this exact construction rather than hand-roll a second copy of
+ * `VERIFIER_BRIEF` plus the impact/file-list formatting: two prompts for "the
+ * non-author reviewer" that could drift apart is exactly the kind of
+ * duplication this file's own history (see the `k2p6` / `--format text`
+ * comments above) argues against.
+ */
+export function buildReviewPrompt(pr: string, diff: string, report: VerifyReport, exportDir: string): string {
   const impactNote = report.impact === 'high'
     ? `\n\nThis diff was classified HIGH IMPACT for:\n${report.impactReasons.map((r) => `- ${r}`).join('\n')}\n\n` +
       `Give it a slower, more careful pass than a routine diff would get.`
@@ -482,7 +492,7 @@ async function gitState(worktree: string): Promise<{ head: string; status: strin
   return { head: head.trim(), status }
 }
 
-interface ReviewSnapshot { dir: string; cleanup(): Promise<void> }
+export interface ReviewSnapshot { dir: string; cleanup(): Promise<void> }
 
 /**
  * Files and directories that are INSTRUCTIONS or CONFIGURATION for a coding
@@ -563,7 +573,7 @@ export async function stripReviewerControlFiles(dir: string): Promise<string[]> 
  * Agent instructions/configuration and symlinks are stripped before the
  * export is returned — see `stripReviewerControlFiles`.
  */
-async function exportReviewSnapshot(worktree: string, headSha: string): Promise<ReviewSnapshot> {
+export async function exportReviewSnapshot(worktree: string, headSha: string): Promise<ReviewSnapshot> {
   const dir = await mkdtemp(join(tmpdir(), 'llamenos-fleet-review-'))
   const cleanup = async (): Promise<void> => {
     await rm(dir, { recursive: true, force: true })
@@ -648,7 +658,7 @@ function verifierEnv(): NodeJS.ProcessEnv {
   return env
 }
 
-interface EngineRun {
+export interface EngineRun {
   /** False for a crash, a timeout, a non-zero exit or a missing binary
    *  (which now includes a `--model` id `claude` itself refuses to run —
    *  see `classifyEngineFailure` and `failureKind`). */
@@ -713,19 +723,31 @@ function decodeEngineOutput(stdout: string, stderr: string): Omit<EngineRun, 're
  * skip-permissions escape hatch to run non-interactively. The reviewer is
  * never pointed at the author's real worktree either — see the V1 fix note
  * above `gitState`.
+ *
+ * `model`, when given, overrides `reviewerInvocationFor(authorEngine).model`.
+ * Added for `review-and-merge.ts`'s operator command, which always reviews
+ * with `claude` at a model tier deliberately different from the authoring
+ * lanes' own default (`cli.ts`'s `DEFAULT_MODEL`, `'sonnet'`). Every other
+ * property below — the read-only permission mode, the env allowlist, the
+ * empty project root, the export as the one readable directory — is
+ * unchanged and shared by both callers.
  */
-async function invokeVerifierEngine(input: {
+export async function invokeVerifierEngine(input: {
   authorEngine: EngineId
   exportDir: string
   prompt: string
   maxTurns: number
   timeoutMs: number
+  model?: string
 }): Promise<EngineRun> {
   // `reviewerInvocationFor` — never a literal `'claude'`/`REVIEWER_MODEL`
   // pair inlined here — is what ties this call to the exact same resolution
   // the smoke test proves works (see that function's doc comment for why
   // the two hardcoded literals this replaced were never actually a fix).
-  const { binary, model } = reviewerInvocationFor(input.authorEngine)
+  // `input.model`, when given, overrides the resolved default — see the doc
+  // comment above this function for why `review-and-merge.ts` needs that.
+  const { binary, model: defaultModel } = reviewerInvocationFor(input.authorEngine)
+  const model = input.model ?? defaultModel
   const projectRoot = await mkdtemp(join(tmpdir(), 'llamenos-fleet-reviewer-root-'))
   try {
     const env = verifierEnv()
@@ -763,7 +785,12 @@ async function invokeVerifierEngine(input: {
   }
 }
 
-function toSecondOpinion(run: EngineRun): SecondOpinionResult {
+/** Exported alongside `invokeVerifierEngine` for `review-and-merge.ts`, which
+ *  calls that function directly (with `engine: 'claude'` and its own model
+ *  override) and needs the same EngineRun -> verdict/text mapping every other
+ *  caller of this file's reviewer gets — never a second, hand-rolled copy of
+ *  "no output reached = UNREADABLE, otherwise parse the final line". */
+export function toSecondOpinion(run: EngineRun): SecondOpinionResult {
   const shown = run.assistantText.trim().length > 0 ? run.assistantText : run.diagnostics
   if (!run.reached) {
     return {

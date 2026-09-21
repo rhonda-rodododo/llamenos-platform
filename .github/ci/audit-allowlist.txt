@@ -40,17 +40,6 @@ GHSA-v2wj-q39q-566r  # added 2026-09-11 by rhonda-rodododo — vite (direct dep)
 GHSA-p9ff-h696-f583  # added 2026-09-11 by rhonda-rodododo — vite (direct dep) — dev-server-only websocket file read
 GHSA-fx2h-pf6j-xcff  # added 2026-09-11 by rhonda-rodododo — vite (direct dep) — dev-server-only, Windows-path specific (Linux/macOS dev + CI unaffected)
 
-# --- hono: direct production dependency (backend framework) ---
-# This is the one entry in this list that IS in the production request path
-# (apps/worker's Hono app). The advisory is in Hono's CORS middleware
-# reflecting Origin with credentials when `origin` defaults to the
-# wildcard. Audited apps/worker/app.ts: our CORS middleware always passes an
-# explicit allow-list `origin` function (never the wildcard default), so the
-# vulnerable default is not in use — but this is a config-dependent
-# mitigation, not a code fix, so it stays allowlisted only until upgraded to
-# a patched Hono release rather than being treated as permanently safe.
-GHSA-88fw-hqm2-52qc  # added 2026-09-11 by rhonda-rodododo — hono (direct prod dep) — CORS wildcard default not used; explicit allow-list configured in apps/worker/app.ts; upgrade tracked
-
 # --- form-data: openai (prod dep) / twilio (devDep, unused SDK path) ---
 GHSA-hmw2-7cc7-3qxx  # added 2026-09-11 by rhonda-rodododo — form-data (via openai, prod dep; also via twilio devDep) — field/filenames we send to the OpenAI SDK are server-generated, not attacker-controlled; twilio path is devDependency-only and its SDK is not imported anywhere in apps/worker (adapters use raw fetch, see apps/worker/telephony/twilio.ts)
 
@@ -107,4 +96,5 @@ GHSA-rp42-5vxx-qpwr  # added 2026-09-11 by rhonda-rodododo — basic-ftp — sam
 GHSA-jmr9-qjv8-65gv  # added 2026-09-11 by rhonda-rodododo — extract-zip (webdriverio devDependency, browser-download unzip path) — dev/test tooling only
 GHSA-7pqw-9j4j-h8q3  # added 2026-09-11 by rhonda-rodododo — extract-zip — same as above
 GHSA-xcpc-8h2w-3j85  # added 2026-09-11 by rhonda-rodododo — adm-zip (via @huggingface/transformers > onnxruntime-node, optional native binding not used — project uses onnxruntime-web/WASM) — not reachable at runtime
+GHSA-7q85-xj36-vmfc  # added 2026-09-19 by rhonda-rodododo (discovered while landing #705, unrelated to hono) — adm-zip (same path as GHSA-xcpc-8h2w-3j85 above) — advisory published 2026-09-18, after this file's 2026-09-11 baseline; same non-reachability: optional onnxruntime-node native binding not used, project uses onnxruntime-web/WASM. Fix requires adm-zip 0.6.1, one minor above onnxruntime-node's declared ^0.5.16 range — tracked under #649, not upgraded here to keep this PR scoped to hono/CORS
 GHSA-ggr8-5vv4-36mx  # added 2026-09-11 by rhonda-rodododo — deepmerge-ts (webdriverio devDependency config merging) — dev/test tooling only
