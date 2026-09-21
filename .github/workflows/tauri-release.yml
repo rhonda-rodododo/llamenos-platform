@@ -51,7 +51,7 @@ jobs:
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
       - name: Install Rust stable
-        uses: dtolnay/rust-toolchain@67ef31d5b988238dd797d409d6f9574278e20537 # stable
+        uses: dtolnay/rust-toolchain@02cb101ec7c40f2c49e1d9714d64511d8e1b74de # stable
         with:
           toolchain: stable
           targets: ${{ matrix.target }}
@@ -148,11 +148,28 @@ jobs:
           "
 
       # macOS code signing — cert imported directly to keychain without writing to disk
+      #
+      # Not-configured vs configured-but-failing are different outcomes and must stay
+      # different: an absent APPLE_CERTIFICATE means "no paid Apple Developer account
+      # yet" (tracked separately in #741) and must let the build succeed unsigned; a
+      # present-but-broken certificate is a real error and must still hard-fail below
+      # (in "Build (macOS universal)" and "Verify macOS notarization").
+      #
+      # APPLE_SIGNING_IDENTITY / APPLE_ID / APPLE_PASSWORD / APPLE_TEAM_ID are exported
+      # to $GITHUB_ENV ONLY inside the configured branch, never referenced directly in a
+      # later step's `env:` block. An unset secret interpolated into an `env:` block
+      # becomes an empty string, not an absent variable — Tauri sees a set-but-empty
+      # APPLE_SIGNING_IDENTITY and attempts `codesign` with identity "", which hard-fails
+      # instead of skipping signing the way a genuinely-unset var would.
       - name: Setup macOS signing
         if: matrix.platform == 'macos-latest'
         env:
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
           if [ -n "$APPLE_CERTIFICATE" ]; then
             KEYCHAIN_PASSWORD=$(openssl rand -hex 16)
@@ -169,6 +186,18 @@ jobs:
               -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
             rm -rf "$CERT_TMPDIR"
             security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" build.keychain
+
+            {
+              echo "APPLE_SIGNING_IDENTITY=${APPLE_SIGNING_IDENTITY}"
+              echo "APPLE_ID=${APPLE_ID}"
+              echo "APPLE_PASSWORD=${APPLE_PASSWORD}"
+              echo "APPLE_TEAM_ID=${APPLE_TEAM_ID}"
+            } >> "$GITHUB_ENV"
+            echo "APPLE_SIGNING_CONFIGURED=true" >> "$GITHUB_ENV"
+            echo "Apple Developer certificate configured — building a signed + notarized macOS bundle."
+          else
+            echo "APPLE_SIGNING_CONFIGURED=false" >> "$GITHUB_ENV"
+            echo "::warning::No Apple Developer signing certificate configured (APPLE_CERTIFICATE secret is unset). Building an UNSIGNED macOS bundle — see #741 to fix this properly. This bundle WILL be rejected by Gatekeeper (\"app is damaged\"/\"unidentified developer\") on any tester's Mac until a paid Apple Developer account is configured."
           fi
 
       # Build Tauri app — signing keys scoped to signing step only, not compile step.
@@ -177,21 +206,28 @@ jobs:
       # and staples the ticket when APPLE_ID + APPLE_PASSWORD + APPLE_TEAM_ID env vars
       # are set. The APPLE_PASSWORD must be an app-specific password, not the account
       # password. Tauri uses `notarytool submit --wait` internally.
+      #
+      # APPLE_SIGNING_IDENTITY / APPLE_ID / APPLE_PASSWORD / APPLE_TEAM_ID are deliberately
+      # NOT set here — "Setup macOS signing" above exports them via $GITHUB_ENV only when
+      # APPLE_CERTIFICATE is actually configured, so this step sees them as genuinely unset
+      # (not empty-string) when there is no certificate, and Tauri skips codesigning cleanly
+      # instead of failing on an empty identity.
       - name: Build (macOS universal)
         if: matrix.platform == 'macos-latest'
         env:
-          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: bun run tauri:build -- --target universal-apple-darwin
 
       # Verify notarization succeeded — fail the build if the .app is not notarized.
       # This catches silent notarization failures (wrong credentials, Apple outage).
+      # Gated on APPLE_SIGNING_CONFIGURED (set by "Setup macOS signing" above) so this
+      # stays a hard failure whenever a certificate IS present — a certificate that
+      # exists and does not work is a real error, never silently skipped. When no
+      # certificate is configured at all, "Report unsigned macOS build" below runs
+      # instead and does not fail the job.
       - name: Verify macOS notarization
-        if: matrix.platform == 'macos-latest'
+        if: matrix.platform == 'macos-latest' && env.APPLE_SIGNING_CONFIGURED == 'true'
         run: |
           APP_PATH=$(find apps/desktop/target/universal-apple-darwin/release/bundle -name '*.app' -maxdepth 3 | head -1)
           if [ -z "$APP_PATH" ]; then
@@ -213,6 +249,17 @@ jobs:
               exit 1
             fi
           fi
+
+      # No certificate was configured for this run (see "Setup macOS signing" above) —
+      # the bundle above built successfully but unsigned. Report that plainly instead of
+      # pretending it's a normal signed build: an unsigned .app hits Gatekeeper
+      # ("app is damaged"/"unidentified developer") on a real Mac. #741 tracks getting a
+      # paid Apple Developer account to fix this properly; this step never fails the job.
+      - name: Report unsigned macOS build
+        if: matrix.platform == 'macos-latest' && env.APPLE_SIGNING_CONFIGURED != 'true'
+        run: |
+          APP_PATH=$(find apps/desktop/target/universal-apple-darwin/release/bundle -name '*.app' -maxdepth 3 | head -1)
+          echo "::warning::macOS bundle built UNSIGNED (no APPLE_CERTIFICATE configured — see #741). Skipping notarization verification. This bundle will be rejected by Gatekeeper on any tester's Mac until a paid Apple Developer account is configured. Bundle: ${APP_PATH:-not found}"
 
       - name: Build (Windows)
         if: matrix.platform == 'windows-latest'
@@ -342,7 +389,7 @@ jobs:
 
       # ── SLSA attestation ────────────────────────────────────────
       - name: Generate SLSA build provenance attestation
-        uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v2.1.0
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v2.1.0
         with:
           subject-path: flat-artifacts/*
 
