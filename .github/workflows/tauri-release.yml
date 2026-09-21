@@ -51,7 +51,7 @@ jobs:
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
       - name: Install Rust stable
-        uses: dtolnay/rust-toolchain@67ef31d5b988238dd797d409d6f9574278e20537 # stable
+        uses: dtolnay/rust-toolchain@02cb101ec7c40f2c49e1d9714d64511d8e1b74de # stable
         with:
           toolchain: stable
           targets: ${{ matrix.target }}
@@ -148,11 +148,28 @@ jobs:
           "
 
       # macOS code signing — cert imported directly to keychain without writing to disk
+      #
+      # Not-configured vs configured-but-failing are different outcomes and must stay
+      # different: an absent APPLE_CERTIFICATE means "no paid Apple Developer account
+      # yet" (tracked separately in #741) and must let the build succeed unsigned; a
+      # present-but-broken certificate is a real error and must still hard-fail below
+      # (in "Build (macOS universal)" and "Verify macOS notarization").
+      #
+      # APPLE_SIGNING_IDENTITY / APPLE_ID / APPLE_PASSWORD / APPLE_TEAM_ID are exported
+      # to $GITHUB_ENV ONLY inside the configured branch, never referenced directly in a
+      # later step's `env:` block. An unset secret interpolated into an `env:` block
+      # becomes an empty string, not an absent variable — Tauri sees a set-but-empty
+      # APPLE_SIGNING_IDENTITY and attempts `codesign` with identity "", which hard-fails
+      # instead of skipping signing the way a genuinely-unset var would.
       - name: Setup macOS signing
         if: matrix.platform == 'macos-latest'
         env:
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
           if [ -n "$APPLE_CERTIFICATE" ]; then
             KEYCHAIN_PASSWORD=$(openssl rand -hex 16)
@@ -169,6 +186,18 @@ jobs:
               -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
             rm -rf "$CERT_TMPDIR"
             security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" build.keychain
+
+            {
+              echo "APPLE_SIGNING_IDENTITY=${APPLE_SIGNING_IDENTITY}"
+              echo "APPLE_ID=${APPLE_ID}"
+              echo "APPLE_PASSWORD=${APPLE_PASSWORD}"
+              echo "APPLE_TEAM_ID=${APPLE_TEAM_ID}"
+            } >> "$GITHUB_ENV"
+            echo "APPLE_SIGNING_CONFIGURED=true" >> "$GITHUB_ENV"
+            echo "Apple Developer certificate configured — building a signed + notarized macOS bundle."
+          else
+            echo "APPLE_SIGNING_CONFIGURED=false" >> "$GITHUB_ENV"
+            echo "::warning::No Apple Developer signing certificate configured (APPLE_CERTIFICATE secret is unset). Building an UNSIGNED macOS bundle — see #741 to fix this properly. This bundle WILL be rejected by Gatekeeper (\"app is damaged\"/\"unidentified developer\") on any tester's Mac until a paid Apple Developer account is configured."
           fi
 
       # Build Tauri app — signing keys scoped to signing step only, not compile step.
@@ -177,21 +206,28 @@ jobs:
       # and staples the ticket when APPLE_ID + APPLE_PASSWORD + APPLE_TEAM_ID env vars
       # are set. The APPLE_PASSWORD must be an app-specific password, not the account
       # password. Tauri uses `notarytool submit --wait` internally.
+      #
+      # APPLE_SIGNING_IDENTITY / APPLE_ID / APPLE_PASSWORD / APPLE_TEAM_ID are deliberately
+      # NOT set here — "Setup macOS signing" above exports them via $GITHUB_ENV only when
+      # APPLE_CERTIFICATE is actually configured, so this step sees them as genuinely unset
+      # (not empty-string) when there is no certificate, and Tauri skips codesigning cleanly
+      # instead of failing on an empty identity.
       - name: Build (macOS universal)
         if: matrix.platform == 'macos-latest'
         env:
-          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: bun run tauri:build -- --target universal-apple-darwin
 
       # Verify notarization succeeded — fail the build if the .app is not notarized.
       # This catches silent notarization failures (wrong credentials, Apple outage).
+      # Gated on APPLE_SIGNING_CONFIGURED (set by "Setup macOS signing" above) so this
+      # stays a hard failure whenever a certificate IS present — a certificate that
+      # exists and does not work is a real error, never silently skipped. When no
+      # certificate is configured at all, "Report unsigned macOS build" below runs
+      # instead and does not fail the job.
       - name: Verify macOS notarization
-        if: matrix.platform == 'macos-latest'
+        if: matrix.platform == 'macos-latest' && env.APPLE_SIGNING_CONFIGURED == 'true'
         run: |
           APP_PATH=$(find apps/desktop/target/universal-apple-darwin/release/bundle -name '*.app' -maxdepth 3 | head -1)
           if [ -z "$APP_PATH" ]; then
@@ -213,6 +249,17 @@ jobs:
               exit 1
             fi
           fi
+
+      # No certificate was configured for this run (see "Setup macOS signing" above) —
+      # the bundle above built successfully but unsigned. Report that plainly instead of
+      # pretending it's a normal signed build: an unsigned .app hits Gatekeeper
+      # ("app is damaged"/"unidentified developer") on a real Mac. #741 tracks getting a
+      # paid Apple Developer account to fix this properly; this step never fails the job.
+      - name: Report unsigned macOS build
+        if: matrix.platform == 'macos-latest' && env.APPLE_SIGNING_CONFIGURED != 'true'
+        run: |
+          APP_PATH=$(find apps/desktop/target/universal-apple-darwin/release/bundle -name '*.app' -maxdepth 3 | head -1)
+          echo "::warning::macOS bundle built UNSIGNED (no APPLE_CERTIFICATE configured — see #741). Skipping notarization verification. This bundle will be rejected by Gatekeeper on any tester's Mac until a paid Apple Developer account is configured. Bundle: ${APP_PATH:-not found}"
 
       - name: Build (Windows)
         if: matrix.platform == 'windows-latest'
@@ -342,7 +389,7 @@ jobs:
 
       # ── SLSA attestation ────────────────────────────────────────
       - name: Generate SLSA build provenance attestation
-        uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v2.1.0
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v2.1.0
         with:
           subject-path: flat-artifacts/*
 
@@ -386,6 +433,48 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      # ── Verify metadata-repo push access BEFORE touching the bucket ─────
+      # Issue #720: a failed metadata push after the RustFS upload used to leave
+      # a partial, unannounced release — a bucket with a version nothing describes.
+      # Catch a missing/expired/wrong-scope RELEASES_REPO_PAT here, before any
+      # artifact is uploaded, by proving we can push to llamenos-releases. The
+      # probe pushes an empty commit to a run-scoped throwaway ref (never main)
+      # and deletes it immediately — no trace left in the metadata repo.
+      - name: Verify releases repo push access
+        env:
+          GH_TOKEN: ${{ secrets.RELEASES_REPO_PAT }}
+        run: |
+          if [ -z "${GH_TOKEN}" ]; then
+            echo "::error::RELEASES_REPO_PAT is not set — cannot publish release metadata for v${VERSION}. Refusing to upload artifacts."
+            exit 1
+          fi
+
+          PROBE_DIR=$(mktemp -d)
+          if ! git clone --depth 1 "https://x-access-token:${GH_TOKEN}@github.com/rhonda-rodododo/llamenos-releases.git" "$PROBE_DIR"; then
+            echo "::error::Could not clone llamenos-releases with RELEASES_REPO_PAT — token invalid or expired. Refusing to upload artifacts for v${VERSION}."
+            rm -rf "$PROBE_DIR"
+            exit 1
+          fi
+
+          cd "$PROBE_DIR"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          PROBE_REF="ci-push-probe-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          git checkout -b "$PROBE_REF"
+          git commit --allow-empty -m "ci: push-access probe (v${VERSION}, run ${GITHUB_RUN_ID})"
+
+          if ! git push origin "HEAD:refs/heads/${PROBE_REF}"; then
+            echo "::error::Push access check failed for llamenos-releases repo — RELEASES_REPO_PAT may be invalid, expired, or lack write access. Refusing to upload artifacts for v${VERSION}."
+            cd "$OLDPWD"
+            rm -rf "$PROBE_DIR"
+            exit 1
+          fi
+          git push origin --delete "$PROBE_REF" || echo "::warning::Push-access probe ref ${PROBE_REF} could not be deleted from llamenos-releases — harmless, but clean it up manually."
+
+          cd "$OLDPWD"
+          rm -rf "$PROBE_DIR"
+          echo "Push access to llamenos-releases verified for v${VERSION}."
+
       # ── Upload binaries to RustFS ───────────────────────────────
       - name: Install AWS CLI
         run: |
@@ -395,6 +484,7 @@ jobs:
           aws --version
 
       - name: Upload artifacts to RustFS staging bucket
+        id: upload_artifacts
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.RUSTFS_ACCESS_KEY }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.RUSTFS_SECRET_KEY }}
@@ -432,9 +522,17 @@ jobs:
             --endpoint-url "${RUSTFS_ENDPOINT}"
 
       # ── Commit metadata to llamenos-releases ────────────────────
+      # Idempotent: if this version's metadata is already present and identical
+      # (a re-run after a mid-way failure on this same VERSION), there is
+      # nothing to commit and the step is a no-op success.
+      # Retry-safe: a non-fast-forward push (another concurrent release job
+      # landed on main first) is a benign race, not a fatal error — fetch,
+      # rebase, and retry a bounded number of times before giving up.
       - name: Commit metadata to llamenos-releases repo
+        id: commit_metadata
         env:
           GH_TOKEN: ${{ secrets.RELEASES_REPO_PAT }}
+          RUSTFS_BUCKET: ${{ secrets.RUSTFS_STAGING_BUCKET }}
         run: |
           RELEASES_DIR=$(mktemp -d)
           git clone "https://x-access-token:${GH_TOKEN}@github.com/rhonda-rodododo/llamenos-releases.git" "$RELEASES_DIR"
@@ -448,24 +546,56 @@ jobs:
           cp build-info.json "$VERSION_DIR/"
           cp latest.json "$VERSION_DIR/"
 
-          # Commit and push
           cd "$RELEASES_DIR"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add "desktop/v${VERSION}/"
+
+          if git diff --cached --quiet; then
+            echo "Metadata for v${VERSION} already up to date in llamenos-releases — nothing to commit (idempotent re-run)."
+            cd "$OLDPWD"
+            rm -rf "$RELEASES_DIR"
+            exit 0
+          fi
+
           git commit -m "desktop: v${VERSION} build metadata
 
           Workflow: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
           Commit: ${{ github.sha }}"
-          git push origin main
+
+          MAX_ATTEMPTS=5
+          attempt=1
+          until git push origin main; do
+            if [ "$attempt" -ge "$MAX_ATTEMPTS" ]; then
+              echo "::error::PARTIAL RELEASE: v${VERSION} artifacts are already uploaded to s3://${RUSTFS_BUCKET}/desktop/v${VERSION}, but pushing metadata to llamenos-releases failed after ${MAX_ATTEMPTS} attempts (persistent non-fast-forward race or lost auth). Re-run this workflow with the same version (${VERSION}) to retry — upload and metadata commit are both idempotent and will converge. If the repo push access itself is broken, also clean up s3://${RUSTFS_BUCKET}/desktop/v${VERSION} and s3://${RUSTFS_BUCKET}/desktop/latest.json before the next attempt."
+              cd "$OLDPWD"
+              rm -rf "$RELEASES_DIR"
+              exit 1
+            fi
+            echo "Push to llamenos-releases main rejected (attempt ${attempt}/${MAX_ATTEMPTS}) — fetching and rebasing before retry..."
+            git fetch origin main
+            if ! git rebase origin/main; then
+              echo "::error::PARTIAL RELEASE: v${VERSION} artifacts are already uploaded to s3://${RUSTFS_BUCKET}/desktop/v${VERSION}, but rebasing the metadata commit onto llamenos-releases main hit a real conflict (not a benign race) — manual intervention required. Clean up s3://${RUSTFS_BUCKET}/desktop/v${VERSION} or resolve the conflict in llamenos-releases before re-running."
+              git rebase --abort || true
+              cd "$OLDPWD"
+              rm -rf "$RELEASES_DIR"
+              exit 1
+            fi
+            attempt=$((attempt + 1))
+            sleep $((attempt * 2))
+          done
 
           echo "Metadata committed to llamenos-releases repo."
+          cd "$OLDPWD"
           rm -rf "$RELEASES_DIR"
 
       # ── Create metadata-only GitHub Release ─────────────────────
+      # Already idempotent by construction (upload --clobber on an existing
+      # release, create on a new one); retry only transient gh/API failures.
       - name: Create metadata-only GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RUSTFS_BUCKET: ${{ secrets.RUSTFS_STAGING_BUCKET }}
         run: |
           TAG="v${VERSION}"
 
@@ -504,20 +634,49 @@ jobs:
           - [Build Info](https://github.com/rhonda-rodododo/llamenos-releases/blob/main/desktop/v${VERSION}/build-info.json)
           BODYEOF
 
-          # Create release (or upload to existing)
-          if gh release view "${TAG}" --repo "${GITHUB_REPOSITORY}" &>/dev/null; then
-            echo "Release ${TAG} exists — uploading metadata..."
-            gh release upload "${TAG}" \
-              CHECKSUMS.txt \
-              sbom-desktop.cdx.json \
-              build-info.json \
-              --clobber
-          else
-            echo "Creating new metadata-only release ${TAG}..."
-            gh release create "${TAG}" \
-              --title "v${VERSION}" \
-              --notes-file release-body.md \
-              CHECKSUMS.txt \
-              sbom-desktop.cdx.json \
-              build-info.json
-          fi
+          # Create release (or upload to existing). Idempotent by construction
+          # (--clobber on an existing release, create on a new one), so we only
+          # need to retry transient gh/API failures, not handle a "partial" state.
+          MAX_ATTEMPTS=3
+          attempt=1
+          while true; do
+            if gh release view "${TAG}" --repo "${GITHUB_REPOSITORY}" &>/dev/null; then
+              echo "Release ${TAG} exists — uploading metadata (attempt ${attempt}/${MAX_ATTEMPTS})..."
+              if gh release upload "${TAG}" \
+                CHECKSUMS.txt \
+                sbom-desktop.cdx.json \
+                build-info.json \
+                --clobber; then
+                break
+              fi
+            else
+              echo "Creating new metadata-only release ${TAG} (attempt ${attempt}/${MAX_ATTEMPTS})..."
+              if gh release create "${TAG}" \
+                --title "v${VERSION}" \
+                --notes-file release-body.md \
+                CHECKSUMS.txt \
+                sbom-desktop.cdx.json \
+                build-info.json; then
+                break
+              fi
+            fi
+
+            if [ "$attempt" -ge "$MAX_ATTEMPTS" ]; then
+              echo "::error::PARTIAL RELEASE: v${VERSION} artifacts are uploaded to s3://${RUSTFS_BUCKET}/desktop/v${VERSION} and metadata is committed to llamenos-releases, but creating/updating the GitHub Release for ${TAG} failed after ${MAX_ATTEMPTS} attempts. Re-run this workflow with the same version to retry — this step is idempotent and will converge."
+              exit 1
+            fi
+            attempt=$((attempt + 1))
+            sleep $((attempt * 2))
+          done
+
+      # ── Fail loudly if the bucket has a version nothing describes ──────
+      # Issue #720: only the steps below this point in the job can leave a
+      # partial release (RustFS has v${VERSION}, but metadata/GitHub Release
+      # is missing or stale). Anything above the upload step failing leaves
+      # nothing behind to clean up, so it does not need this check.
+      - name: Report partial release state
+        if: failure() && steps.upload_artifacts.outcome == 'success'
+        env:
+          RUSTFS_BUCKET: ${{ secrets.RUSTFS_STAGING_BUCKET }}
+        run: |
+          echo "::error::PARTIAL RELEASE: v${VERSION} binaries were uploaded to s3://${RUSTFS_BUCKET}/desktop/v${VERSION} (and s3://${RUSTFS_BUCKET}/desktop/latest.json was updated to point at them), but a later step in this job failed — the llamenos-releases metadata commit and/or the GitHub Release for v${VERSION} may be missing or incomplete. Re-run this workflow with the same version (${VERSION}) to converge: the upload, metadata commit, and GitHub Release steps are all idempotent. If you are abandoning this version instead, manually delete s3://${RUSTFS_BUCKET}/desktop/v${VERSION} and restore s3://${RUSTFS_BUCKET}/desktop/latest.json from the previous version."
