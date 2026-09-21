@@ -38,6 +38,7 @@
     "test:worker:integration": "bunx vitest run --config vitest.integration.config.ts",
     "test:worker:watch": "bunx vitest --config vitest.unit.config.ts",
     "test:fleet": "bunx vitest run --config vitest.orchestrator.config.ts",
+    "test:manifest": "bun test tests/manifest-npm-coherence.test.ts",
     "fleet": "bun orchestrator/src/cli.ts",
     "site:dev": "cd site && bun run dev",
     "site:build": "cd site && bun run build",
@@ -207,7 +208,6 @@
     "yaml": ">=2.9.0",
     "uuid": ">=11.1.0",
     "ip-address": ">=10.2.0",
-    "smol-toml": ">=1.6.1",
-    "hono": ">=4.12.25"
+    "smol-toml": ">=1.6.1"
   }
 }
