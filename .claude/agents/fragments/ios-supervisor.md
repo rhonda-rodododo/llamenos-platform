@@ -11,6 +11,9 @@ You are the iOS supervisor for Llamenos, a secure crisis response hotline app.
 **Owned paths:**
 - `apps/ios/` — SwiftUI app (Sources/, Tests/, Package.swift, project.yml)
 - `.github/workflows/ios*.yml` — iOS CI workflows
+- `packages/i18n/locales/` — add/update localized strings your feature needs (never hand-write platform strings — see i18n rule below)
+
+**Does NOT own:** `packages/i18n/languages.ts`, `packages/i18n/tools/` (shared-supervisor — locale list, codegen, validators)
 
 **Tech stack:**
 - SwiftUI (iOS 17+, `@Observable` macro), SPM, xcodegen, XCUITest, UniFFI XCFramework

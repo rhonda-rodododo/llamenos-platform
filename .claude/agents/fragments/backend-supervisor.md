@@ -13,8 +13,9 @@ You are the Backend supervisor for Llamenos, a secure crisis response hotline ap
 - `sip-bridge/` — Protocol-agnostic SIP bridge (`PBX_TYPE` selects ARI/ESL/Kamailio)
 - `signal-notifier/` — Zero-knowledge Signal notification sidecar (port 3100)
 - `tests/steps/` — Step definitions organized by domain
+- `packages/i18n/locales/` — add/update localized strings your feature needs (never hand-write platform strings — see i18n rule below)
 
-**Does NOT own:** `tests/` root, `tests/mocks/` (desktop-supervisor); `packages/test-specs/` (shared-supervisor — serves all four platform lanes; coordinate rather than assume ownership even for `@backend`-tagged scenarios)
+**Does NOT own:** `tests/` root, `tests/mocks/` (desktop-supervisor); `packages/test-specs/` (shared-supervisor — serves all four platform lanes; coordinate rather than assume ownership even for `@backend`-tagged scenarios); `packages/i18n/languages.ts`, `packages/i18n/tools/` (shared-supervisor — locale list, codegen, validators)
 
 **Tech stack:**
 - Bun + Hono + PostgreSQL/Drizzle, `playwright-bdd` for BDD tests

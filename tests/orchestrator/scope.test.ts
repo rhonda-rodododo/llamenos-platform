@@ -68,8 +68,20 @@ describe('checkScope', () => {
     })
 
     it('parses the real fragments into the expected owned/notOwned lists', () => {
-      expect(backend.owned).toEqual(['apps/worker/', 'sip-bridge/', 'signal-notifier/', 'tests/steps/'])
-      expect(backend.notOwned).toEqual(['tests/', 'tests/mocks/', 'packages/test-specs/'])
+      expect(backend.owned).toEqual([
+        'apps/worker/',
+        'sip-bridge/',
+        'signal-notifier/',
+        'tests/steps/',
+        'packages/i18n/locales/',
+      ])
+      expect(backend.notOwned).toEqual([
+        'tests/',
+        'tests/mocks/',
+        'packages/test-specs/',
+        'packages/i18n/languages.ts',
+        'packages/i18n/tools/',
+      ])
       expect(desktop.owned).toEqual([
         'apps/desktop/',
         'src/client/',
@@ -77,8 +89,14 @@ describe('checkScope', () => {
         'tests/mocks/',
         'playwright.config.ts',
         '.github/ci/*-baseline.json',
+        'packages/i18n/locales/',
       ])
-      expect(desktop.notOwned).toEqual(['tests/steps/', 'packages/test-specs/'])
+      expect(desktop.notOwned).toEqual([
+        'tests/steps/',
+        'packages/test-specs/',
+        'packages/i18n/languages.ts',
+        'packages/i18n/tools/',
+      ])
     })
 
     it('backend may write tests/steps/scope.step.ts — owned tests/steps/ (12 chars) beats notOwned tests/ (6 chars)', () => {
@@ -97,6 +115,79 @@ describe('checkScope', () => {
 
     it('desktop may write tests/helpers.ts — owned tests/ matches, no notOwned match', () => {
       expect(checkScope(['tests/helpers.ts'], desktop, []).strayed).toEqual([])
+    })
+  })
+
+  // --- i18n lane-scope fix: platform lanes may add localized strings, but
+  // only under packages/i18n/locales/. The rest of packages/i18n/ (the locale
+  // list, codegen, validators) stays exclusive to shared-supervisor. Before
+  // this fix, none of the four platform lanes owned any part of
+  // packages/i18n/, so a feature PR that added a string (mandatory per the
+  // project's i18n rule — see CLAUDE.md/i18n-string-workflow) was structurally
+  // unmergeable: fleet/verify rejected the locale file as out-of-lane no
+  // matter which platform authored the feature (observed on PRs #920, #917).
+
+  describe('i18n lane-scope fix: platform lanes may write packages/i18n/locales/ only', () => {
+    let desktop: LaneScope
+    let backend: LaneScope
+    let ios: LaneScope
+    let android: LaneScope
+    let shared: LaneScope
+
+    beforeAll(async () => {
+      const scopes = await loadLaneScopes(process.cwd())
+      const d = scopes['desktop']
+      const b = scopes['backend']
+      const i = scopes['ios']
+      const a = scopes['android']
+      const s = scopes['shared']
+      if (!d || !b || !i || !a || !s) throw new Error('expected desktop/backend/ios/android/shared lane fragments to exist')
+      desktop = d
+      backend = b
+      ios = i
+      android = a
+      shared = s
+    })
+
+    // (a) a platform-lane diff touching packages/i18n/locales/ is in scope.
+    it.each(['desktop', 'backend', 'ios', 'android'] as const)(
+      '%s may add/update a localized string under packages/i18n/locales/',
+      (lane) => {
+        const scope = { desktop, backend, ios, android }[lane]
+        expect(checkScope(['packages/i18n/locales/en.json'], scope, []).strayed).toEqual([])
+      },
+    )
+
+    // (b) the same lane touching packages/i18n/languages.ts or
+    // packages/i18n/tools/ is still out of scope — the narrow grant to
+    // locales/ must not widen into the rest of packages/i18n/.
+    it.each(['desktop', 'backend', 'ios', 'android'] as const)(
+      '%s may not touch packages/i18n/languages.ts (shared-supervisor exclusive)',
+      (lane) => {
+        const scope = { desktop, backend, ios, android }[lane]
+        expect(checkScope(['packages/i18n/languages.ts'], scope, []).strayed).toEqual([
+          'packages/i18n/languages.ts',
+        ])
+      },
+    )
+
+    it.each(['desktop', 'backend', 'ios', 'android'] as const)(
+      '%s may not touch packages/i18n/tools/ (shared-supervisor exclusive)',
+      (lane) => {
+        const scope = { desktop, backend, ios, android }[lane]
+        expect(checkScope(['packages/i18n/tools/i18n-codegen.ts'], scope, []).strayed).toEqual([
+          'packages/i18n/tools/i18n-codegen.ts',
+        ])
+      },
+    )
+
+    // (c) shared lane is unaffected — it still owns everything under
+    // packages/i18n/, locales/ included, via its unchanged `packages/i18n/`
+    // owned entry.
+    it('shared lane still owns packages/i18n/locales/, packages/i18n/languages.ts, and packages/i18n/tools/', () => {
+      expect(checkScope(['packages/i18n/locales/en.json'], shared, []).strayed).toEqual([])
+      expect(checkScope(['packages/i18n/languages.ts'], shared, []).strayed).toEqual([])
+      expect(checkScope(['packages/i18n/tools/i18n-codegen.ts'], shared, []).strayed).toEqual([])
     })
   })
 
