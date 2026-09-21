@@ -404,6 +404,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - add E2E tests for device linking and fix /link-device public path
 
 
+## 0.19.16 (2026-09-21)
+
+### Features
+
+- add review-and-merge operator command (#864)
+- TLS certificate pinning for the network proxy (#859)
+- add `llamenos-fleet board` — the deterministic gate decision table (#871)
+- per-hub IVR language override, constrained to provider speakability (#829)
+
+### Fixes
+
+- keep apps/desktop/Cargo.lock in lockstep with knope releases (#919)
+- scope ci.yml jobs to the platforms a PR's changes actually touch (#862)
+- prevent partial tauri release from a failed metadata push (#884)
+- point the updater at the current signing keypair (#927)
+- updater pubkey must match the key CI signs with (#931)
+- let macOS release build succeed unsigned when no Apple cert is configured (#932)
+- remove redundant hono override that conflicts under npm (#933)
+
 ## 0.19.15 (2026-09-20)
 
 ### Fixes
