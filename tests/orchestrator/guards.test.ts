@@ -7,6 +7,7 @@ import { codeownersMatcher, codeownersPatterns, trackedFiles, trackedFilesUnder 
 import { mkdtempSync, rmSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { execFileSync } from 'node:child_process'
 import { runReviewCi, decideReviewGate, type CiContext, type ReviewCiDeps } from '../../orchestrator/src/ci.js'
 import { DEFAULT_MAX_TURNS, HIGH_IMPACT_MAX_TURNS, DEFAULT_TIMEOUT_MS, HIGH_IMPACT_TIMEOUT_MS } from '../../orchestrator/src/review.js'
 import { diffHash, cacheArtifactName, type ReviewCache, type CachedVerdict, type ReviewCacheKey } from '../../orchestrator/src/review-cache.js'
@@ -218,33 +219,79 @@ describe('rail: the fleet never bypasses a PR\'s checks, and never reviews', () 
   })
 
   /**
-   * `mergePr` and its `--match-head-commit` pin are gone: the fleet no longer
-   * merges anything. What replaced the pin is a property of the platform —
-   * a check run is attached to ONE commit, so a push moves the head and the
-   * new head carries no green `fleet/verify` or `fleet/review` of its own,
-   * and auto-merge does not fire.
+   * `mergePr` and its `--match-head-commit` pin are gone from the AUTONOMOUS
+   * fleet: `tick.ts`'s own dispatch loop still never merges anything itself.
+   * What replaced the pin is a property of the platform — a check run is
+   * attached to ONE commit, so a push moves the head and the new head
+   * carries no green `fleet/verify` or `fleet/review` of its own, and
+   * auto-merge does not fire.
    *
-   * Exactly two `gh pr merge` calls remain and they are a pair: one ARMS
-   * GitHub's auto-merge, reached only after mechanical verification and the
-   * non-author review have both passed; one can only UN-arm, for a PR an
-   * earlier attempt armed before this one rejected it. Anything that is
-   * neither — a bare merge, or a third call — would be this process deciding
+   * Three `gh pr merge` calls exist now, not two: `review-and-merge.ts`
+   * added the OPERATOR-invoked `llamenos-fleet review-and-merge <pr>`
+   * command, which is a human running a named command against a named PR —
+   * a different act from the autonomous tick loop deciding to arm
+   * auto-merge on its own. Its one real, `--squash --delete-branch` merge is
+   * reached only after `runReviewAndMerge` has independently re-verified
+   * every required check (including a fresh `fleet/review`) is green on an
+   * unmoved head (`evaluateMergeReadiness`) — GitHub is still what actually
+   * enforces the gate; this call cannot skip a red check GitHub would
+   * refuse. It is confined to exactly that one file and never carries
+   * `--auto`/`--disable-auto` (a real merge is neither arming nor
+   * un-arming). The original pair survives unchanged: one ARMS GitHub's
+   * auto-merge for the autonomous fleet, reached only after mechanical
+   * verification and the non-author review have both passed; one can only
+   * UN-arm, for a PR an earlier attempt armed before this one rejected it.
+   * Any OTHER shape — a bare merge with none of `--auto`/`--disable-auto`/
+   * `--squash`, or a fourth call anywhere, or the real merge appearing
+   * outside `review-and-merge.ts` — would be this process deciding
    * something that is GitHub's to decide.
    */
-  it('invokes `gh pr merge` only to arm or to un-arm auto-merge, never to merge', () => {
+  it('invokes `gh pr merge` only to arm/un-arm auto-merge, or to squash-merge from review-and-merge.ts alone', () => {
     const PR_MERGE = /\[\s*'pr'\s*,\s*'merge'[^\]]*\]/g
-    const calls: string[] = []
+    const REVIEW_AND_MERGE_FILE = join(process.cwd(), 'orchestrator', 'src', 'review-and-merge.ts')
+    const arms: string[] = []
+    const disarms: string[] = []
+    const realMerges: { file: string; call: string }[] = []
+    const unknown: string[] = []
     for (const { file, text } of orchestratorSources()) {
       for (const call of text.match(PR_MERGE) ?? []) {
-        calls.push(call)
-        const arms = call.includes("'--auto'")
-        const disarms = call.includes("'--disable-auto'")
-        expect(arms !== disarms, `${file}: gh pr merge that neither arms nor disarms: ${call}`).toBe(true)
+        const isArm = call.includes("'--auto'")
+        const isDisarm = call.includes("'--disable-auto'")
+        const isRealMerge = call.includes("'--squash'")
+        if (isArm) arms.push(call)
+        else if (isDisarm) disarms.push(call)
+        else if (isRealMerge) realMerges.push({ file, call })
+        else unknown.push(`${file}: ${call}`)
       }
     }
-    expect(calls.filter((c) => c.includes("'--auto'"))).toHaveLength(1)
-    expect(calls.filter((c) => c.includes("'--disable-auto'"))).toHaveLength(1)
-    expect(calls).toHaveLength(2)
+    expect(unknown, 'gh pr merge call(s) that neither arm, un-arm, nor squash-merge').toEqual([])
+    expect(arms).toHaveLength(1)
+    expect(disarms).toHaveLength(1)
+    expect(realMerges).toHaveLength(1)
+    expect(realMerges[0]?.file, 'a real (squash) gh pr merge exists outside review-and-merge.ts')
+      .toBe(REVIEW_AND_MERGE_FILE)
+    expect(realMerges[0]?.call, 'the real merge in review-and-merge.ts must delete the branch too')
+      .toContain("'--delete-branch'")
+  })
+
+  /**
+   * The Checks API's `POST /repos/{R}/check-runs` is a write path with real
+   * consequences: whatever it posts becomes a required-status verdict on a
+   * commit, exactly as authoritative as an Actions job's own result. Only
+   * `review-and-merge.ts`'s `postReviewCheckRun` may call it — see that
+   * file's own module comment for why this is the ONE local write path this
+   * design trusts, and why it never gained a `statuses:write`-shaped
+   * capability anywhere else in the orchestrator (ci.ts's own comment above
+   * `VERIFY_JOB`/`REVIEW_JOB` explains why a same-named STATUS was rejected
+   * outright: it is what makes fork PRs unmergeable). A second call site
+   * creating a check-run — however it got there — would be a second,
+   * ungoverned place this process can post a verdict nothing here reviewed.
+   */
+  it('creates a check-run from exactly one file (review-and-merge.ts)', () => {
+    const CHECK_RUNS_CREATE = /check-runs/
+    const REVIEW_AND_MERGE_FILE = join(process.cwd(), 'orchestrator', 'src', 'review-and-merge.ts')
+    const hits = orchestratorSources().filter(({ text }) => CHECK_RUNS_CREATE.test(text))
+    expect(hits.map((h) => h.file)).toEqual([REVIEW_AND_MERGE_FILE])
   })
 })
 
@@ -1646,5 +1693,234 @@ describe('rail: a base-provides-the-gate check runs BEFORE the gate step ever in
     // backtick — matched here against that raw text, not the string bash
     // would ultimately print.
     expect(block).toContain('re-apply the \\`review\\` label')
+  })
+})
+
+/**
+ * #664: "a PR's changes should shape which checks matter." Before this fix,
+ * every heavy ci.yml job (ios-build-test, crypto-tests, e2e, backend-bdd,
+ * backend-unit, desktop-unit, android-build-test, migration-drift) ran on
+ * every non-docs PR regardless of what it touched — an orchestrator-only or
+ * Helm-only change spent a macOS runner on an iOS build (see the "Problem"
+ * section of #664 for the real dependabot/#848/#851/#855/#857 incidents this
+ * caused). The fix: one classification script
+ * (.github/scripts/detect-changed-platforms.sh) computes per-platform flags
+ * from the changed-file list, ci.yml's `changes` job feeds it the correct
+ * diff range, and every heavy job gates on the platform(s) it actually needs.
+ *
+ * This rail has three parts:
+ *  1. Run the classification script itself against the three scenarios the
+ *     #664 PR body documents (a workflows-only change, an apps/ios/-only
+ *     change, a packages/protocol/-only change) and, through it, assert
+ *     which ci.yml jobs actually run vs. skip for each — the property the
+ *     issue is about, not just "the script returns some string".
+ *  2. Pin every gated job's job-level `if:` to its exact expected text —
+ *     the mutation this exists to catch is deleting the `if:` entirely
+ *     (making the job unconditional again), which part 1 alone would NOT
+ *     catch for jobs whose flag happens to be true in every scenario tested.
+ *  3. Confirm the `changes` job diffs against the real PR/merge-group base
+ *     rather than `HEAD^`, and that all three workflows that need the path
+ *     map call the same script rather than re-deriving their own copy.
+ *
+ * `ci-status` itself already has its own rail above (every required job
+ * must report on merge_group) — that rail is about REPORTING, and is
+ * satisfied equally by a job that runs and a job that is cleanly skipped.
+ * This rail is about the separate property that #664 is actually for:
+ * which of those two things happens for a given change.
+ */
+describe("rail: a PR's changes decide which ci.yml platform jobs run (#664)", () => {
+  const CI_YAML_PATH = join(process.cwd(), '.github', 'workflows', 'ci.yml')
+  const SCRIPT_PATH = join(process.cwd(), '.github', 'scripts', 'detect-changed-platforms.sh')
+
+  function ciYaml(): string {
+    return readFileSync(CI_YAML_PATH, 'utf8')
+  }
+
+  /** Same job-block-slicing convention as the rail above — from a job's own
+   *  `  <name>:` line up to (but not including) the next job at the same
+   *  two-space indentation. */
+  function jobBlock(text: string, name: string): string {
+    const jobHeaderRe = /\n {2}([a-zA-Z0-9_-]+):\n/g
+    const starts: { name: string; index: number }[] = []
+    for (const m of text.matchAll(jobHeaderRe)) starts.push({ name: m[1] as string, index: m.index })
+    const at = starts.findIndex((s) => s.name === name)
+    if (at === -1) throw new Error(`no "${name}:" job found in ci.yml — the grep must not pass vacuously`)
+    const end = at + 1 < starts.length ? starts[at + 1]?.index : text.length
+    return text.slice(starts[at]?.index, end)
+  }
+
+  /** The JOB-level `if:` — same convention as the rail above (four-space
+   *  indentation, before `steps:`). */
+  function jobLevelIf(block: string): string {
+    const beforeSteps = block.split(/\n {4}steps:\n/)[0] ?? block
+    return beforeSteps.match(/\n {4}if:\s*(.+)/)?.[1] ?? ''
+  }
+
+  /** Runs the REAL classification script against a synthetic changed-file
+   *  list — the exact script ci.yml's, ios-e2e.yml's, and desktop-e2e.yml's
+   *  own `changes` jobs all pipe their diff into. This is what makes the
+   *  scenarios below assertions about the actual shipped script, not a
+   *  reimplementation of it that could drift from what CI runs. */
+  function classify(files: string[]): Record<string, string> {
+    const stdout = execFileSync('bash', [SCRIPT_PATH], {
+      input: files.join('\n') + '\n',
+      encoding: 'utf8',
+    })
+    const outputs: Record<string, string> = {}
+    for (const line of stdout.split('\n')) {
+      const eq = line.indexOf('=')
+      if (eq === -1) continue
+      outputs[line.slice(0, eq)] = line.slice(eq + 1)
+    }
+    return outputs
+  }
+
+  /** Evaluates a ci.yml job-level `if:` of the exact shape every gated job
+   *  in this file uses today: empty (always runs), or one or more
+   *  `needs.changes.outputs.<flag> == 'true'` terms OR'd together. Anything
+   *  else throws rather than guessing — an unrecognized condition must fail
+   *  loudly, not silently evaluate to "always runs" or "always skips". */
+  function evalJobIf(ifExpr: string, outputs: Record<string, string>): boolean {
+    if (ifExpr.trim() === '') return true
+    return ifExpr.split('||').map((t) => t.trim()).some((term) => {
+      const m = term.match(/^needs\.changes\.outputs\.([a-z_]+) == 'true'$/)
+      if (m === null) throw new Error(`unrecognized if: term "${term}" — evalJobIf must not guess`)
+      return outputs[m[1] as string] === 'true'
+    })
+  }
+
+  const ALL_GATED_JOBS = [
+    'ios-build-test', 'android-build-test', 'android-e2e', 'desktop-unit',
+    'e2e', 'backend-bdd', 'backend-unit', 'crypto-tests', 'migration-drift',
+    'ansible-validate', 'audit',
+  ]
+
+  it.each([
+    [
+      'a workflows-only change (not ci.yml itself)',
+      ['.github/workflows/fleet-verify.yml'],
+      [] as string[],
+      ALL_GATED_JOBS,
+    ],
+    [
+      'an apps/ios/-only change',
+      ['apps/ios/Sources/App/Foo.swift'],
+      ['ios-build-test'],
+      ALL_GATED_JOBS.filter((j) => j !== 'ios-build-test'),
+    ],
+    [
+      'a packages/protocol/-only change',
+      ['packages/protocol/schemas/foo.ts'],
+      ['ios-build-test', 'android-build-test', 'android-e2e', 'desktop-unit', 'e2e', 'backend-bdd', 'backend-unit', 'crypto-tests'],
+      // `audit` stays scoped to dependency manifests even on a shared-dep
+      // change that runs everything else — this PR touched neither
+      // package.json nor bun.lock and must not be blocked by a pre-existing
+      // advisory. `migration-drift` and `ansible-validate` run too (both
+      // gate on `backend`, which a shared-dep change sets), so only `audit`
+      // is expected to skip.
+      ['audit'],
+    ],
+    [
+      // Round 2 of #664's review (fleet/review on PR #862): a
+      // packages/test-specs/-only change (the shared BDD feature corpus)
+      // must RUN e2e, backend-bdd, and android-e2e — not skip them. Before
+      // this fix, none of the three platform regexes matched
+      // packages/test-specs/, so a PR that broke a feature file (or added
+      // one with no matching step) merged with all three suites silently
+      // skipped and ci-status green.
+      'a packages/test-specs/-only change',
+      ['packages/test-specs/features/security/foo.feature'],
+      ['android-build-test', 'android-e2e', 'desktop-unit', 'e2e', 'backend-bdd', 'backend-unit', 'migration-drift', 'ansible-validate'],
+      // `ios-build-test` and `crypto-tests` correctly skip — iOS doesn't
+      // consume packages/test-specs/ yet (ios-e2e.yml stays dispatch-only
+      // pending #661) and this touches no Rust. `audit` stays scoped to
+      // dependency manifests.
+      ['ios-build-test', 'crypto-tests', 'audit'],
+    ],
+  ])('%s: the right ci.yml jobs run and skip', (_name, files, expectRun, expectSkip) => {
+    const outputs = classify(files as string[])
+    const yaml = ciYaml()
+    for (const job of expectRun as string[]) {
+      const runs = evalJobIf(jobLevelIf(jobBlock(yaml, job)), outputs)
+      expect(runs, `expected "${job}" to RUN for ${JSON.stringify(files)}; outputs=${JSON.stringify(outputs)}`).toBe(true)
+    }
+    for (const job of expectSkip as string[]) {
+      const runs = evalJobIf(jobLevelIf(jobBlock(yaml, job)), outputs)
+      expect(runs, `expected "${job}" to SKIP for ${JSON.stringify(files)}; outputs=${JSON.stringify(outputs)}`).toBe(false)
+    }
+  })
+
+  // The mutation this rail exists to catch: delete a job's `if:` entirely
+  // (so it runs unconditionally again). `evalJobIf('', outputs)` always
+  // returns true, which the scenario table above would NOT catch for a job
+  // whose flag happens to already be true in every scenario tested — this
+  // pins the exact if: text instead, independent of any scenario.
+  it.each([
+    ['ios-build-test', "needs.changes.outputs.ios == 'true'"],
+    ['android-build-test', "needs.changes.outputs.android == 'true'"],
+    ['android-e2e', "needs.changes.outputs.android == 'true'"],
+    ['desktop-unit', "needs.changes.outputs.desktop == 'true'"],
+    ['crypto-tests', "needs.changes.outputs.crypto == 'true'"],
+    ['migration-drift', "needs.changes.outputs.backend == 'true'"],
+    ['backend-bdd', "needs.changes.outputs.backend == 'true'"],
+    ['e2e', "needs.changes.outputs.desktop == 'true' || needs.changes.outputs.backend == 'true'"],
+    ['backend-unit', "needs.changes.outputs.backend == 'true' || needs.changes.outputs.orchestrator == 'true'"],
+    ['ansible-validate', "needs.changes.outputs.ansible == 'true' || needs.changes.outputs.backend == 'true'"],
+    ['audit', "needs.changes.outputs.audit == 'true'"],
+  ])('"%s" carries exactly the expected job-level if: — removing it must fail this test', (job, expected) => {
+    expect(jobLevelIf(jobBlock(ciYaml(), job))).toBe(expected)
+  })
+
+  /**
+   * Round 2 of #664's own review (fleet/review on PR #862): "the new path
+   * map omits inputs that decide real checks." The scenario table above
+   * only exercises three specific diffs — a path could be missing from the
+   * map and still pass every scenario there, as long as none of the three
+   * happened to touch it. This rail is narrower and more direct: for every
+   * (job, file) pair below, that exact file is the ONLY change, and the
+   * job must run. Each pair names a file a real PR would plausibly touch on
+   * its own — a migration, a BDD feature, a step definition, the server
+   * entry point, the Playwright config, the shared bootstrap action — and
+   * pins it to the job whose verdict it can silently invalidate if skipped.
+   * Removing any one of these paths from its regex in
+   * detect-changed-platforms.sh makes the corresponding row fail.
+   */
+  it.each([
+    ['migration-drift', 'drizzle.config.ts'],
+    ['migration-drift', 'drizzle/migrations/0001_add_foo/migration.sql'],
+    ['backend-bdd', 'drizzle.config.ts'],
+    ['backend-bdd', 'tests/steps/backend/foo.steps.ts'],
+    ['backend-bdd', 'packages/test-specs/features/security/foo.feature'],
+    ['backend-bdd', 'src/server/index.ts'],
+    ['backend-bdd', '.github/actions/bootstrap-backend/action.yml'],
+    ['e2e', 'playwright.config.ts'],
+    ['e2e', 'packages/test-specs/features/security/foo.feature'],
+    ['e2e', 'src/server/index.ts'],
+    ['android-e2e', 'packages/test-specs/features/platform/mobile/foo.feature'],
+    ['android-e2e', '.github/actions/bootstrap-backend/action.yml'],
+  ])('"%s" runs when its own input "%s" changes alone', (job, file) => {
+    const outputs = classify([file])
+    const runs = evalJobIf(jobLevelIf(jobBlock(ciYaml(), job)), outputs)
+    expect(runs, `expected "${job}" to RUN when only "${file}" changes; outputs=${JSON.stringify(outputs)}`).toBe(true)
+  })
+
+  it('the changes job diffs against the PR/merge-group base sha, not HEAD^', () => {
+    const block = jobBlock(ciYaml(), 'changes')
+    expect(block).toContain('github.event.pull_request.base.sha')
+    expect(block).toContain('github.event.merge_group.base_sha')
+  })
+
+  it('ci.yml, ios-e2e.yml and desktop-e2e.yml all call the one shared classification script — no second copy of the path map', () => {
+    for (const file of ['ci.yml', 'ios-e2e.yml', 'desktop-e2e.yml']) {
+      const yaml = readFileSync(join(process.cwd(), '.github', 'workflows', file), 'utf8')
+      expect(yaml, `${file} does not call detect-changed-platforms.sh`).toContain('detect-changed-platforms.sh')
+    }
+  })
+
+  it('desktop-e2e.yml carries no workflow-level pull_request paths: filter — that shape breaks a future required check', () => {
+    const yaml = readFileSync(join(process.cwd(), '.github', 'workflows', 'desktop-e2e.yml'), 'utf8')
+    const onBlock = yaml.split(/\njobs:\n/)[0] ?? ''
+    const pullRequestBlock = onBlock.match(/\n {2}pull_request:\n((?:\n| {4,}.*\n)*)/)?.[0] ?? '\n  pull_request:\n'
+    expect(pullRequestBlock).not.toContain('paths:')
   })
 })

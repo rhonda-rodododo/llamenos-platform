@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { enterPin, resetTestState, TEST_PIN, Timeouts, completeProfileSetup } from './helpers'
+import { ADMIN_SEED, enterPin, resetTestState, TEST_PIN, Timeouts, completeProfileSetup } from './helpers'
 import { TestIds } from './test-ids'
 
 const TEST_RESET_SECRET = process.env.DEV_RESET_SECRET || 'test-reset-secret'
@@ -22,23 +22,12 @@ async function enterBootstrapPin(page: import('@playwright/test').Page, pin: str
 
 /**
  * After loading storage state and navigating to /, handle PIN entry.
- * Blocks refresh to force PIN screen, enters PIN, waits for dashboard.
+ * The cached localStorage holds an encrypted key, so the app always shows the
+ * PIN screen (decrypting it into memory happens fresh on every page load —
+ * see tests/fixtures/auth.ts for the full explanation). Enters PIN, waits for
+ * dashboard.
  */
 async function unlockAndNavigateToDashboard(page: import('@playwright/test').Page) {
-  // Block the automatic restoreSession refresh so the PIN screen appears first.
-  let refreshBlocked = true
-  await page.route('**/api/auth/token/refresh', async (route) => {
-    if (refreshBlocked) {
-      await route.fulfill({
-        status: 401,
-        contentType: 'application/json',
-        body: '{"error":"blocked-during-setup"}',
-      })
-    } else {
-      await route.continue()
-    }
-  })
-
   await page.goto('/', { waitUntil: 'domcontentloaded' })
 
   const pinInput = page.getByTestId(TestIds.PIN_INPUT).locator('input')
@@ -50,9 +39,6 @@ async function unlockAndNavigateToDashboard(page: import('@playwright/test').Pag
     pageTitle.waitFor({ state: 'visible', timeout: 45000 }).then(() => 'dashboard' as const),
     profileSetupBtn.waitFor({ state: 'visible', timeout: 45000 }).then(() => 'profile' as const),
   ])
-
-  // Unblock refresh so the PIN unlock flow can call refreshToken and getUserInfo
-  refreshBlocked = false
 
   if (firstVisible === 'pin') {
     await enterPin(page, TEST_PIN)
@@ -66,8 +52,6 @@ async function unlockAndNavigateToDashboard(page: import('@playwright/test').Pag
   } else if (firstVisible === 'profile') {
     await completeProfileSetup(page)
   }
-
-  await page.unroute('**/api/auth/token/refresh')
 
   // Ensure sidebar is visible (confirms full auth)
   await page.getByTestId(TestIds.NAV_SIDEBAR).waitFor({ state: 'visible', timeout: Timeouts.AUTH })
@@ -486,5 +470,54 @@ test.describe('Global Setup: Provision Test Accounts', () => {
     const res = await request.get('/api/config')
     const config = await res.json()
     expect(config.needsBootstrap).toBe(false)
+  })
+
+  // ── Session-reuse cache for the FIXED admin identity ──────────────────
+  //
+  // Every other Playwright project's loginAsAdmin() (tests/helpers.ts) and
+  // the "Given I am logged in as an admin" family of BDD steps authenticate
+  // as ADMIN_SEED, not as whichever random keypair bootstrapAdmin() generated
+  // above. ADMIN_SEED is a FIXED Ed25519 seed whose derived pubkey
+  // (79215a4c04f08fcd...af9183) matches CI's TEST_ADMIN_PUBKEY -- the
+  // identity every /api/test-reset call re-seeds server-side, for the entire
+  // rest of the suite's lifetime.
+  //
+  // The bootstrap admin created above, by contrast, exists ONLY to exercise
+  // the real onboarding UI (AdminBootstrap.tsx) -- that is bootstrapAdmin()'s
+  // actual job, unrelated to session caching. `resetTestState()` two tests
+  // up wipes it (services.identity.reset() unconditionally deletes the users
+  // table) and, when ADMIN_PUBKEY is configured, re-seeds ADMIN_SEED's
+  // identity in its place. Saving tests/storage/admin.json from the
+  // bootstrap-UI context (as this file used to do, right after
+  // bootstrapAdmin() finished) captured an identity guaranteed to be
+  // orphaned by the very next test in this file -- every consumer's cache
+  // read would then correctly decrypt the key client-side but get a 401 on
+  // the very first authenticated API call, surfacing as "Wrong PIN" (see
+  // docs/KNOWN_FLAKES.md#login-pin-race for the full trace). This step
+  // authenticates as the identity that actually survives, once, for real,
+  // through the UI -- and overwrites admin.json with a cache that stays
+  // valid for the rest of the run.
+  test('cache the fixed admin session for loginAsAdmin() reuse', async ({ page }) => {
+    await page.goto('/login')
+    await page.waitForLoadState('domcontentloaded')
+    await page.waitForFunction(() => !!(window as any).__TEST_PLATFORM, { timeout: Timeouts.AUTH })
+
+    await page.evaluate(async ({ secretHex, pin }) => {
+      const platform = (window as any).__TEST_PLATFORM
+      const encrypted = await platform.deviceImportAndLoad(secretHex, pin, crypto.randomUUID())
+      await platform.persistAndUnlockDeviceKeys(encrypted, pin)
+      await platform.lockCrypto()
+    }, { secretHex: ADMIN_SEED, pin: TEST_PIN })
+
+    // Real UI PIN entry, once, proving the identity we're about to cache
+    // actually authenticates end to end before anything else trusts it.
+    await page.reload()
+    await page.waitForLoadState('domcontentloaded')
+    await enterPin(page, TEST_PIN)
+    await page.waitForURL(u => !u.toString().includes('/login'), { timeout: Timeouts.AUTH })
+    await page.getByTestId(TestIds.NAV_SIDEBAR).waitFor({ state: 'visible', timeout: Timeouts.AUTH })
+
+    await page.context().storageState({ path: `${STORAGE_DIR}/admin.json` })
+    console.log('[SETUP] Fixed admin (ADMIN_SEED) storage state saved — supersedes the bootstrap-UI admin cache')
   })
 })
