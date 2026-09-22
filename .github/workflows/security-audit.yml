@@ -290,6 +290,43 @@ jobs:
           ignore-unfixed: true
           exit-code: '1'
 
+      # G7 (issue #650, re-measured 2026-09-20): CRITICAL is 0 across all three
+      # matrix legs now (perl-base fixed in #668). Re-measuring the fixable-HIGH
+      # action item split cleanly by layer:
+      #   - Debian OS layer (`app`/`static` targets' base): 0 fixable HIGH — the
+      #     43 remaining HIGH findings have no upstream fix yet (util-linux/
+      #     systemd/ncurses/login family); routine `apt-get upgrade` + Dependabot
+      #     base-image bumps already pick up a fix the moment one ships.
+      #   - Alpine OS layer (`static` target, Caddy image): was 23 fixable HIGH
+      #     (curl/c-ares/libcrypto3/libssl3) — fixed in this PR by bumping the
+      #     `caddy:2.11.4-alpine`/`caddy:2.11.4-builder-alpine` digest pins to
+      #     the current latest for the same tag (same Caddy version, refreshed
+      #     Alpine layer only). Re-scan confirms 0 fixable HIGH remain there.
+      #   - Node/npm layer (`app` target): 19 fixable HIGH (browserslist,
+      #     form-data, h3, hono, nanoid, postcss, protobufjs, smol-toml, svgo,
+      #     undici, vite) — fixing these means editing package.json/bun.lock,
+      #     which is outside this workflow file's ownership; tracked by the
+      #     "bun audit" issue referenced in #650.
+      #   - Go-module layer (`static` target, our xcaddy-built caddy binary):
+      #     6 fixable HIGH (golang.org/x/crypto, x/net, x/text, grpc) baked
+      #     into the Caddy 2.11.4 release's resolved dependency set — a digest
+      #     bump can't reach these, only an actual Caddy version bump can, and
+      #     that needs Caddyfile.production + caddy-ratelimit plugin compat
+      #     validation first. Left as a follow-up.
+      # Scoping this gate to `vuln-type: os` hard-fails the moment a *fixable*
+      # OS-package HIGH/CRITICAL appears (e.g. a base-image bump regresses)
+      # without blocking on the Node/Go-module findings this workflow can't
+      # fix by itself.
+      - name: Fail on fixable HIGH/CRITICAL OS-package vulnerabilities
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: 'llamenos-scan:latest'
+          format: 'table'
+          severity: 'CRITICAL,HIGH'
+          vuln-type: 'os'
+          ignore-unfixed: true
+          exit-code: '1'
+
       - name: Upload image scan results
         uses: github/codeql-action/upload-sarif@b96794f015dfd88f77b49b1c93e0fa7110f94c63 # v3
         if: always() && github.repository_visibility == 'public'
