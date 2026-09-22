@@ -4,6 +4,7 @@ import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
+import org.llamenos.hotline.crypto.BiometricKeyStore
 import org.llamenos.hotline.crypto.KeyValueStore
 import org.llamenos.hotline.crypto.KeystoreService
 import javax.inject.Singleton
@@ -33,4 +34,8 @@ abstract class AppModule {
     @Binds
     @Singleton
     abstract fun bindKeyValueStore(keystoreService: KeystoreService): KeyValueStore
+
+    @Binds
+    @Singleton
+    abstract fun bindBiometricKeyStore(keystoreService: KeystoreService): BiometricKeyStore
 }

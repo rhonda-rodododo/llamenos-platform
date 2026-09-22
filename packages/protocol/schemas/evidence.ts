@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { recipientEnvelopeSchema, paginationSchema } from './common'
+import { auditEntryResponseSchema } from './audit'
 
 // --- Evidence Classification ---
 
@@ -130,3 +131,14 @@ export const verifyIntegrityResponseSchema = z.object({
   originalHash: z.string(),
   currentHash: z.string(),
 })
+
+// --- Evidence Access Log (Issue #730) ---
+// Admin-only, hash-chained view of every access to a single evidence item —
+// backed by the Epic 77 audit_log chain, not a parallel unchained table.
+
+export const evidenceAccessLogResponseSchema = z.object({
+  entries: z.array(auditEntryResponseSchema),
+  total: z.number(),
+})
+
+export type EvidenceAccessLogResponse = z.infer<typeof evidenceAccessLogResponseSchema>
