@@ -244,16 +244,18 @@ Then('the plural label should auto-populate with {string}', async ({ page }, exp
   await expect(page.getByTestId('entity-type-label-plural-input')).toHaveValue(expected, { timeout: 5000 })
 })
 
-Then('default statuses {string} and {string} should be pre-populated', async ({ page }, s1: string, _s2: string) => {
+Then('default statuses {string} and {string} should be pre-populated', async ({ page }, s1: string, s2: string) => {
   // Switch to statuses tab to verify
   await page.getByTestId('entity-tab-statuses').click()
   const rows = page.getByTestId('status-row')
   const count = await rows.count()
   expect(count).toBeGreaterThanOrEqual(2)
-  // Use exact match to avoid matching the value badge (lowercase) in addition to the label.
-  // Both defaults must be pre-populated, not just whichever sorts first.
-  await expect(rows.filter({ hasText: s1 }).first().getByText(s1, { exact: true })).toBeVisible({ timeout: Timeouts.ELEMENT })
-  await expect(rows.filter({ hasText: s2 }).first().getByText(s2, { exact: true })).toBeVisible({ timeout: Timeouts.ELEMENT })
+  // Scope to the row's status-label testid, not a bare getByText(exact) — each row also
+  // renders the same status text again in a value badge, so an unscoped exact-text match
+  // resolves to both and strict-mode-violates. Both defaults must be pre-populated, not
+  // just whichever sorts first.
+  await expect(rows.filter({ hasText: s1 }).first().getByTestId('status-label')).toHaveText(s1, { timeout: Timeouts.ELEMENT })
+  await expect(rows.filter({ hasText: s2 }).first().getByTestId('status-label')).toHaveText(s2, { timeout: Timeouts.ELEMENT })
   // Go back to general tab
   await page.getByTestId('entity-tab-general').click()
 })
