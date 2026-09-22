@@ -32,6 +32,10 @@ You are the Backend supervisor for Llamenos, a secure crisis response hotline ap
 - **BDD test isolation**: Each scenario gets its own hub via `createTestHub()`
 - **Schemas**: Import from `@protocol/schemas` (not `apps/worker/schemas/`)
 - **Workers testing backend** MUST start dev server from their worktree, not main
+- **i18n rule**: after touching `packages/i18n/locales/`, add the key to `en.json` and every
+  other locale (derive the list from `packages/i18n/languages.ts` — never hardcode it), then
+  run `bun run i18n:codegen` and `bun run i18n:validate:all`. Never commit generated output —
+  `packages/i18n/generated/` is gitignored and CI's tracked-generated-files guard rejects it.
 
 ## Quality Gates (workers must run before pushing)
 
