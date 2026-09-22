@@ -252,6 +252,12 @@ final class AuthLoginBDDTests: XCTestCase {
 
         failAttempts(9, on: viewModel)
         keychain.setLockoutUntil(.distantPast)
+        XCTAssertEqual(
+            keychain.getLockoutAttempts(), 9,
+            "Nine failed attempts must be persisted going into the tenth, terminal attempt — "
+                + "this is what proves the wipe below is triggered by reaching 10, not by some "
+                + "other path"
+        )
         XCTAssertNotNil(
             try keychain.retrieve(key: KeychainKey.encryptedKeys),
             "Keys should still be present before the tenth attempt"
@@ -259,7 +265,24 @@ final class AuthLoginBDDTests: XCTestCase {
 
         viewModel.onPINComplete(wrongPIN("0"))
 
-        XCTAssertEqual(viewModel.failedAttempts, 10)
+        // The wipe (AuthService.logout()) clears the persisted lockout counter along
+        // with the keys — deliberately, not incidentally. If it didn't, a device wiped
+        // this way and then re-provisioned with a brand new identity would inherit an
+        // already-maxed-out counter and get its NEW identity wiped on the very first
+        // wrong guess, destroying the 1-4-free-retries ladder for that identity.
+        // `failedAttempts` is a live read of that same Keychain record (see the #621
+        // live-read fix — caching it would silently miss exactly this kind of write
+        // from another code path), so it correctly reports 0 once `logout()` has run.
+        // The boundary itself — that attempt 10 is what triggers the wipe, no earlier
+        // and no later — is covered independently and precisely by
+        // `SecurityHardeningTests.testWipeOnTenthAttempt`/`testNoWipeBelowTenAttempts`,
+        // which assert `PINLockout.shouldWipeKeys(forAttempts:)` directly against the
+        // pure threshold function, decoupled from Keychain-clearing side effects.
+        XCTAssertEqual(
+            viewModel.failedAttempts, 0,
+            "The wipe must clear the persisted attempt counter along with the keys, so a "
+                + "freshly re-provisioned identity does not inherit a maxed-out lockout ladder"
+        )
         XCTAssertNil(
             try keychain.retrieve(key: KeychainKey.encryptedKeys),
             "The tenth failed attempt must wipe the stored encrypted keys"
