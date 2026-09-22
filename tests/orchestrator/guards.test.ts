@@ -1632,14 +1632,33 @@ describe('rail: decideReviewGate enforces the four fleet/review branches (cache-
     }
   })
 
-  it('concludes low-tier for an instructions/tooling-only diff (Tier 1)', async () => {
+  it('concludes low-tier for a verified-inert-data-only diff (Tier 1)', async () => {
     const cache = fakeCache()
     const outcome = await decideReviewGate({
-      ctx: ctx(), prDiff: async () => diff, changedFiles: async () => ['eslint.config.js'],
+      ctx: ctx(), prDiff: async () => diff, changedFiles: async () => ['.editorconfig'],
       cache, requested: false, log: () => {},
     })
     expect(outcome.kind).toBe('low-tier')
     if (outcome.kind === 'low-tier') expect(outcome.tier).toBe(1)
+  })
+
+  // PR #870's SECOND fix, pinned at the decision-gate level (not just in
+  // impact.test.ts's unit tests on `tierFor` directly): `eslint.config.js`
+  // used to be a `TIER1_PATHS` member, which meant it concluded `low-tier`
+  // here with ZERO CODEOWNERS coverage (verified against the tracked
+  // `CODEOWNERS` file) — a lint CI step `import()`s and executes this file,
+  // so a diff touching only it could disable the lint gate with no review
+  // of any kind. It must now fall through to Tier 2 like any other
+  // unmatched path, and reach `run-engine` once requested — never
+  // `low-tier`, proven the same way the `.claude/agents/` regression above
+  // is proven.
+  it('a diff touching eslint.config.js never concludes low-tier — lint/format config can alter what a gate enforces', async () => {
+    const cache = fakeCache()
+    const outcome = await decideReviewGate({
+      ctx: ctx(), prDiff: async () => diff, changedFiles: async () => ['eslint.config.js'],
+      cache, requested: true, log: () => {},
+    })
+    expect(outcome.kind).toBe('run-engine')
   })
 
   // PR #870's own fix, pinned at the decision-gate level (not just in

@@ -215,17 +215,67 @@ describe('tierFor', () => {
     expect(r.reasons).toEqual([])
   })
 
-  // Only cosmetic lint/format/editor config remains Tier 1 after PR #870's
-  // fix — `.claude/agents/`, `.claude/skills/`, `docs/superpowers/specs/`,
-  // and `lefthook.yml` are asserted Tier 2 further down, not here.
+  // Only data verified to be sourced/evaluated/executed by NOTHING in this
+  // repo remains Tier 1 after PR #870's SECOND fix — `.claude/agents/`,
+  // `.claude/skills/`, `docs/superpowers/specs/`, and `lefthook.yml` (first
+  // fix) plus every lint/format tool config (second fix, below) are all
+  // asserted Tier 2 further down, not here.
+  it.each([
+    '.editorconfig',
+    '.gitattributes',
+  ])('classifies %s as Tier 1 (verified inert — sourced/evaluated by nothing in this repo)', (f) => {
+    expect(tierFor([f]).tier).toBe(1)
+  })
+
+  // PR #870's SECOND fix: `eslint.config.js`/`.ts` are literal JavaScript a
+  // lint CI step `import()`s and executes; the JSON/plain variants are not
+  // code but ARE sourced and evaluated by that same step (resolving
+  // `"extends"`/`"plugins"`, applying `"rules"`), so a diff touching only
+  // one of them could silently disable the lint gate with zero review —
+  // none of these seven paths has ever had a CODEOWNERS line (verified
+  // against the tracked `CODEOWNERS` file). All seven must default to Tier
+  // 2 now, the same as any other unmatched path — this is the regression
+  // test for the finding itself, not just a coverage check.
   it.each([
     'eslint.config.js',
     'eslint.config.ts',
     '.eslintrc.json',
+    '.eslintrc.js',
     '.prettierrc',
-    '.editorconfig',
-  ])('classifies %s as Tier 1 (cosmetic tooling)', (f) => {
-    expect(tierFor([f]).tier).toBe(1)
+    '.prettierrc.json',
+    '.prettierrc.js',
+  ])('%s is Tier 2 (default) — lint/format tool config can alter what a gate enforces, never auto-succeeds', (f) => {
+    expect(tierFor([f]).tier).toBe(2)
+  })
+
+  // Standing rail (not a one-off): no path whose extension is ever executed
+  // or `import()`-ed by Node/Bun tooling can land in the auto-succeed tiers
+  // (0 or 1), regardless of directory. This is deliberately broader than
+  // just "today's TIER1_PATHS members" — it also guards `isTier0Path` and
+  // any future rule this file gains, so the next widening (of EITHER tier)
+  // trips this test rather than the live gate the way it did twice already.
+  const EXECUTABLE_EXTENSIONS = ['.js', '.ts', '.mjs', '.cjs', '.mts', '.cts', '.sh', '.py', '.rb']
+  it.each(EXECUTABLE_EXTENSIONS)(
+    'no path ending in %s can ever classify below Tier 2, at any depth',
+    (ext) => {
+      const rootFile = `some-config${ext}`
+      const nestedFile = `some/nested/dir/some-config${ext}`
+      for (const f of [rootFile, nestedFile]) {
+        const tier = tierFor([f]).tier
+        expect(tier, `${f} classified Tier ${tier}, expected Tier 2`).toBe(2)
+      }
+    },
+  )
+
+  // The list itself, not just tierFor's behavior on hand-picked examples —
+  // fails immediately if ANY future entry is added to TIER1_PATHS with an
+  // executable (or otherwise CI-sourced/evaluated) extension, without
+  // needing a new hardcoded example above to catch it.
+  it('TIER1_PATHS admits no executable extension — the auto-succeed tier can only ever hold inert data', () => {
+    for (const p of TIER1_PATHS) {
+      const hasExecutableExtension = EXECUTABLE_EXTENSIONS.some((ext) => p.endsWith(ext))
+      expect(hasExecutableExtension, `${p} has an executable extension and must not be in TIER1_PATHS`).toBe(false)
+    }
   })
 
   // A `.md` file under `.claude/` is instruction text a coding agent obeys,
@@ -331,11 +381,13 @@ describe('tierFor', () => {
   // filename — while actually living under a Tier 2 "always" directory —
   // classified as Tier 1 and skipped the non-author review entirely. Both
   // examples are real Tier 2 directories (`packages/crypto/`,
-  // `orchestrator/`) paired with real TIER1_PATHS basenames
-  // (`eslint.config.js`, `.eslintrc.json`) that are ONLY meant to match at
-  // the repo root. Neither path is a tracked file today — this asserts the
-  // classifier's behavior on a hypothetical path, not file existence.
-  it.each(['packages/crypto/eslint.config.js', 'orchestrator/src/.eslintrc.json'])(
+  // `orchestrator/`) paired with the CURRENT real TIER1_PATHS basenames
+  // (`.editorconfig`, `.gitattributes` — updated from the original
+  // `eslint.config.js`/`.eslintrc.json` examples when PR #870's SECOND fix
+  // removed those from `TIER1_PATHS` entirely) that are ONLY meant to match
+  // at the repo root. Neither path is a tracked file today — this asserts
+  // the classifier's behavior on a hypothetical path, not file existence.
+  it.each(['packages/crypto/.editorconfig', 'orchestrator/src/.gitattributes'])(
     '%s stays Tier 2 (always) — a Tier 1 basename match must not shadow the directory it lives under',
     (f) => {
       expect(tierFor([f]).tier).toBe(2)
@@ -359,9 +411,9 @@ describe('tierFor', () => {
     const tier2AndTier0 = tierFor(['docs/readme.md', '.claude/agents/backend-supervisor.md'])
     expect(tier2AndTier0.tier).toBe(2)
 
-    // The genuinely-Tier-1 case: cosmetic tooling mixed with docs prose
+    // The genuinely-Tier-1 case: verified-inert data mixed with docs prose
     // still tops out at Tier 1, never escalating to 2 on its own.
-    const tier1AndTier0 = tierFor(['docs/readme.md', 'eslint.config.js'])
+    const tier1AndTier0 = tierFor(['docs/readme.md', '.editorconfig'])
     expect(tier1AndTier0.tier).toBe(1)
   })
 

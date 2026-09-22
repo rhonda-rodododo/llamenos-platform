@@ -176,15 +176,36 @@ export function classifyImpact(
 // mobile-suite exemption; it never had, and never needed, a model-review
 // exemption for paths this sensitive.
 //
+// CORRECTED AGAIN 2026-09-22 (the SAME gate caught the SAME class of defect
+// a second time, on the SAME PR): "cosmetic tooling" is not automatically
+// "cannot widen what a gate enforces." `eslint.config.js` is JavaScript a
+// lint CI step `import()`s and executes; `.eslintrc.json`/`.prettierrc*`
+// are not code but ARE sourced and evaluated by that same step, and a diff
+// touching only one of them could disable the lint gate entirely. None of
+// the seven paths this removed (see `TIER1_PATHS`'s own comment) ever had a
+// CODEOWNERS line, so "waits on cheap checks + code-owner review" was as
+// false for these as it was for `.claude/skills/` in the first fix — the
+// bullet below now says what is actually true of what remains, instead of
+// what the tier was originally supposed to mean. The pattern across BOTH
+// fixes: every category proposed as "safe to auto-pass" has turned out to
+// be executable or authority-bearing. `TIER1_PATHS`'s own comment argues
+// the durable fix is a cheap check gating Tier 1 in `ci.ts` (outside this
+// file's owned paths, so not implemented here) rather than another round of
+// re-curating which paths feel safe.
+//
 //   Tier 0 — no executable content: `docs/**`, `*.md` outside `.claude/`
 //     and outside an agent-instruction basename, spec prose. Nothing here
 //     can affect runtime behavior. Waits on cheap repo checks only
 //     (lint/typecheck where applicable) — no model review, ever.
-//   Tier 1 — cosmetic tooling that shapes FUTURE work but can never widen
-//     what a coding agent obeys or what a gate enforces: lint/format/editor
-//     config. Waits on cheap checks + code-owner review (every Tier 1 path
-//     is already, or should be, CODEOWNERS-protected). No model review, no
-//     e2e/mobile suites.
+//   Tier 1 — data verified (not assumed) to be sourced, evaluated, or
+//     executed by NOTHING in this repo: `.editorconfig`, `.gitattributes`.
+//     No lint/format tool config, however inert it looks, because ESLint
+//     and Prettier configs (JS or JSON) both resolve `"extends"`/`"plugins"`
+//     and apply `"rules"` — capability enough to alter what the lint gate
+//     enforces. Waits on cheap checks only. No model review, no e2e/mobile
+//     suites, and NOT contingent on CODEOWNERS coverage the way the
+//     original design assumed — see `TIER1_PATHS`'s own comment for why
+//     that contingency failed twice.
 //   Tier 2 — everything else, and ALWAYS: product code, `packages/crypto/`,
 //     auth/session/sigchain, `packages/protocol/schemas/`,
 //     `.github/workflows/`, `orchestrator/`, `tests/orchestrator/`,
@@ -260,22 +281,56 @@ function isTier0Path(f: string): boolean {
  * `HIGH_IMPACT_PATHS` entry (removing it here was enough — that list
  * already forces Tier 2 with full CODEOWNERS coverage).
  *
- * What remains below is lint/format/editor config: cosmetic tooling that
- * cannot change what an agent obeys or what CI enforces as a gate. `tierFor
- * File` checks `TIER1_PATHS` AFTER `AGENT_INSTRUCTION_PATHS` (Tier 2,
- * unconditional) and the `HIGH_IMPACT_PATHS`/secret checks, so nothing
+ * FIXED AGAIN 2026-09-22 (PR #870's review gate caught this on itself a
+ * SECOND time): the list above used to also carry `eslint.config.js`,
+ * `eslint.config.ts`, `.eslintrc.json`, `.eslintrc.js`, `.prettierrc`,
+ * `.prettierrc.json`, and `.prettierrc.js`. Every one of those is a file a
+ * lint/format CI step SOURCES and EVALUATES — `eslint.config.js` is literal
+ * JavaScript the lint job `import()`s and executes; the JSON variants are
+ * not code, but ESLint/Prettier both resolve `"extends"`/`"plugins"` out of
+ * them and apply their `"rules"` verbatim, so a diff touching only one of
+ * these could silently disable the very lint gate other PRs rely on as a
+ * quality signal — with ZERO review, because (verified against the tracked
+ * `CODEOWNERS` file, not assumed) not one of those seven paths has ever had
+ * a CODEOWNERS line. The doc comment above claiming Tier 1 "already earns a
+ * code-owner review on its own" was true for `lefthook.yml` (removed from
+ * this list in the first fix, already Tier 2 via `HIGH_IMPACT_PATHS`) but
+ * was never true for any of these seven — a promise this file could not
+ * keep, the identical shape as the first fix's `.claude/skills/` finding.
+ *
+ * Twice now, everything proposed for this tier has turned out to be either
+ * executable or authority-bearing over what a gate enforces. The PR that
+ * made this second fix argues in its own description that the honest
+ * long-term answer is probably "Tier 1 should require a CHEAP check before
+ * `ci.ts` lets it skip the model review" rather than nothing at all — but
+ * `decideReviewGate` (`orchestrator/src/ci.ts`) currently treats Tier 0 and
+ * Tier 1 identically (`tier < 2` → zero engine calls, zero other checks)
+ * and that function is outside this file's owned paths
+ * (`orchestrator/src/impact.ts`, `tests/orchestrator/`), so it could not be
+ * changed here. What COULD be fixed here, unconditionally and without
+ * touching `ci.ts` at all: shrink membership to paths verified (by grep — see
+ * the guard test in `impact.test.ts`, not a comment's claim) to be sourced,
+ * evaluated, or executed by NOTHING in this repo today — `.editorconfig`
+ * and `.gitattributes`. Both are pure declarative key/value data (whitespace
+ * rules; line-ending/diff/export hints) with no `"extends"`, no plugin
+ * loading, and no rule-suppression capability, so a diff touching only one
+ * of them cannot alter what any gate enforces or what CI executes. Neither
+ * is CODEOWNERS-covered either, but that no longer matters the way it did
+ * for `.claude/skills/`: there is no capability left in these two files for
+ * an absent human reviewer to have missed.
+ *
+ * `tierForFile` checks `TIER1_PATHS` AFTER `AGENT_INSTRUCTION_PATHS` (Tier
+ * 2, unconditional) and the `HIGH_IMPACT_PATHS`/secret checks, so nothing
  * below can ever shadow a Tier 2 path — the ordering the PR #870 regression
- * tests in `impact.test.ts` pin down.
+ * tests in `impact.test.ts` pin down. The standing rail in
+ * `impact.test.ts` (`TIER1_PATHS admits no executable extension`) asserts
+ * this list can never again gain a `.js`/`.ts`/`.mjs`/`.cjs`/`.mts`/`.cts`
+ * (or other CI-executed) entry — the exact regression this comment
+ * documents — so the next widening trips that test, not a live gate.
  */
 export const TIER1_PATHS: readonly string[] = [
   '.editorconfig',
-  'eslint.config.js',
-  'eslint.config.ts',
-  '.eslintrc.json',
-  '.eslintrc.js',
-  '.prettierrc',
-  '.prettierrc.json',
-  '.prettierrc.js',
+  '.gitattributes',
 ]
 
 /**
@@ -343,15 +398,20 @@ function isAgentInstructionFile(f: string): boolean {
  * unanchored-substring shape `classifyImpact` uses for `HIGH_IMPACT_PATHS`.
  * For a directory entry that's a reasonable "is this path under that
  * directory" test, but every `TIER1_PATHS` entry without a trailing `/` is
- * a single REPO-ROOT file (`lefthook.yml`, `eslint.config.js`, ...), and
- * `includes(\`/${p}\`)` matches that basename at ANY depth —
- * `packages/crypto/eslint.config.js` or `orchestrator/src/lefthook.yml`
- * would match here despite living under a directory `HIGH_IMPACT_PATHS`
- * calls Tier 2 "always". Because `tierForFile` checks this list first, that
- * false match let a crypto or orchestrator file skip the non-author review
- * entirely. A path must match a `TIER1_PATHS` entry because it IS that
- * directory's descendant, or literally IS that root file — never because
- * the entry's text merely appears somewhere in the path string.
+ * a single REPO-ROOT file — at the time of the fix, `lefthook.yml` and
+ * `eslint.config.js` (both since removed from `TIER1_PATHS` entirely; see
+ * that constant's own comment for why), today `.editorconfig` and
+ * `.gitattributes` — and `includes(\`/${p}\`)` matches that basename at ANY
+ * depth: `packages/crypto/eslint.config.js` or
+ * `orchestrator/src/lefthook.yml` matched despite living under a directory
+ * `HIGH_IMPACT_PATHS` calls Tier 2 "always". Because `tierForFile` checks
+ * this list first, that false match let a crypto or orchestrator file skip
+ * the non-author review entirely. A path must match a `TIER1_PATHS` entry
+ * because it IS that directory's descendant, or literally IS that root
+ * file — never because the entry's text merely appears somewhere in the
+ * path string. The anchoring itself stays correct regardless of which
+ * files currently populate the list — this is what makes it safe for
+ * `TIER1_PATHS` to keep shrinking without a matching change here.
  */
 function tier1Hit(f: string): string | undefined {
   return TIER1_PATHS.find((p) => (p.endsWith('/') ? f.startsWith(p) : f === p))
@@ -362,7 +422,8 @@ function tier1Hit(f: string): string | undefined {
  * `AGENT_INSTRUCTION_PATHS` entry ends in `/`, so a plain `startsWith` is
  * already a real "is this path under that directory" test with no
  * unanchored-substring risk — no bare-basename branch is needed the way
- * `tier1Hit` needs one for `lefthook.yml`/`eslint.config.js`.
+ * `tier1Hit` needs one for its repo-root file entries (`.editorconfig`,
+ * `.gitattributes`).
  */
 function agentInstructionHit(f: string): string | undefined {
   return AGENT_INSTRUCTION_PATHS.find((p) => f.startsWith(p))
@@ -378,8 +439,11 @@ function agentInstructionHit(f: string): string | undefined {
  *    for the PR #870 finding: paths that define what the fleet's own coding
  *    agents obey must never reach the auto-succeed tiers, checked before
  *    any rule that could otherwise demote them.
- * 2. `TIER1_PATHS` next — cosmetic lint/format/editor config only, now that
- *    the agent-instruction paths have been carved out above. No
+ * 2. `TIER1_PATHS` next — data verified to be sourced/evaluated/executed by
+ *    nothing in this repo (`.editorconfig`, `.gitattributes` — NOT lint/
+ *    format tool config, removed here a second time after PR #870's review
+ *    gate caught `eslint.config.js`/`.eslintrc.json`/`.prettierrc*` as a
+ *    fail-open; see `TIER1_PATHS`'s own comment). No
  *    `HIGH_IMPACT_PATHS`/secret-pattern entry overlaps a `TIER1_PATHS`
  *    prefix today — pinned by the "never demoted" tests in
  *    `tests/orchestrator/impact.test.ts`, which iterate the real
