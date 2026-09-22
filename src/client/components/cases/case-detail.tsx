@@ -393,7 +393,6 @@ function LinkCaseDialog({ eventId, open, onOpenChange, onLinked }: {
           placeholder={t('events.searchCases', { defaultValue: 'Search cases...' })}
           value={search}
           onChange={e => setSearch(e.target.value)}
-          data-testid="event-link-case-search"
           autoFocus
         />
         <div className="max-h-60 overflow-y-auto space-y-1">

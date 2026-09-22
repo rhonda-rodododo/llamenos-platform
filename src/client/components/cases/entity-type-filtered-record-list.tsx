@@ -6,7 +6,6 @@ import {
   listEntityTypes,
   updateRecord,
   getCaseManagementEnabled,
-  updateRecord,
   type CaseRecord,
   type EntityTypeDefinition,
 } from '@/lib/api'

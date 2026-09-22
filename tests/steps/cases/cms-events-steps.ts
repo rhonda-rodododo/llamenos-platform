@@ -232,13 +232,9 @@ Given('an event with linked cases exists', async ({ backendRequest: request, cas
 
   // Create and link a case. Record-based events link via record parent/child —
   // POST /events/:id/records targets the separate events table and 404s here.
-  const entityTypes = await listEntityTypesViaApi(request, workerHub)
-  const arrestType = entityTypes.find(et => (et as { name?: string }).name === 'arrest_case')
-  if (arrestType) {
-    const etId = (arrestType as { id: string }).id
-    const record = await createRecordViaApi(request, etId, { statusHash: 'reported', hubId: workerHub })
-    await updateRecordViaApi(request, (record as { id: string }).id, { parentRecordId: casesWorld.lastEventId! }, workerHub)
-  }
+  const etId = await arrestCaseTypeId(request, workerHub)
+  const record = await createRecordViaApi(request, etId, { statusHash: 'reported', hubId: workerHub })
+  await updateRecordViaApi(request, (record as { id: string }).id, { parentRecordId: casesWorld.lastEventId! }, workerHub)
 })
 
 Given('an event with {int} linked cases exists', async ({ backendRequest: request, casesWorld, workerHub }, count: number) => {
@@ -247,14 +243,10 @@ Given('an event with {int} linked cases exists', async ({ backendRequest: reques
   const event = await createRecordViaApi(request, entityTypeId, { statusHash: 'active', hubId: workerHub })
   casesWorld.lastEventId = (event as { id: string }).id
 
-  const entityTypes = await listEntityTypesViaApi(request, workerHub)
-  const arrestType = entityTypes.find(et => (et as { name?: string }).name === 'arrest_case')
-  if (arrestType) {
-    const etId = (arrestType as { id: string }).id
-    for (let i = 0; i < count; i++) {
-      const record = await createRecordViaApi(request, etId, { statusHash: 'reported', hubId: workerHub })
-      await updateRecordViaApi(request, (record as { id: string }).id, { parentRecordId: casesWorld.lastEventId! }, workerHub)
-    }
+  const etId = await arrestCaseTypeId(request, workerHub)
+  for (let i = 0; i < count; i++) {
+    const record = await createRecordViaApi(request, etId, { statusHash: 'reported', hubId: workerHub })
+    await updateRecordViaApi(request, (record as { id: string }).id, { parentRecordId: casesWorld.lastEventId! }, workerHub)
   }
 })
 
