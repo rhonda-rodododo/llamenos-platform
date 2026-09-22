@@ -217,7 +217,10 @@ export class ContactsService {
       .select()
       .from(contacts)
       .where(where)
-      .orderBy(desc(contacts.lastInteractionAt))
+      // lastInteractionAt is NULL for never-contacted contacts; without a total order
+      // their relative order is arbitrary, which makes offset pagination skip or
+      // repeat rows between pages. Tie-break newest-first, then by id.
+      .orderBy(desc(contacts.lastInteractionAt), desc(contacts.createdAt), desc(contacts.id))
       .limit(limit)
       .offset(offset)
 

@@ -305,7 +305,7 @@ function EventLinkedReportsTab({ eventId }: { eventId: string }) {
       ) : (
         <div data-testid="event-linked-reports-list" className="space-y-2">
           {links.map(link => (
-            <Card key={link.reportId}>
+            <Card key={link.reportId} data-testid="event-linked-report-item">
               <CardContent className="flex items-center gap-3 py-3">
                 <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
                 <div className="min-w-0 flex-1">
@@ -389,10 +389,10 @@ function LinkCaseDialog({ eventId, open, onOpenChange, onLinked }: {
           </DialogDescription>
         </DialogHeader>
         <Input
+          data-testid="event-link-case-search"
           placeholder={t('events.searchCases', { defaultValue: 'Search cases...' })}
           value={search}
           onChange={e => setSearch(e.target.value)}
-          data-testid="event-link-case-search"
           autoFocus
         />
         <div className="max-h-60 overflow-y-auto space-y-1">
@@ -409,6 +409,7 @@ function LinkCaseDialog({ eventId, open, onOpenChange, onLinked }: {
               <button
                 key={rec.id}
                 type="button"
+                data-testid="event-link-case-result"
                 disabled={linking}
                 onClick={() => handleSelect(rec.id)}
                 className="w-full flex items-center gap-2 rounded-md px-3 py-2 text-left text-sm hover:bg-accent transition-colors"
@@ -482,6 +483,7 @@ function LinkReportDialog({ eventId, open, onOpenChange, onLinked }: {
           </DialogDescription>
         </DialogHeader>
         <Input
+          data-testid="event-link-report-search"
           placeholder={t('events.searchReports', { defaultValue: 'Search reports...' })}
           value={search}
           onChange={e => setSearch(e.target.value)}
@@ -501,6 +503,7 @@ function LinkReportDialog({ eventId, open, onOpenChange, onLinked }: {
               <button
                 key={report.id}
                 type="button"
+                data-testid="event-link-report-result"
                 disabled={linking}
                 onClick={() => handleSelect(report.id)}
                 className="w-full flex items-center gap-2 rounded-md px-3 py-2 text-left text-sm hover:bg-accent transition-colors"

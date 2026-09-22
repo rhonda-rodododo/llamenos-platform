@@ -4,8 +4,8 @@ import { useToast } from '@/lib/toast'
 import {
   listRecords,
   listEntityTypes,
-  getCaseManagementEnabled,
   updateRecord,
+  getCaseManagementEnabled,
   type CaseRecord,
   type EntityTypeDefinition,
 } from '@/lib/api'
