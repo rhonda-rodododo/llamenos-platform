@@ -74,6 +74,8 @@ interface CmsState {
   lastEvidence?: Record<string, unknown>
   custodyChain?: { custodyChain: Record<string, unknown>[]; total: number }
   verifyResult?: { valid: boolean; originalHash: string; currentHash: string }
+  // Evidence access log (Issue #730 — hash-chained chain-of-custody audit trail)
+  accessLogResult?: { entries: Record<string, unknown>[]; total: number }
   // Report
   lastReportId?: string
   // Volunteer for permission tests
@@ -739,4 +741,89 @@ When('the admin verifies evidence integrity with a wrong hash', async ({ request
 
 Then('the verification should return valid false', async ({ world }) => {
   expect(getCmsState(world).verifyResult!.valid).toBe(false)
+})
+
+// ============================================================
+// EVIDENCE ACCESS LOG STEPS (Issue #730)
+//
+// The access log reuses the Epic 77 hash-chained audit_log table (see
+// apps/worker/services/audit.ts AuditService.listForEvidence) rather than
+// a parallel unchained table, so every access — and every denied access
+// attempt — is tamper-evident the same way any other audit entry is.
+// ============================================================
+
+When('the admin views the evidence metadata', async ({ request, world }) => {
+  const evidenceId = getCmsState(world).lastEvidence!.id as string
+  const { status } = await apiGet(request, `/evidence/${evidenceId}`)
+  expect(status).toBe(200)
+})
+
+When('the admin views the evidence via the hub-scoped API', async ({ request, world }) => {
+  const hubId = getScenarioState(world).hubId
+  const evidenceId = getCmsState(world).lastEvidence!.id as string
+  const { status } = await apiGet(request, `/hubs/${hubId}/evidence/${evidenceId}`)
+  expect(status).toBe(200)
+})
+
+When('the admin reads the evidence access log', async ({ request, world }) => {
+  const evidenceId = getCmsState(world).lastEvidence!.id as string
+  const { status, data } = await apiGet<{ entries: Record<string, unknown>[]; total: number }>(
+    request,
+    `/evidence/${evidenceId}/access-log`,
+  )
+  expect(status).toBe(200)
+  getCmsState(world).accessLogResult = data
+})
+
+Then('the evidence access log should contain an entry with access type {string}', async ({ world }, accessType: string) => {
+  const log = getCmsState(world).accessLogResult
+  expect(log).toBeTruthy()
+  const found = log!.entries.some((entry) => {
+    if (accessType === 'denied') return entry.action === 'evidenceAccessDenied'
+    const details = entry.details as Record<string, unknown> | null | undefined
+    return details?.action === accessType
+  })
+  expect(found).toBe(true)
+})
+
+Given('a volunteer without evidence permissions exists', async ({ request, world }) => {
+  const role = await createRoleViaApi(request, {
+    name: `No Evidence Access ${Date.now()}`,
+    slug: `no-evidence-access-${Date.now()}`,
+    permissions: ['notes:read-own'],
+    description: 'Cannot view or manage evidence',
+  })
+  const vol = await createVolunteerViaApi(request, {
+    name: `vol-noevidence-${Date.now()}`,
+    roleIds: [role.id],
+  })
+  getCmsState(world).volunteerDeviceKey = vol.deviceKey
+  getCmsState(world).volunteerPubkey = vol.pubkey
+})
+
+When('the volunteer tries to view the evidence', async ({ request, world }) => {
+  const evidenceId = getCmsState(world).lastEvidence!.id as string
+  const res = await apiGet(request, `/evidence/${evidenceId}`, getCmsState(world).volunteerDeviceKey!)
+  setLastResponse(world, res)
+})
+
+Given('a volunteer without audit:read permission exists', async ({ request, world }) => {
+  const role = await createRoleViaApi(request, {
+    name: `Evidence Only ${Date.now()}`,
+    slug: `evidence-only-${Date.now()}`,
+    permissions: ['evidence:download', 'evidence:manage-custody'],
+    description: 'Can view evidence but not the admin-only access log',
+  })
+  const vol = await createVolunteerViaApi(request, {
+    name: `vol-evidenceonly-${Date.now()}`,
+    roleIds: [role.id],
+  })
+  getCmsState(world).volunteerDeviceKey = vol.deviceKey
+  getCmsState(world).volunteerPubkey = vol.pubkey
+})
+
+When('the volunteer tries to read the evidence access log', async ({ request, world }) => {
+  const evidenceId = getCmsState(world).lastEvidence!.id as string
+  const res = await apiGet(request, `/evidence/${evidenceId}/access-log`, getCmsState(world).volunteerDeviceKey!)
+  setLastResponse(world, res)
 })

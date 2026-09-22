@@ -8,7 +8,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.llamenos.hotline.api.WebSocketService
 import org.llamenos.hotline.model.ActiveCall
-import org.llamenos.hotline.model.AuditEntry
+import org.llamenos.protocol.SharedEntry
 import org.llamenos.hotline.model.BanEntry
 import org.llamenos.hotline.model.ContactSummary
 import org.llamenos.hotline.model.Conversation
@@ -55,6 +55,7 @@ import org.llamenos.hotline.ui.notes.NotesViewModel
 import org.llamenos.hotline.ui.reports.ReportsScreen
 import org.llamenos.hotline.ui.reports.ReportsUiState
 import org.llamenos.hotline.ui.reports.ReportsViewModel
+import org.llamenos.hotline.ui.settings.BiometricSectionState
 import org.llamenos.hotline.ui.settings.SettingsScreen
 import org.llamenos.hotline.ui.shifts.ShiftsScreen
 import org.llamenos.hotline.ui.shifts.ShiftsUiState
@@ -417,7 +418,7 @@ class ScreenshotTests {
     )
 
     private val sampleAuditEntries = listOf(
-        AuditEntry(
+        SharedEntry(
             id = "audit-001",
             action = "call.answered",
             actorPubkey = samplePubkey,
@@ -426,7 +427,7 @@ class ScreenshotTests {
             previousEntryHash = null,
             createdAt = sampleTimestamp,
         ),
-        AuditEntry(
+        SharedEntry(
             id = "audit-002",
             action = "note.created",
             actorPubkey = samplePubkey,
@@ -435,7 +436,7 @@ class ScreenshotTests {
             previousEntryHash = "sha256-001",
             createdAt = sampleTimestamp2,
         ),
-        AuditEntry(
+        SharedEntry(
             id = "audit-003",
             action = "user.created",
             actorPubkey = "npub1admin000000000000000000000000000000000000000000000000000000ad",
@@ -854,6 +855,49 @@ class ScreenshotTests {
                     onClearCache = {},
                     onNavigateToAdmin = {},
                     onNavigateToDeviceLink = {},
+                )
+            }
+        }
+    }
+
+    @Test
+    fun settingsScreenBiometricEnrolled() {
+        captureRoboImage("$OUT/settings-biometric-enrolled-android.png") {
+            LlamenosTheme(darkTheme = true) {
+                SettingsScreen(
+                    signingPubkey = samplePubkey,
+                    encryptionPubkey = samplePubkey2,
+                    hubUrl = "https://llamenos.example.org",
+                    connectionState = WebSocketService.ConnectionState.CONNECTED,
+                    displayName = "Sarah Chen",
+                    phone = "+1 (555) 867-5309",
+                    selectedTheme = "dark",
+                    onUpdateProfile = { _, _ -> },
+                    onThemeChange = {},
+                    selectedLanguage = "en",
+                    onLanguageChange = {},
+                    spokenLanguages = setOf("en", "es"),
+                    onSpokenLanguagesChange = {},
+                    notifyCalls = true,
+                    notifyShifts = true,
+                    notifyGeneral = false,
+                    onNotifyCallsChange = {},
+                    onNotifyShiftsChange = {},
+                    onNotifyGeneralChange = {},
+                    onLock = {},
+                    onLogout = {},
+                    onPanicWipe = {},
+                    transcriptionEnabled = true,
+                    transcriptionCanOptOut = true,
+                    onTranscriptionChange = {},
+                    autoLockMinutes = 5,
+                    onAutoLockChange = {},
+                    debugLogging = false,
+                    onDebugLoggingChange = {},
+                    onClearCache = {},
+                    onNavigateToAdmin = {},
+                    onNavigateToDeviceLink = {},
+                    biometricState = BiometricSectionState(enrolled = true),
                 )
             }
         }

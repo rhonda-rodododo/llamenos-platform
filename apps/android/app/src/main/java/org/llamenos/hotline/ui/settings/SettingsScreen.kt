@@ -1,5 +1,7 @@
 package org.llamenos.hotline.ui.settings
 
+import androidx.biometric.BiometricManager
+import androidx.biometric.BiometricPrompt
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
@@ -27,6 +29,7 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Translate
 import androidx.compose.material.icons.filled.LightMode
@@ -60,6 +63,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -69,16 +73,21 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
+import androidx.fragment.app.FragmentActivity
+import javax.crypto.Cipher
 import kotlinx.coroutines.launch
 import org.llamenos.hotline.BuildConfig
 import org.llamenos.hotline.R
 import org.llamenos.hotline.api.WebSocketService
+import org.llamenos.hotline.ui.components.PINPad
 
 /**
  * Supported language with ISO code and native label.
@@ -184,6 +193,8 @@ fun SettingsScreen(
     pendingCrashReports: Int = 0,
     onSendCrashReports: () -> Unit = {},
     onClearCrashReports: () -> Unit = {},
+    biometricState: BiometricSectionState = BiometricSectionState(),
+    onBiometricEvent: (BiometricSectionEvent) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     var showLogoutDialog by remember { mutableStateOf(false) }
@@ -208,7 +219,60 @@ fun SettingsScreen(
     var hubExpanded by rememberSaveable { mutableStateOf(false) }
     var transcriptionExpanded by rememberSaveable { mutableStateOf(false) }
     var advancedExpanded by rememberSaveable { mutableStateOf(false) }
+    var biometricExpanded by rememberSaveable { mutableStateOf(false) }
     var showClearCacheDialog by remember { mutableStateOf(false) }
+
+    // ---- Biometric unlock enrollment state ----
+    var showBiometricPinDialog by remember { mutableStateOf(false) }
+    var showBiometricDisableDialog by remember { mutableStateOf(false) }
+    var biometricPinInput by remember { mutableStateOf("") }
+    val biometricContext = LocalContext.current
+    val biometricHardwareAvailable = remember {
+        BiometricManager.from(biometricContext)
+            .canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_STRONG) ==
+            BiometricManager.BIOMETRIC_SUCCESS
+    }
+    val biometricEnrollPromptTitle = stringResource(R.string.settings_biometric)
+    val cancelLabel = stringResource(android.R.string.cancel)
+
+    // Once the ViewModel hands us a fresh enrollment cipher (PIN verified),
+    // drive the BiometricPrompt enrollment auth. Success/failure both close
+    // the PIN dialog — the PIN itself is never affected either way.
+    LaunchedEffect(biometricState.enrollCipher) {
+        val cipher = biometricState.enrollCipher ?: return@LaunchedEffect
+        val activity = biometricContext as? FragmentActivity ?: return@LaunchedEffect
+        val executor = ContextCompat.getMainExecutor(biometricContext)
+        val prompt = BiometricPrompt(
+            activity,
+            executor,
+            object : BiometricPrompt.AuthenticationCallback() {
+                override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
+                    val resultCipher = result.cryptoObject?.cipher ?: return
+                    showBiometricPinDialog = false
+                    biometricPinInput = ""
+                    onBiometricEvent(BiometricSectionEvent.EnrollSucceeded(resultCipher))
+                }
+
+                override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
+                    // User cancelled or hardware unavailable — abandon this
+                    // enrollment attempt. The PIN pad / PIN unlock elsewhere
+                    // in the app is completely unaffected.
+                    showBiometricPinDialog = false
+                    biometricPinInput = ""
+                    onBiometricEvent(BiometricSectionEvent.EnrollCancelled)
+                }
+
+                override fun onAuthenticationFailed() {
+                    // Single failed match attempt — system shows retry UI, keep waiting.
+                }
+            },
+        )
+        val promptInfo = BiometricPrompt.PromptInfo.Builder()
+            .setTitle(biometricEnrollPromptTitle)
+            .setNegativeButtonText(cancelLabel)
+            .build()
+        prompt.authenticate(promptInfo, BiometricPrompt.CryptoObject(cipher))
+    }
 
     if (showLogoutDialog) {
         AlertDialog(
@@ -317,6 +381,78 @@ fun SettingsScreen(
                 }
             },
             modifier = Modifier.testTag("clear-cache-dialog"),
+        )
+    }
+
+    // Enrollment step 1: PIN entry. Verifying the PIN (step 2, driven by the
+    // ViewModel) gates the biometric prompt that follows in the LaunchedEffect above.
+    if (showBiometricPinDialog) {
+        AlertDialog(
+            onDismissRequest = {
+                showBiometricPinDialog = false
+                biometricPinInput = ""
+                onBiometricEvent(BiometricSectionEvent.DismissPinDialog)
+            },
+            title = { Text(stringResource(R.string.settings_biometric_pin_prompt)) },
+            text = {
+                PINPad(
+                    pin = biometricPinInput,
+                    maxLength = 6,
+                    onPinChange = { biometricPinInput = it },
+                    onComplete = { completedPin -> onBiometricEvent(BiometricSectionEvent.SubmitPin(completedPin)) },
+                    errorMessage = when (biometricState.pinError) {
+                        BiometricSettingsViewModel.PIN_ERROR_INCORRECT -> stringResource(R.string.error_pin_incorrect)
+                        BiometricSettingsViewModel.PIN_ERROR_NO_IDENTITY -> stringResource(R.string.error_no_stored_keys)
+                        else -> null
+                    },
+                    enabled = !biometricState.verifyingPin,
+                )
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        showBiometricPinDialog = false
+                        biometricPinInput = ""
+                        onBiometricEvent(BiometricSectionEvent.DismissPinDialog)
+                    },
+                    modifier = Modifier.testTag("cancel-biometric-pin-button"),
+                ) {
+                    Text(cancelLabel)
+                }
+            },
+            modifier = Modifier.testTag("biometric-pin-dialog"),
+        )
+    }
+
+    if (showBiometricDisableDialog) {
+        AlertDialog(
+            onDismissRequest = { showBiometricDisableDialog = false },
+            title = { Text(stringResource(R.string.confirm_biometric_disable_title)) },
+            text = { Text(stringResource(R.string.confirm_biometric_disable)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showBiometricDisableDialog = false
+                        onBiometricEvent(BiometricSectionEvent.Disable)
+                    },
+                    modifier = Modifier.testTag("confirm-biometric-disable-button"),
+                ) {
+                    Text(
+                        text = stringResource(R.string.confirm_biometric_disable_title),
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { showBiometricDisableDialog = false },
+                    modifier = Modifier.testTag("cancel-biometric-disable-button"),
+                ) {
+                    Text(cancelLabel)
+                }
+            },
+            modifier = Modifier.testTag("biometric-disable-dialog"),
         )
     }
 
@@ -626,6 +762,107 @@ fun SettingsScreen(
                             text = stringResource(R.string.settings_key_backup_warning),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onErrorContainer,
+                        )
+                    }
+                }
+            }
+
+            // ---- Biometric unlock section (collapsible) ----
+            SettingsSection(
+                title = stringResource(R.string.settings_biometric),
+                expanded = biometricExpanded,
+                onToggle = { biometricExpanded = !biometricExpanded },
+                testTag = "settings-biometric-section",
+            ) {
+                Text(
+                    text = stringResource(R.string.settings_biometric_desc),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+
+                Spacer(Modifier.height(8.dp))
+
+                if (biometricState.statusMessage == BiometricSettingsViewModel.INVALIDATED_MESSAGE) {
+                    Card(
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f),
+                        ),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("biometric-invalidated-notice"),
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Warning,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.size(20.dp),
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                text = stringResource(R.string.settings_biometric_invalidated),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onErrorContainer,
+                            )
+                        }
+                    }
+                    Spacer(Modifier.height(8.dp))
+                }
+
+                if (!biometricHardwareAvailable && !biometricState.enrolled) {
+                    Text(
+                        text = stringResource(R.string.error_biometric_not_available),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.testTag("biometric-unavailable"),
+                    )
+                } else {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("biometric-toggle-row"),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = Icons.Filled.Fingerprint,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(18.dp),
+                                )
+                                Spacer(Modifier.width(8.dp))
+                                Text(
+                                    text = stringResource(R.string.settings_biometric),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                )
+                            }
+                            if (biometricState.enrolled) {
+                                Text(
+                                    text = stringResource(R.string.settings_biometric_enrolled),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+                        Switch(
+                            checked = biometricState.enrolled,
+                            onCheckedChange = { checked ->
+                                if (checked) {
+                                    biometricPinInput = ""
+                                    showBiometricPinDialog = true
+                                } else {
+                                    showBiometricDisableDialog = true
+                                }
+                            },
+                            enabled = !biometricState.verifyingPin,
+                            modifier = Modifier.testTag("biometric-toggle"),
                         )
                     }
                 }

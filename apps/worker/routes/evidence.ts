@@ -1,7 +1,8 @@
-import { Hono } from 'hono'
+import { Hono, type Context } from 'hono'
+import { createMiddleware } from 'hono/factory'
 import { describeRoute, resolver, validator } from 'hono-openapi'
 import type { AppEnv } from '../types'
-import { requirePermission, requireAnyPermission } from '../middleware/permission-guard'
+import { permissionGranted } from '@shared/permissions'
 import { audit } from '../services/audit'
 import {
   uploadEvidenceBodySchema,
@@ -13,10 +14,86 @@ import {
   custodyChainResponseSchema,
   custodyEntrySchema,
   verifyIntegrityResponseSchema,
+  evidenceAccessLogResponseSchema,
 } from '@protocol/schemas/evidence'
 import { authErrors, notFoundError } from '../openapi/helpers'
 
 const evidence = new Hono<AppEnv>()
+
+// ============================================================
+// Permission guards that also write a denied-access entry to the
+// hash-chained audit log (Issue #730 — chain-of-custody audit trail).
+//
+// Evidence access must never fail silently: a volunteer probing for
+// evidence they cannot see is itself a security-relevant event, so the
+// denial is recorded the same way a successful access is.
+// ============================================================
+
+async function auditDenial(c: Context<AppEnv>, required: string[]) {
+  const services = c.get('services')
+  const pubkey = c.get('pubkey')
+  // Include evidenceId (when the route has one) so a denied attempt shows up
+  // in that item's access log via AuditService.listForEvidence — a denial
+  // recorded under no evidenceId would be invisible from the one place an
+  // admin would look for it (Issue #730).
+  const evidenceId = c.req.param('evidenceId')
+  await audit(
+    services.audit,
+    'evidenceAccessDenied',
+    pubkey,
+    { required, path: c.req.path, method: c.req.method, ...(evidenceId ? { evidenceId } : {}) },
+    deviceCtx(c),
+    hubIdOf(c),
+  )
+}
+
+/** Like requirePermission(), but logs a denied-access audit entry instead of failing silently. */
+function requirePermissionAudited(...required: string[]) {
+  return createMiddleware<AppEnv>(async (c, next) => {
+    const permissions = c.get('permissions')
+    const hubPermissions = c.get('hubPermissions') as string[] | undefined
+    for (const perm of required) {
+      if (!permissionGranted(permissions, perm) &&
+          !(hubPermissions && permissionGranted(hubPermissions, perm))) {
+        await auditDenial(c, [perm])
+        return c.json({ error: 'Forbidden', required: perm }, 403)
+      }
+    }
+    await next()
+  })
+}
+
+/** Like requireAnyPermission(), but logs a denied-access audit entry instead of failing silently. */
+function requireAnyPermissionAudited(...anyOf: string[]) {
+  return createMiddleware<AppEnv>(async (c, next) => {
+    const permissions = c.get('permissions')
+    const hubPermissions = c.get('hubPermissions') as string[] | undefined
+    const hasAny = anyOf.some(perm =>
+      permissionGranted(permissions, perm) ||
+      (hubPermissions != null && permissionGranted(hubPermissions, perm)),
+    )
+    if (!hasAny) {
+      await auditDenial(c, anyOf)
+      return c.json({ error: 'Forbidden', required: anyOf }, 403)
+    }
+    await next()
+  })
+}
+
+/** Captures request metadata (IP hash + UA hash) for "which device" attribution. */
+function deviceCtx(c: Context<AppEnv>): { request: Request; hmacSecret: string } {
+  return { request: c.req.raw, hmacSecret: (c.env?.HMAC_SECRET as string | undefined) ?? '' }
+}
+
+/**
+ * Scope evidence access-log entries to the current hub, same as every other
+ * hub-aware audit call (e.g. bans.ts). Evidence routes are mounted both
+ * globally and under /hubs/:hubId — undefined outside a hub-scoped request,
+ * matching the hub scoping of the case record the evidence belongs to.
+ */
+function hubIdOf(c: Context<AppEnv>): string | undefined {
+  return c.get('hubId') ?? undefined
+}
 
 // ============================================================
 // Evidence routes mounted under /records/:id/evidence
@@ -43,7 +120,7 @@ evidence.post('/records/:id/evidence',
       ...notFoundError,
     },
   }),
-  requirePermission('evidence:upload'),
+  requirePermissionAudited('evidence:upload'),
   validator('json', uploadEvidenceBodySchema),
   async (c) => {
     const caseId = c.req.param('id')
@@ -77,7 +154,7 @@ evidence.post('/records/:id/evidence',
       caseId,
       evidenceId: created.id,
       classification: body.classification,
-    })
+    }, deviceCtx(c), hubIdOf(c))
 
     return c.json(created, 201)
   },
@@ -101,10 +178,11 @@ evidence.get('/records/:id/evidence',
       ...notFoundError,
     },
   }),
-  requireAnyPermission('evidence:download', 'evidence:upload', 'evidence:manage-custody'),
+  requireAnyPermissionAudited('evidence:download', 'evidence:upload', 'evidence:manage-custody'),
   validator('query', listEvidenceQuerySchema),
   async (c) => {
     const caseId = c.req.param('id')
+    const pubkey = c.get('pubkey')
     const services = c.get('services')
     const query = c.req.valid('query')
 
@@ -113,6 +191,14 @@ evidence.get('/records/:id/evidence',
       limit: query.limit,
       classification: query.classification,
     })
+
+    // Metadata read: viewing the evidence list for a case is itself an
+    // access worth recording in the chain-of-custody log (Issue #730).
+    await audit(services.audit, 'evidenceAccessed', pubkey, {
+      caseId,
+      action: 'list_viewed',
+      count: result.evidence.length,
+    }, deviceCtx(c), hubIdOf(c))
 
     return c.json(result)
   },
@@ -140,11 +226,20 @@ evidence.get('/evidence/:evidenceId',
       ...notFoundError,
     },
   }),
-  requireAnyPermission('evidence:download', 'evidence:manage-custody'),
+  requireAnyPermissionAudited('evidence:download', 'evidence:manage-custody'),
   async (c) => {
     const evidenceId = c.req.param('evidenceId')
+    const pubkey = c.get('pubkey')
     const services = c.get('services')
     const ev = await services.cases.getEvidence(evidenceId)
+
+    // Metadata read of a specific evidence item — recorded automatically,
+    // not left to the client to self-report (Issue #730).
+    await audit(services.audit, 'evidenceAccessed', pubkey, {
+      evidenceId,
+      action: 'metadata_read',
+    }, deviceCtx(c), hubIdOf(c))
+
     return c.json(ev)
   },
 )
@@ -167,12 +262,54 @@ evidence.get('/evidence/:evidenceId/custody',
       ...notFoundError,
     },
   }),
-  requirePermission('evidence:manage-custody'),
+  requirePermissionAudited('evidence:manage-custody'),
+  async (c) => {
+    const evidenceId = c.req.param('evidenceId')
+    const pubkey = c.get('pubkey')
+    const services = c.get('services')
+    const result = await services.cases.listCustodyEntries(evidenceId)
+
+    await audit(services.audit, 'evidenceAccessed', pubkey, {
+      evidenceId,
+      action: 'custody_viewed',
+    }, deviceCtx(c), hubIdOf(c))
+
+    return c.json(result)
+  },
+)
+
+// --- Get the hash-chained evidence access log (admin only — Issue #730) ---
+// Unlike the custody chain above (Epic 325's own per-evidence log of
+// upload/view/download/share events), this reads directly from the Epic 77
+// hash-chained audit_log table, so a modified or deleted entry is
+// detectable via GET /audit/verify.
+evidence.get('/evidence/:evidenceId/access-log',
+  describeRoute({
+    tags: ['Evidence'],
+    summary: 'Get the tamper-evident access log for an evidence item (admin only)',
+    description:
+      'Every view, download, export, metadata read, and denied access attempt for this ' +
+      'evidence item, backed by the hash-chained audit log (not a parallel unchained table). ' +
+      'Restricted to admin roles via the audit:read permission.',
+    responses: {
+      200: {
+        description: 'Chronological access log entries for this evidence item',
+        content: {
+          'application/json': {
+            schema: resolver(evidenceAccessLogResponseSchema),
+          },
+        },
+      },
+      ...authErrors,
+    },
+  }),
+  requirePermissionAudited('audit:read'),
   async (c) => {
     const evidenceId = c.req.param('evidenceId')
     const services = c.get('services')
-    const result = await services.cases.listCustodyEntries(evidenceId)
-    return c.json(result)
+    const hubId = c.get('hubId')
+    const entries = await services.audit.listForEvidence(evidenceId, hubId ?? undefined)
+    return c.json({ entries, total: entries.length })
   },
 )
 
@@ -193,7 +330,7 @@ evidence.post('/evidence/:evidenceId/access',
       ...authErrors,
     },
   }),
-  requirePermission('evidence:download'),
+  requirePermissionAudited('evidence:download'),
   validator('json', logCustodyEventBodySchema),
   async (c) => {
     const evidenceId = c.req.param('evidenceId')
@@ -211,7 +348,7 @@ evidence.post('/evidence/:evidenceId/access',
     await audit(services.audit, 'evidenceAccessed', pubkey, {
       evidenceId,
       action: body.action,
-    })
+    }, deviceCtx(c), hubIdOf(c))
 
     return c.json(entry, 201)
   },
@@ -235,7 +372,7 @@ evidence.post('/evidence/:evidenceId/verify',
       ...notFoundError,
     },
   }),
-  requirePermission('evidence:download'),
+  requirePermissionAudited('evidence:download'),
   validator('json', verifyIntegrityBodySchema),
   async (c) => {
     const evidenceId = c.req.param('evidenceId')
@@ -252,7 +389,7 @@ evidence.post('/evidence/:evidenceId/verify',
     await audit(services.audit, 'evidenceIntegrityVerified', pubkey, {
       evidenceId,
       valid: result.valid,
-    })
+    }, deviceCtx(c), hubIdOf(c))
 
     return c.json(result)
   },

@@ -55,7 +55,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import org.llamenos.hotline.R
-import org.llamenos.hotline.model.AuditEntry
+import org.llamenos.protocol.SharedEntry
 import org.llamenos.hotline.model.detailsString
 import org.llamenos.hotline.model.timestamp
 
@@ -228,7 +228,7 @@ fun AuditLogTab(
                         items = uiState.auditEntries,
                         key = { it.id },
                     ) { entry ->
-                        AuditEntryCard(entry = entry)
+                        SharedEntryCard(entry = entry)
                     }
 
                     // Loading indicator at the bottom for pagination
@@ -276,8 +276,8 @@ fun AuditLogTab(
  * Card displaying a single audit log entry.
  */
 @Composable
-private fun AuditEntryCard(
-    entry: AuditEntry,
+private fun SharedEntryCard(
+    entry: SharedEntry,
     modifier: Modifier = Modifier,
 ) {
     Card(
