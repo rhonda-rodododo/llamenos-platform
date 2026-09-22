@@ -72,7 +72,8 @@ describe('checkScope', () => {
         'apps/worker/',
         'sip-bridge/',
         'signal-notifier/',
-        'tests/steps/',
+        'tests/steps/backend/',
+        '.github/ci/*-baseline.json',
         'packages/i18n/locales/',
       ])
       expect(backend.notOwned).toEqual([
@@ -92,29 +93,167 @@ describe('checkScope', () => {
         'packages/i18n/locales/',
       ])
       expect(desktop.notOwned).toEqual([
-        'tests/steps/',
+        'tests/steps/backend/',
         'packages/test-specs/',
         'packages/i18n/languages.ts',
         'packages/i18n/tools/',
       ])
     })
 
-    it('backend may write tests/steps/scope.step.ts — owned tests/steps/ (12 chars) beats notOwned tests/ (6 chars)', () => {
-      expect(checkScope(['tests/steps/scope.step.ts'], backend, []).strayed).toEqual([])
+    it('backend may write tests/steps/backend/scope.steps.ts — owned tests/steps/backend/ (20 chars) beats notOwned tests/ (6 chars)', () => {
+      expect(checkScope(['tests/steps/backend/scope.steps.ts'], backend, []).strayed).toEqual([])
     })
 
     it('backend may not write tests/mocks/* — no owned match at all', () => {
       expect(checkScope(['tests/mocks/tauri.ts'], backend, []).strayed).toEqual(['tests/mocks/tauri.ts'])
     })
 
-    it('desktop may not write tests/steps/scope.step.ts — notOwned tests/steps/ (12) beats owned tests/ (6)', () => {
-      expect(checkScope(['tests/steps/scope.step.ts'], desktop, []).strayed).toEqual([
-        'tests/steps/scope.step.ts',
+    it('desktop may not write tests/steps/backend/scope.steps.ts — notOwned tests/steps/backend/ (20) beats owned tests/ (6)', () => {
+      expect(checkScope(['tests/steps/backend/scope.steps.ts'], desktop, []).strayed).toEqual([
+        'tests/steps/backend/scope.steps.ts',
       ])
     })
 
     it('desktop may write tests/helpers.ts — owned tests/ matches, no notOwned match', () => {
       expect(checkScope(['tests/helpers.ts'], desktop, []).strayed).toEqual([])
+    })
+  })
+
+  // --- tests/steps/ ownership fix: only tests/steps/backend/ is backend's ---
+  //
+  // The fragment used to say backend owns the whole tests/steps/ tree ("Step
+  // definitions organized by domain") and desktop does NOT own any of it.
+  // That was wrong at the file-content level: of the 144 *.ts files under
+  // tests/steps/, 139 import `@playwright/test` and drive a real browser
+  // `page` fixture — Playwright is desktop-only tooling (CLAUDE.md: "E2E via
+  // Playwright (desktop)"), and the two files under tests/steps/ that don't
+  // import it but still live outside tests/steps/backend/ (common/before-hooks.ts,
+  // config/test-backend-server.ts) turn out to be desktop-only too on inspection
+  // (page.addInitScript / a harness proving desktop's net_fetch origin
+  // handling). The only genuinely API-only, browser-free step code lives
+  // under tests/steps/backend/ — and playwright.config.ts's own `backend-bdd`
+  // project definition says so directly: `steps: "tests/steps/backend/**/*.ts"`,
+  // while its `bdd` (desktop) project loads every other tests/steps/<dir>
+  // via `desktopStepDirs`. Five separate PRs in the 2026-09-22 fleet/verify
+  // triage (#853, #854, #897, #916, #917) were desktop E2E flake fixes
+  // (isVisible()/.first() probe sweeps — a defect that can only exist in
+  // browser-driving code) rejected as "outside lane desktop's scope" for
+  // touching tests/steps/<domain>/*.ts files that are desktop's in every
+  // way except this one stale ownership line.
+  //
+  // The fix narrows backend's grant from all of tests/steps/ down to
+  // tests/steps/backend/ (mirroring desktop's existing notOwned carve-out,
+  // now equally narrowed) — not a blanket grant of tests/steps/ to desktop;
+  // desktop already owns everything under tests/ via its unchanged `tests/`
+  // entry, once the over-broad backend notOwned/owned pair no longer shadows it.
+
+  describe('tests/steps/ ownership fix: tests/steps/backend/ is backend-exclusive, everything else under tests/steps/ is desktop-exclusive', () => {
+    let backend: LaneScope
+    let desktop: LaneScope
+
+    beforeAll(async () => {
+      const scopes = await loadLaneScopes(process.cwd())
+      const b = scopes['backend']
+      const d = scopes['desktop']
+      if (!b || !d) throw new Error('expected backend and desktop lane fragments to exist')
+      backend = b
+      desktop = d
+    })
+
+    // (a) the actual files from the five rejected PRs are now in-scope for desktop.
+    it.each([
+      'tests/steps/cases/cms-cases-steps.ts', // #853, #917
+      'tests/steps/cases/cms-events-steps.ts', // #854
+      'tests/steps/calls/call-steps.ts', // #897
+      'tests/steps/hub/hub-steps.ts', // #897
+      'tests/steps/messaging/conversations-full-steps.ts', // #897
+      'tests/steps/notes/note-steps.ts', // #897
+      'tests/steps/reports/report-steps.ts', // #897
+      'tests/steps/security/security-steps.ts', // #897
+      'tests/steps/admin/admin-settings-steps.ts', // #916
+      'tests/steps/common/interaction-steps.ts', // #916
+      'tests/steps/notes/custom-fields-steps.ts', // #916
+      'tests/steps/settings/erasure-steps.ts', // #916
+    ])('desktop may write %s', (file) => {
+      expect(checkScope([file], desktop, []).strayed).toEqual([])
+    })
+
+    // (b) backend keeps exactly its own subdirectory.
+    it('backend may write a new file under tests/steps/backend/', () => {
+      expect(checkScope(['tests/steps/backend/new-domain.steps.ts'], backend, []).strayed).toEqual([])
+    })
+
+    // (c) the boundary is not widened past tests/steps/backend/ in either direction.
+    it('backend may NOT write into any other tests/steps/ directory', () => {
+      const r = checkScope(
+        ['tests/steps/cases/cms-cases-steps.ts', 'tests/steps/admin/admin-settings-steps.ts'],
+        backend,
+        [],
+      )
+      expect(r.strayed).toEqual([
+        'tests/steps/cases/cms-cases-steps.ts',
+        'tests/steps/admin/admin-settings-steps.ts',
+      ])
+    })
+
+    it('desktop may NOT write into tests/steps/backend/ — backend keeps its exclusive subdirectory', () => {
+      expect(checkScope(['tests/steps/backend/recovery-group.steps.ts'], desktop, []).strayed).toEqual([
+        'tests/steps/backend/recovery-group.steps.ts',
+      ])
+    })
+
+    // (d) adjacent grants this fix must NOT touch stay exactly as they were.
+    it('backend still does not own tests/mocks/ or packages/test-specs/', () => {
+      expect(checkScope(['tests/mocks/tauri.ts'], backend, []).strayed).toEqual(['tests/mocks/tauri.ts'])
+      expect(checkScope(['packages/test-specs/features/x.feature'], backend, []).strayed).toEqual([
+        'packages/test-specs/features/x.feature',
+      ])
+    })
+
+    it('desktop still does not own packages/test-specs/ or the shared i18n files', () => {
+      expect(checkScope(['packages/test-specs/features/x.feature'], desktop, []).strayed).toEqual([
+        'packages/test-specs/features/x.feature',
+      ])
+      expect(checkScope(['packages/i18n/languages.ts'], desktop, []).strayed).toEqual([
+        'packages/i18n/languages.ts',
+      ])
+    })
+  })
+
+  // --- .github/ci/*-baseline.json grant extended to backend (#887) ---
+  //
+  // Desktop already owned `.github/ci/*-baseline.json` (its own tsc/lint
+  // baseline tracker). Backend doing the exact same kind of work — clearing
+  // its own baselined tsc debt under tests/steps/backend/ — hit the same gap
+  // desktop's grant already solved for desktop, just never extended to
+  // backend. This mirrors PR #938's shape: a narrow, precedented grant, not
+  // a new category of risk (desktop has held unrestricted write access to
+  // this exact glob all along).
+
+  describe('.github/ci/*-baseline.json grant extended to backend (#887)', () => {
+    let backend: LaneScope
+
+    beforeAll(async () => {
+      const scopes = await loadLaneScopes(process.cwd())
+      const b = scopes['backend']
+      if (!b) throw new Error('expected backend lane fragment to exist')
+      backend = b
+    })
+
+    it('backend may write .github/ci/tsc-tests-baseline.json', () => {
+      expect(checkScope(['.github/ci/tsc-tests-baseline.json'], backend, []).strayed).toEqual([])
+    })
+
+    it('the grant is scoped to *-baseline.json — backend still may not write .github/ci/audit-allowlist.txt', () => {
+      expect(checkScope(['.github/ci/audit-allowlist.txt'], backend, []).strayed).toEqual([
+        '.github/ci/audit-allowlist.txt',
+      ])
+    })
+
+    it('the grant does not widen into the rest of .github/ — backend still may not write .github/workflows/ci.yml', () => {
+      expect(checkScope(['.github/workflows/ci.yml'], backend, []).strayed).toEqual([
+        '.github/workflows/ci.yml',
+      ])
     })
   })
 

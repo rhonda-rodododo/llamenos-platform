@@ -198,7 +198,7 @@ describe('loadLaneScopes against the real fragments', () => {
         'packages/i18n/locales/',
       ],
       notOwned: [
-        'tests/steps/',
+        'tests/steps/backend/',
         'packages/test-specs/',
         'packages/i18n/languages.ts',
         'packages/i18n/tools/',
@@ -206,7 +206,14 @@ describe('loadLaneScopes against the real fragments', () => {
     })
 
     expect(scopes.backend).toEqual({
-      owned: ['apps/worker/', 'sip-bridge/', 'signal-notifier/', 'tests/steps/', 'packages/i18n/locales/'],
+      owned: [
+        'apps/worker/',
+        'sip-bridge/',
+        'signal-notifier/',
+        'tests/steps/backend/',
+        '.github/ci/*-baseline.json',
+        'packages/i18n/locales/',
+      ],
       notOwned: [
         'tests/',
         'tests/mocks/',
