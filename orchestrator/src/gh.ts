@@ -20,13 +20,15 @@ export const REPO = 'rhonda-rodododo/llamenos-platform'
  * than `api` DOES accept it (`gh issue list -R owner/repo`, etc.) — `api` is
  * the one raw HTTP passthrough where the repo has to be embedded in the
  * endpoint path itself, which every caller in this codebase already does
- * (`repos/${REPO}/...` — see `review-cache.ts`'s `lookup`). Appending `-R`
- * onto an `api` call used to make `gh` itself reject the whole invocation
- * before it ever reached GitHub, which `ghJson`'s catch-all then silently
- * turned into an indistinguishable-from-a-genuine-miss `undefined` — so the
- * one real consumer of this path (the review-verdict artifact cache) was
- * unable to ever record a hit, not just on an edge case but on every single
- * call, forever.
+ * (`repos/${REPO}/...` — see `review-cache.ts`'s `lookup`, and this PR's own
+ * `GitHubSink.editComment`, which hit the identical failure while adding
+ * digest/halt-resume reporting). Appending `-R` onto an `api` call used to
+ * make `gh` itself reject the whole invocation before it ever reached
+ * GitHub, which `ghJson`'s catch-all then silently turned into an
+ * indistinguishable-from-a-genuine-miss `undefined` — so the one real
+ * consumer of this path (the review-verdict artifact cache) was unable to
+ * ever record a hit, not just on an edge case but on every single call,
+ * forever.
  */
 export function ghArgs(args: string[]): string[] {
   if (args[0] === 'api') return args
