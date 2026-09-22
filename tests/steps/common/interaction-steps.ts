@@ -353,13 +353,24 @@ Then('I should see {string}', async ({ page }, text: string) => {
   // inline error elements — combined into a single locator via `.or()` so
   // there is one real waiting assertion instead of four non-waiting
   // isVisible() probes racing the page to decide which strategy "won".
+  //
+  // These alternatives are NOT mutually exclusive: a toast like
+  // `<div role="status" data-testid="toast-success">…<span>Profile updated</span></div>`
+  // matches both `toastEl` (the container, via `.filter({ hasText })`) and `exactEl`
+  // (the nested `<span>` text node) at the same time. `.or()` unions the matches, and an
+  // inner `.first()` on each branch only narrows *within* that branch — the union can
+  // still resolve to 2+ elements, which trips Playwright strict mode on `toBeVisible()`.
+  // The outer `.first()` takes the first DOM match across the whole union, which is
+  // safe here because we only care that *some* strategy matched (CI evidence: PR #916,
+  // e2e shard 1/2, `strict mode violation: … resolved to 2 elements` on every toast
+  // assertion — `toast-success` container + its nested text span).
   const exactEl = page.getByText(text, { exact: true }).first()
   const regexEl = page.getByText(new RegExp(text, 'i')).first()
   const toastEl = page.locator('[data-sonner-toast], [data-testid="toast-message"], [role="status"], [role="alert"], .toast-message')
     .filter({ hasText: new RegExp(text, 'i') }).first()
   const errorEl = page.locator('[data-testid="error-message"], [role="alert"]')
     .filter({ hasText: new RegExp(text, 'i') }).first()
-  await expect(exactEl.or(regexEl).or(toastEl).or(errorEl)).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await expect(exactEl.or(regexEl).or(toastEl).or(errorEl).first()).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 Then('I should see the {string} heading', async ({ page }, heading: string) => {

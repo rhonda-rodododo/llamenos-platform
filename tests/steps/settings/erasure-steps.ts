@@ -12,11 +12,15 @@ Then('I should see the erasure request button or pending state', async ({ page }
   // Promise.race(waitFor) + isVisible() double-check — isVisible() never waits
   // (its `timeout` option is a documented no-op), so re-checking with it after
   // the race raced the page load a second time for no benefit.
-  // `section` (account-erasure) is the parent Card that wraps whichever of
-  // available/pending/completed rendered, so once expanded BOTH the child div
-  // and the parent Card match simultaneously — an outer `.first()` on the union
-  // is required, otherwise this resolves to 2 elements and toBeVisible() throws
-  // a strict-mode violation instead of waiting.
+  //
+  // `section` (`account-erasure`) is the outer Card and `available`/`pending`/
+  // `completed` render *inside* it, so they are not mutually exclusive from
+  // `.or()`'s perspective: both the child testid and its ancestor testid match
+  // at once, and the union resolves to 2 elements — tripping Playwright strict
+  // mode on `toBeVisible()`. The outer `.first()` collapses the union to a
+  // single DOM match, which is safe since any one of these states matching is
+  // sufficient (CI evidence: PR #916, e2e shard 2, `strict mode violation: …
+  // resolved to 2 elements` — `account-erasure` card + nested `erasure-available`).
   const available = page.getByTestId('erasure-available')
   const pending = page.getByTestId('erasure-pending')
   const completed = page.getByTestId('erasure-completed')
@@ -25,8 +29,8 @@ Then('I should see the erasure request button or pending state', async ({ page }
 })
 
 Then('I should see the erasure available state or pending state', async ({ page }) => {
-  // See note above — `section` wraps `available`/`pending`, so an outer `.first()`
-  // on the union avoids a strict-mode violation when both match at once.
+  // See the comment above — `section` is an ancestor of `available`/`pending`, so the
+  // outer `.first()` is required to keep the union to a single strict-mode match.
   const available = page.getByTestId('erasure-available')
   const pending = page.getByTestId('erasure-pending')
   const section = page.getByTestId('account-erasure')
