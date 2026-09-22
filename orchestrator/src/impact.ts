@@ -164,21 +164,37 @@ export function classifyImpact(
 // consume `tierFor` rather than re-deriving their own notion of "this diff
 // doesn't need X."
 //
-//   Tier 0 — no executable content: `docs/**`, `*.md` outside `.claude/`,
-//     spec prose. Nothing here can affect runtime behavior. Waits on cheap
-//     repo checks only (lint/typecheck where applicable) — no model review,
-//     ever.
-//   Tier 1 — instructions and tooling that shape FUTURE work, never
-//     runtime behavior today: agent/skill definitions, specs that carry an
-//     invariant this repo's own gates rely on, lint/format/hook config.
-//     Waits on cheap checks + code-owner review (every Tier 1 path is
-//     already, or should be, CODEOWNERS-protected). No model review, no
+// CORRECTED 2026-09-22 (PR #870's own review gate caught this on itself):
+// "an instruction change should not wait on the mobile suites" does not
+// mean "an instruction change should skip the model review too." The
+// original implementation read it that way and put agent-instruction paths
+// in Tier 1, which — for the paths CODEOWNERS does not cover — meant no
+// review of any kind. An instruction change is exactly the diff whose
+// blast radius is largest: it can alter what every FUTURE diff, including
+// a malicious one, is judged against. Those paths are Tier 2 now,
+// unconditionally — see `AGENT_INSTRUCTION_PATHS` below. Tier 1 keeps the
+// mobile-suite exemption; it never had, and never needed, a model-review
+// exemption for paths this sensitive.
+//
+//   Tier 0 — no executable content: `docs/**`, `*.md` outside `.claude/`
+//     and outside an agent-instruction basename, spec prose. Nothing here
+//     can affect runtime behavior. Waits on cheap repo checks only
+//     (lint/typecheck where applicable) — no model review, ever.
+//   Tier 1 — cosmetic tooling that shapes FUTURE work but can never widen
+//     what a coding agent obeys or what a gate enforces: lint/format/editor
+//     config. Waits on cheap checks + code-owner review (every Tier 1 path
+//     is already, or should be, CODEOWNERS-protected). No model review, no
 //     e2e/mobile suites.
 //   Tier 2 — everything else, and ALWAYS: product code, `packages/crypto/`,
 //     auth/session/sigchain, `packages/protocol/schemas/`,
 //     `.github/workflows/`, `orchestrator/`, `tests/orchestrator/`,
-//     dependency manifests. Waits on the full gate, including the
-//     non-author model review.
+//     dependency manifests, AND — as of PR #870's fix — every
+//     agent-instruction path: `.claude/**` (skills, agents, fragments,
+//     settings, coordination), `docs/superpowers/specs/`, and any
+//     `CLAUDE.md`/`AGENTS.md`/`GEMINI.md` file at any depth. Waits on the
+//     full gate, including the non-author model review. Also the default
+//     for any path this file does not otherwise recognize — an unmatched
+//     path is a gap in this classifier, not evidence of safety.
 //
 // A diff spanning tiers takes the HIGHEST tier it touches — never an
 // average, never "mostly docs." `tierFor` below is that computation.
@@ -193,11 +209,13 @@ export type ImpactTier = 0 | 1 | 2
  *
  * `.claude/` is explicitly exempt from the `*.md` rule: an agent or skill
  * definition happens to use the same extension as a README, but it is
- * instruction text a coding agent OBEYS, not prose a human reads — see
- * `TIER1_PATHS` below, which is what actually classifies it.
- * `docs/superpowers/specs/` is carved back OUT of Tier 0 for the same
- * reason: a spec can carry an invariant this repo's own gates depend on
- * (`TIER1_PATHS` checks it first — see `tierForFile`'s ordering comment).
+ * instruction text a coding agent OBEYS, not prose a human reads —
+ * `AGENT_INSTRUCTION_PATHS` below (Tier 2, unconditional) is what actually
+ * classifies it, checked BEFORE this function ever runs (see
+ * `tierForFile`'s ordering comment), so the exemption below is
+ * defense-in-depth, not the primary mechanism. `docs/superpowers/specs/` is
+ * carved back OUT of Tier 0 the same way, for the same reason: a spec can
+ * carry an invariant this repo's own gates depend on.
  *
  * Deliberately does NOT attempt to detect a comment-only CODE diff: that
  * needs the diff's own content, and no caller of `tierFor` currently plumbs
@@ -221,34 +239,35 @@ function isTier0Path(f: string): boolean {
 
 /**
  * Instructions and tooling that shape FUTURE work — never product behavior
- * at runtime today. `.claude/agents/` and `lefthook.yml` are ALSO members of
- * `HIGH_IMPACT_PATHS` above (added there for a different, still-valid
- * reason: a worker that edits its own agent definition, or the hook
- * enforcing write-deny, can widen its own authority — see that constant's
- * "fleet's own trust base" comment). `tierForFile` checks `TIER1_PATHS`
- * BEFORE `HIGH_IMPACT_PATHS`, so this list's classification is the one that
- * wins for the NEW question this file answers ("does a model review run at
- * all") — without editing `HIGH_IMPACT_PATHS` or its still-valid `low`/
- * `high` axis (a Tier 1 diff under `.claude/agents/` still reads `high` from
- * `classifyImpact`; it simply never reaches a reviewer that would use that
- * signal, because Tier 1 never requests one).
+ * at runtime today, and never a path that can alter what the fleet's own
+ * coding agents OBEY.
  *
- * `.claude/agents/` and `lefthook.yml` are already CODEOWNERS-protected
- * (verified against the tracked `CODEOWNERS` file). `.claude/skills/`,
- * `docs/superpowers/specs/`, and the lint/editor configs below are NOT yet
- * owned there — `CODEOWNERS` is outside this change's owned paths
- * (`orchestrator/`, `tests/orchestrator/`, `.github/workflows/`,
- * `docs/superpowers/specs/`), so adding those lines is a follow-up for
- * whoever owns that file, not done here. Until then, a Tier 1 diff under one
- * of those three still skips the model review (the tier itself does not
- * depend on CODEOWNERS coverage) but does not yet get the code-owner review
- * this tier's own definition promises it.
+ * `.claude/agents/`, `.claude/skills/`, `docs/superpowers/specs/`, and
+ * `lefthook.yml` used to live in this list — that was the defect a review
+ * gate caught on PR #870: "Tier 1 lets PRs auto-succeed with neither a
+ * model review nor a CODEOWNERS-enforced human review, converting a
+ * fail-closed 'not-requested' gate into an unattended pass for paths that
+ * can alter what the fleet's own coding agents will obey." `.claude/skills/`
+ * and `docs/superpowers/specs/` are not owned in `CODEOWNERS` at all (see
+ * `AGENT_INSTRUCTION_PATHS` below), so "Tier 1 gets a code-owner review" was
+ * a promise this file could not keep for exactly the paths where breaking
+ * it matters most — the files that define lane ownership, never-write
+ * paths, and the determinism invariants every dispatched worker is bound
+ * by. All four now classify Tier 2 unconditionally — see
+ * `AGENT_INSTRUCTION_PATHS` (which absorbs `.claude/agents/` and
+ * `.claude/skills/` under a single `.claude/` prefix, plus
+ * `docs/superpowers/specs/`) and `lefthook.yml`'s existing, untouched
+ * `HIGH_IMPACT_PATHS` entry (removing it here was enough — that list
+ * already forces Tier 2 with full CODEOWNERS coverage).
+ *
+ * What remains below is lint/format/editor config: cosmetic tooling that
+ * cannot change what an agent obeys or what CI enforces as a gate. `tierFor
+ * File` checks `TIER1_PATHS` AFTER `AGENT_INSTRUCTION_PATHS` (Tier 2,
+ * unconditional) and the `HIGH_IMPACT_PATHS`/secret checks, so nothing
+ * below can ever shadow a Tier 2 path — the ordering the PR #870 regression
+ * tests in `impact.test.ts` pin down.
  */
 export const TIER1_PATHS: readonly string[] = [
-  '.claude/agents/',
-  '.claude/skills/',
-  'docs/superpowers/specs/',
-  'lefthook.yml',
   '.editorconfig',
   'eslint.config.js',
   'eslint.config.ts',
@@ -258,6 +277,64 @@ export const TIER1_PATHS: readonly string[] = [
   '.prettierrc.json',
   '.prettierrc.js',
 ]
+
+/**
+ * Paths and file-basenames that define what the fleet's own coding agents
+ * OBEY — skill definitions, agent/fragment instructions, the coordination
+ * directory, and specs that carry an invariant this repo's own gates rely
+ * on. Always Tier 2, unconditionally: never downgradable by a `.md`
+ * extension (which would otherwise read as Tier 0 docs prose) or by living
+ * under a directory that also holds ordinary tooling config (which would
+ * otherwise read as Tier 1). A change here has a LARGER blast radius than
+ * most product code, not a smaller one — it can alter the rules every
+ * future PR, including this gate's own decision logic, is judged against.
+ *
+ * Deliberately NOT folded into `HIGH_IMPACT_PATHS` above: that list's own
+ * guard (`tests/orchestrator/guards.test.ts`, "CODEOWNERS owns every
+ * tracked file under every HIGH_IMPACT_PATH") requires full CODEOWNERS
+ * coverage for every entry, and `CODEOWNERS` is outside this change's
+ * owned paths (`orchestrator/src/impact.ts`, `tests/orchestrator/`) — today
+ * it owns `.claude/agents/` and `.claude/settings.json` but not
+ * `.claude/skills/`, `.claude/coordination/`, or `docs/superpowers/specs/`.
+ * Tier 2 itself does not need CODEOWNERS to protect a path: `decideReviewGate`
+ * (ci.ts) sends every Tier 2 diff through the full gate, including the
+ * non-author model review, regardless of who — if anyone — CODEOWNERS
+ * would also request. A follow-up (out of scope here) should still add
+ * CODEOWNERS lines for the paths below that lack one, for the same
+ * belt-and-suspenders reason `HIGH_IMPACT_PATHS` gets one.
+ *
+ * `.claude/` is a single directory prefix — broader than the narrower
+ * `.claude/agents/`/`.claude/skills/` split the earlier TIER1_PATHS
+ * version used — so a new subdirectory under `.claude/` (like
+ * `.claude/coordination/`, tracked today) is Tier 2 by construction, not by
+ * remembering to list it.
+ */
+export const AGENT_INSTRUCTION_PATHS: readonly string[] = [
+  '.claude/',
+  'docs/superpowers/specs/',
+]
+
+/**
+ * Agent-instruction files identified by BASENAME, not directory — this
+ * repo's own root `CLAUDE.md` (and `packages/crypto/CLAUDE.md`) live
+ * outside `.claude/` and outside `docs/`, so without this check they would
+ * fall through to `isTier0Path`'s `.md`-is-prose default and classify as
+ * Tier 0: no review at all, for the single file every dispatched agent
+ * reads first. `AGENTS.md`/`GEMINI.md` are the same convention under other
+ * tool names — this repo's own root `CLAUDE.md` documents all three as
+ * equal-precedence instruction files ("User instructions (CLAUDE.md,
+ * AGENTS.md, GEMINI.md, etc...")) — included pre-emptively even though
+ * neither is tracked here today, the same "owned before anyone remembers
+ * to add it" reasoning `vitest.*.config.ts` uses above. Matched at ANY
+ * depth: a per-package `CLAUDE.md` (like `packages/crypto/CLAUDE.md`,
+ * tracked today) is exactly as load-bearing as the root one.
+ */
+const AGENT_INSTRUCTION_BASENAMES: ReadonlySet<string> = new Set(['CLAUDE.md', 'AGENTS.md', 'GEMINI.md'])
+
+function isAgentInstructionFile(f: string): boolean {
+  const basename = f.slice(f.lastIndexOf('/') + 1)
+  return AGENT_INSTRUCTION_BASENAMES.has(basename)
+}
 
 /**
  * Anchored on purpose — this is the fix for a fail-open a review gate
@@ -281,27 +358,54 @@ function tier1Hit(f: string): string | undefined {
 }
 
 /**
+ * Anchored the same way `tier1Hit` is, and for the same reason: every
+ * `AGENT_INSTRUCTION_PATHS` entry ends in `/`, so a plain `startsWith` is
+ * already a real "is this path under that directory" test with no
+ * unanchored-substring risk — no bare-basename branch is needed the way
+ * `tier1Hit` needs one for `lefthook.yml`/`eslint.config.js`.
+ */
+function agentInstructionHit(f: string): string | undefined {
+  return AGENT_INSTRUCTION_PATHS.find((p) => f.startsWith(p))
+}
+
+/**
  * One changed file's tier, and why. Order is the whole design:
  *
- * 1. `TIER1_PATHS` first — so its two overlaps with `HIGH_IMPACT_PATHS`
- *    (`.claude/agents/`, `lefthook.yml`) resolve to Tier 1 without editing
- *    that list. No other `HIGH_IMPACT_PATHS`/secret-pattern entry overlaps a
- *    `TIER1_PATHS` prefix today — pinned by the "never demoted" tests in
+ * 1. `AGENT_INSTRUCTION_PATHS` and `AGENT_INSTRUCTION_BASENAMES` first,
+ *    UNCONDITIONALLY Tier 2 — before anything else gets a chance to read
+ *    `docs/superpowers/specs/x.md` as Tier 0 prose (`TIER0_DOC_DIR` is a
+ *    `docs/` prefix) or a `.claude/` file as Tier 1 tooling. This is the fix
+ *    for the PR #870 finding: paths that define what the fleet's own coding
+ *    agents obey must never reach the auto-succeed tiers, checked before
+ *    any rule that could otherwise demote them.
+ * 2. `TIER1_PATHS` next — cosmetic lint/format/editor config only, now that
+ *    the agent-instruction paths have been carved out above. No
+ *    `HIGH_IMPACT_PATHS`/secret-pattern entry overlaps a `TIER1_PATHS`
+ *    prefix today — pinned by the "never demoted" tests in
  *    `tests/orchestrator/impact.test.ts`, which iterate the real
  *    `HIGH_IMPACT_PATHS`/`SECRET_PATH_PATTERNS` constants (not a hand-copied
  *    duplicate) so a future entry that accidentally gains an overlap fails
  *    the suite immediately.
- * 2. `HIGH_IMPACT_PATHS` and the secret patterns — the Tier 2 "always" list.
+ * 3. `HIGH_IMPACT_PATHS` and the secret patterns — the Tier 2 "always" list.
  *    Reused wholesale from `classifyImpact` above rather than re-curated:
  *    two lists of "which paths are sensitive" that could drift apart is
  *    exactly the failure mode this project's own comments warn against
  *    elsewhere (see `CRYPTO_REVIEW_PATHS` in review.ts).
- * 3. `TIER0_DOC_DIR`/`.md` — prose.
- * 4. Otherwise Tier 2: the default. "Everything else" in this file's own
- *    module comment is not a residual case handled by falling through with
- *    no logic — it is this line, stated as code.
+ * 4. `TIER0_DOC_DIR`/`.md` — prose.
+ * 5. Otherwise Tier 2: the default, for anything unmatched above — an
+ *    unknown or unrecognized path defaults to the HIGHEST tier, not the
+ *    lowest. "Everything else" in this file's own module comment is not a
+ *    residual case handled by falling through with no logic — it is this
+ *    line, stated as code.
  */
 function tierForFile(f: string): { tier: ImpactTier; reason: string } {
+  const instructionHit = agentInstructionHit(f)
+  if (instructionHit !== undefined) {
+    return { tier: 2, reason: `${f} is Tier 2 (always) — agent-instruction path ${instructionHit}` }
+  }
+  if (isAgentInstructionFile(f)) {
+    return { tier: 2, reason: `${f} is Tier 2 (always) — agent-instruction file (${f.slice(f.lastIndexOf('/') + 1)})` }
+  }
   const t1 = tier1Hit(f)
   if (t1 !== undefined) {
     return { tier: 1, reason: `${f} is Tier 1 (instructions/tooling) — under ${t1}` }

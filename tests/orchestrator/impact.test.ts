@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { classifyImpact, tierFor, TIER1_PATHS } from '../../orchestrator/src/impact.js'
+import { classifyImpact, tierFor, TIER1_PATHS, AGENT_INSTRUCTION_PATHS } from '../../orchestrator/src/impact.js'
 import { NEVER_WRITE_PATHS, SECRET_PATH_PATTERNS } from '../../orchestrator/src/config.js'
 
 /**
@@ -215,24 +215,25 @@ describe('tierFor', () => {
     expect(r.reasons).toEqual([])
   })
 
+  // Only cosmetic lint/format/editor config remains Tier 1 after PR #870's
+  // fix — `.claude/agents/`, `.claude/skills/`, `docs/superpowers/specs/`,
+  // and `lefthook.yml` are asserted Tier 2 further down, not here.
   it.each([
-    '.claude/agents/backend-supervisor.md',
-    '.claude/skills/fleet-review-and-merge/SKILL.md',
-    'docs/superpowers/specs/2026-09-19-impact-tiers-addendum.md',
-    'lefthook.yml',
     'eslint.config.js',
-  ])('classifies %s as Tier 1 (instructions/tooling)', (f) => {
+    'eslint.config.ts',
+    '.eslintrc.json',
+    '.prettierrc',
+    '.editorconfig',
+  ])('classifies %s as Tier 1 (cosmetic tooling)', (f) => {
     expect(tierFor([f]).tier).toBe(1)
   })
 
   // A `.md` file under `.claude/` is instruction text a coding agent obeys,
   // not prose a human reads — it must never fall through to Tier 0 by
-  // extension alone. `CLAUDE.md` under `.claude/agents/` is covered by the
-  // TIER1_PATHS prefix above; a bare `.claude/CLAUDE.md` (not under
-  // agents/ or skills/) is covered by the `.md`-exemption alone and, having
-  // no other tier1/tier2-always hit, is Tier 2 by default — never Tier 0.
-  it('does not classify a .claude/ markdown file as Tier 0 by extension alone', () => {
-    expect(tierFor(['.claude/CLAUDE.md']).tier).not.toBe(0)
+  // extension alone, and (post PR #870 fix) never fall through to Tier 1
+  // either: it is Tier 2, unconditionally, via `AGENT_INSTRUCTION_PATHS`.
+  it('classifies a .claude/ markdown file as Tier 2, never Tier 0 or Tier 1', () => {
+    expect(tierFor(['.claude/CLAUDE.md']).tier).toBe(2)
   })
 
   it.each([
@@ -267,6 +268,42 @@ describe('tierFor', () => {
     expect(tierFor([f]).tier).toBe(2)
   })
 
+  // PR #870's fix: every path that can alter what the fleet's own coding
+  // agents OBEY is Tier 2, unconditionally — the auto-succeed tiers (0/1)
+  // must be unreachable for these regardless of file extension or nesting.
+  // Includes nested subdirectories under `.claude/` that are neither
+  // `agents/` nor `skills/` (`.claude/coordination/`, tracked today) to
+  // prove the fix is a blanket `.claude/` prefix, not a re-curated pair of
+  // narrower ones that could miss a new subdirectory.
+  it.each([
+    '.claude/agents/backend-supervisor.md',
+    '.claude/agents/fragments/_worker-rules.md',
+    '.claude/skills/fleet-review-and-merge/SKILL.md',
+    '.claude/coordination/contracts/README.md',
+    '.claude/settings.json',
+    '.claude/hookify.i18n-camelcase-keys.local.md',
+    'docs/superpowers/specs/2026-09-19-impact-tiers-addendum.md',
+    'lefthook.yml',
+  ])('agent-instruction/gating path %s is Tier 2 (always) — never auto-succeeds', (f) => {
+    expect(tierFor([f]).tier).toBe(2)
+  })
+
+  // The specific CLAUDE.md gap PR #870's review caught: a file named exactly
+  // CLAUDE.md/AGENTS.md/GEMINI.md, at ANY depth — not just `.claude/` — must
+  // never read as Tier 0 prose by its `.md` extension. Includes a per-package
+  // CLAUDE.md (packages/crypto/CLAUDE.md is tracked today) to prove the
+  // basename check is not root-only.
+  it.each([
+    'CLAUDE.md',
+    'packages/crypto/CLAUDE.md',
+    'apps/worker/CLAUDE.md',
+    'AGENTS.md',
+    'GEMINI.md',
+    'some/deeply/nested/dir/CLAUDE.md',
+  ])('agent-instruction file %s is Tier 2 (always), never Tier 0 by its .md extension', (f) => {
+    expect(tierFor([f]).tier).toBe(2)
+  })
+
   // Every SECRET_PATH_PATTERNS entry (config.ts) is also Tier 2 — the same
   // "the two gates must not disagree about secrets" invariant classifyImpact
   // already enforces, extended to the tier axis.
@@ -274,29 +311,31 @@ describe('tierFor', () => {
     expect(tierFor([realisticPathFor(pattern)]).tier).toBe(2)
   })
 
-  // The overlap this file's own comments call out: `.claude/agents/` and
-  // `lefthook.yml` are members of BOTH `HIGH_IMPACT_PATHS` (classifyImpact
-  // still calls them "high impact") and `TIER1_PATHS` — and Tier 1 must win
-  // for the tier question, without editing `HIGH_IMPACT_PATHS`.
+  // `.claude/agents/` and `lefthook.yml` used to be members of BOTH
+  // `HIGH_IMPACT_PATHS` and `TIER1_PATHS`, and the two axes disagreed on
+  // purpose — Tier 1 won for the tier question. PR #870's fix removed both
+  // from `TIER1_PATHS`: the axes now AGREE for these two paths, both
+  // reading Tier 2 (always) via `HIGH_IMPACT_PATHS` (`lefthook.yml`) or
+  // `AGENT_INSTRUCTION_PATHS` (`.claude/agents/`) respectively.
   it.each(['.claude/agents/backend-supervisor.md', 'lefthook.yml'])(
-    '%s is high-impact (classifyImpact) but only Tier 1 (tierFor) — the two axes disagree on purpose',
+    '%s is high-impact (classifyImpact) AND Tier 2 (tierFor) — no axis disagreement for the fleet trust base',
     (f) => {
       expect(classifyImpact([f], 5).impact).toBe('high')
-      expect(tierFor([f]).tier).toBe(1)
+      expect(tierFor([f]).tier).toBe(2)
     },
   )
 
-  // Regression for the fail-open a review gate caught on PR #870:
-  // `tier1Hit` used to match a `TIER1_PATHS` basename anywhere in the path
+  // Regression for a fail-open a review gate caught on PR #870: `tier1Hit`
+  // used to match a `TIER1_PATHS` basename anywhere in the path
   // (`f.includes(\`/${p}\`)`), so a file that merely ENDS with a Tier 1
   // filename — while actually living under a Tier 2 "always" directory —
   // classified as Tier 1 and skipped the non-author review entirely. Both
   // examples are real Tier 2 directories (`packages/crypto/`,
   // `orchestrator/`) paired with real TIER1_PATHS basenames
-  // (`eslint.config.js`, `lefthook.yml`) that are ONLY meant to match at
+  // (`eslint.config.js`, `.eslintrc.json`) that are ONLY meant to match at
   // the repo root. Neither path is a tracked file today — this asserts the
   // classifier's behavior on a hypothetical path, not file existence.
-  it.each(['packages/crypto/eslint.config.js', 'orchestrator/src/lefthook.yml'])(
+  it.each(['packages/crypto/eslint.config.js', 'orchestrator/src/.eslintrc.json'])(
     '%s stays Tier 2 (always) — a Tier 1 basename match must not shadow the directory it lives under',
     (f) => {
       expect(tierFor([f]).tier).toBe(2)
@@ -307,11 +346,22 @@ describe('tierFor', () => {
     const mixed = tierFor(['docs/readme.md', '.claude/agents/backend-supervisor.md', 'packages/crypto/src/lib.rs'])
     expect(mixed.tier).toBe(2)
     expect(mixed.reasons.join(' ')).toMatch(/packages\/crypto/)
-    // The Tier 0/1 files did not decide the outcome — they are not named in
-    // the winning reasons.
+    // The Tier 0 file did not decide the outcome — it is not named in the
+    // winning reasons. (`.claude/agents/...` is ALSO Tier 2 post-fix, so it
+    // legitimately co-decides the outcome alongside packages/crypto/ — see
+    // the dedicated Tier-0-vs-Tier-2 case below for a clean two-file split.)
     expect(mixed.reasons.join(' ')).not.toMatch(/docs\/readme\.md/)
 
-    const tier1AndTier0 = tierFor(['docs/readme.md', '.claude/agents/backend-supervisor.md'])
+    // Post PR #870 fix: `.claude/agents/...` is Tier 2, not Tier 1, so
+    // mixing it with a Tier 0 doc file now reaches Tier 2 — the property
+    // this test asserts (highest tier wins) still holds, just with a
+    // different highest tier than before the fix.
+    const tier2AndTier0 = tierFor(['docs/readme.md', '.claude/agents/backend-supervisor.md'])
+    expect(tier2AndTier0.tier).toBe(2)
+
+    // The genuinely-Tier-1 case: cosmetic tooling mixed with docs prose
+    // still tops out at Tier 1, never escalating to 2 on its own.
+    const tier1AndTier0 = tierFor(['docs/readme.md', 'eslint.config.js'])
     expect(tier1AndTier0.tier).toBe(1)
   })
 
@@ -327,5 +377,47 @@ describe('tierFor', () => {
   it.each(TIER1_PATHS)('TIER1_PATHS entry %s matches a realistic path under it', (p) => {
     const file = p.endsWith('/') ? `${p}example.md` : p
     expect(tierFor([file]).tier).toBe(1)
+  })
+
+  // Every AGENT_INSTRUCTION_PATHS entry must actually match a realistic
+  // path under it, and that path must be Tier 2 — same discipline as
+  // TIER1_PATHS's own coverage test above, applied to the new list.
+  it.each(AGENT_INSTRUCTION_PATHS)('AGENT_INSTRUCTION_PATHS entry %s matches a realistic path under it, at Tier 2', (p) => {
+    const file = `${p}example.md`
+    expect(tierFor([file]).tier).toBe(2)
+  })
+
+  // Requirement (a): a diff touching `.claude/` or `docs/superpowers/specs/`
+  // can never reach the auto-succeed tier (0 or 1) — the exact PR #870
+  // finding, asserted directly against every tier value rather than just
+  // checking `=== 2`, so a future third tier added below 2 could not sneak
+  // one of these paths into it without failing here.
+  it.each([
+    '.claude/agents/x.md',
+    '.claude/skills/y/SKILL.md',
+    '.claude/coordination/z.md',
+    '.claude/settings.json',
+    '.claude/anything-not-yet-invented/w.md',
+    'docs/superpowers/specs/2026-01-01-whatever.md',
+  ])('%s can never classify below Tier 2 (the auto-succeed tiers are unreachable)', (f) => {
+    const tier = tierFor([f]).tier
+    expect(tier).not.toBe(0)
+    expect(tier).not.toBe(1)
+    expect(tier).toBe(2)
+  })
+
+  // Requirement (b): an unknown/unmatched path defaults to the HIGHEST
+  // tier, not the lowest. None of these hit any named list in impact.ts —
+  // not `.claude/`, not `docs/`, not `.md`, not any HIGH_IMPACT_PATHS or
+  // TIER1_PATHS prefix, not a secret pattern — so they exercise the literal
+  // fallthrough at the bottom of `tierForFile`. A change to that default
+  // (e.g. "unrecognized paths are Tier 0 unless proven otherwise") is
+  // exactly the fail-open this test exists to catch.
+  it.each([
+    'some/brand/new/unrecognized-directory/File.xyz',
+    'a-top-level-file-nobody-has-invented-yet.bin',
+    'totally/unknown/path/structure/here',
+  ])('unmatched path %s defaults to Tier 2 (highest), never Tier 0 or 1', (f) => {
+    expect(tierFor([f]).tier).toBe(2)
   })
 })

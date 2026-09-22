@@ -1635,11 +1635,45 @@ describe('rail: decideReviewGate enforces the four fleet/review branches (cache-
   it('concludes low-tier for an instructions/tooling-only diff (Tier 1)', async () => {
     const cache = fakeCache()
     const outcome = await decideReviewGate({
-      ctx: ctx(), prDiff: async () => diff, changedFiles: async () => ['.claude/agents/backend-supervisor.md'],
+      ctx: ctx(), prDiff: async () => diff, changedFiles: async () => ['eslint.config.js'],
       cache, requested: false, log: () => {},
     })
     expect(outcome.kind).toBe('low-tier')
     if (outcome.kind === 'low-tier') expect(outcome.tier).toBe(1)
+  })
+
+  // PR #870's own fix, pinned at the decision-gate level (not just in
+  // impact.test.ts's unit tests on `tierFor` directly): a diff touching
+  // `.claude/agents/` — or any other agent-instruction path — must NEVER
+  // conclude `low-tier`. Proven with `requested: false`, the case that
+  // would previously have produced an unattended, no-review pass: before
+  // the fix this concluded `low-tier` (tier 1); after the fix it must
+  // fall through to `not-requested` — a red, fail-closed check, exactly
+  // like any other Tier 2 diff nobody has labeled `review` yet.
+  it('a diff touching .claude/agents/ never concludes low-tier — it is Tier 2, unconditionally', async () => {
+    const cache = fakeCache()
+    const outcome = await decideReviewGate({
+      ctx: ctx(), prDiff: async () => diff, changedFiles: async () => ['.claude/agents/backend-supervisor.md'],
+      cache, requested: false, log: () => {},
+    })
+    expect(outcome.kind).toBe('not-requested')
+  })
+
+  // Same property, proven for the other three paths the PR #870 finding
+  // named explicitly: `.claude/skills/`, `docs/superpowers/specs/`, and a
+  // bare `CLAUDE.md` outside `.claude/`. Each must reach the engine once
+  // requested — never conclude low-tier regardless of the label.
+  it.each([
+    '.claude/skills/fleet-review-and-merge/SKILL.md',
+    'docs/superpowers/specs/2026-09-19-impact-tiers-addendum.md',
+    'CLAUDE.md',
+  ])('a diff touching %s reaches run-engine once requested — never low-tier', async (f) => {
+    const cache = fakeCache()
+    const outcome = await decideReviewGate({
+      ctx: ctx(), prDiff: async () => diff, changedFiles: async () => [f],
+      cache, requested: true, log: () => {},
+    })
+    expect(outcome.kind).toBe('run-engine')
   })
 
   // low-tier fires even when the event DID request a review: a Tier 0/1 diff
