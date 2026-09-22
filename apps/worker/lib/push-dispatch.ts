@@ -14,6 +14,7 @@ import type { IdentityService } from '../services/identity'
 import type { ShiftsService } from '../services/shifts'
 import { encryptWakePayload, encryptFullPayload } from './push-encryption'
 import { NtfyClient } from './ntfy-client'
+import { getApnsBundleId } from './apns-topic'
 
 // ── Test Push Log (dev/test environments only) ────────────────────────────────
 // In-memory store for the last dispatched WakePayload — used by BDD tests to
@@ -46,8 +47,6 @@ export function getTestPushLog(): TestPushLogEntry[] {
 export function clearTestPushLog(): void {
   testPushLog.splice(0, testPushLog.length)
 }
-
-const APNS_BUNDLE_ID = 'org.llamenos.mobile'
 
 export interface PushDispatcher {
   /**
@@ -209,7 +208,7 @@ class ServicePushDispatcher implements PushDispatcher {
       team: this.env.APNS_TEAM_ID!,
       keyId: this.env.APNS_KEY_ID!,
       signingKey: this.env.APNS_KEY_P8!,
-      defaultTopic: APNS_BUNDLE_ID,
+      defaultTopic: getApnsBundleId(this.env),
     })
 
     // Wake-only APNs payload: NO plaintext title/body/category.
