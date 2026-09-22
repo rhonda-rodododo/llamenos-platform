@@ -18,7 +18,7 @@ import { secondOpinion, postReview } from './review.js'
 import { artifactReviewCache } from './review-cache.js'
 import { runReviewAndMerge, defaultReviewAndMergeDeps, describeOutcome } from './review-and-merge.js'
 import {
-  runVerifyCi, runReviewCi, decideReviewGate, ciContextFromEnv, ciDiff,
+  runVerifyCi, runReviewCi, decideReviewGate, ciContextFromEnv, ciDiff, ciChangedFiles,
   REVIEW_JOB, REVIEW_KEY_ENV, VERIFY_JOB, itemIdFromBranch, fleetBranchFor, legacyFleetBranchFor,
   type CiContext, type CiVerdict,
 } from './ci.js'
@@ -1289,6 +1289,7 @@ async function runReviewGate(): Promise<number> {
   const outcome = await decideReviewGate({
     ctx,
     prDiff: () => ciDiff(ctx),
+    changedFiles: () => ciChangedFiles(ctx),
     cache: artifactReviewCache(process.env['FLEET_REVIEW_CACHE_DIR'], ciLog),
     requested: process.env['FLEET_REVIEW_REQUESTED'] === 'true',
     log: ciLog,
@@ -1300,6 +1301,17 @@ async function runReviewGate(): Promise<number> {
       `${REVIEW_JOB}: review not requested — add the \`review\` label to run the non-author review\n`,
     )
     return 1
+  }
+  // Tier 0/1 (no reviewable content): a real, explicit success — never a
+  // skip — with the tier and the contributing files printed to stdout, which
+  // IS this check's own output. Never silent: a required check that goes
+  // green with no stated reason is the exact fail-open shape this file's own
+  // header (and #848 before it) exists to prevent.
+  if (outcome.kind === 'low-tier') {
+    process.stdout.write(
+      `${REVIEW_JOB}: no reviewable content (tier ${outcome.tier}) — skipping the non-author review\n` +
+      (outcome.reasons.length > 0 ? `${outcome.reasons.map((r) => `  - ${r}`).join('\n')}\n` : '  (no changed files)\n'),
+    )
   }
   ciLog(`${REVIEW_JOB}: gate outcome = ${outcome.kind}`)
   return 0

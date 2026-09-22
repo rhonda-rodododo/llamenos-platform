@@ -2,10 +2,12 @@ import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import type { Lane } from './config.js'
 import type { VerifyInput, VerifyReport } from './verify.js'
+import { changedFilesFrom } from './verify.js'
 import { finalLine, type SecondOpinionInput, type SecondOpinionResult } from './review.js'
 import { diffHash, type CachedVerdict, type ReviewCache, type ReviewCacheKey } from './review-cache.js'
 import { join } from 'node:path'
 import { buildGateTrace } from './trace.js'
+import { tierFor, type ImpactTier } from './impact.js'
 
 const execFileAsync = promisify(execFile)
 
@@ -406,14 +408,25 @@ export async function runReviewCi(deps: ReviewCiDeps): Promise<CiVerdict> {
  *    this run — this is what makes an unrelated label event (say,
  *    `agent-dispatchable` on an already-reviewed PR) cheap and
  *    non-destructive instead of a wasted (or worse, skipped) re-review.
- *  - `not-requested` — no cached PASS, and this run was not the `review`
- *    label (nor a manual `workflow_dispatch`). Fails the job outright: a
- *    `fleet/review` a reader has not yet asked for is not a passing review,
- *    and the old design's mistake was ever treating "not asked for" as
- *    anything other than a fail-closed red check.
- *  - `run-engine` — no cached PASS, and the review WAS requested. The
- *    workflow proceeds through engine install, auth, the smoke test and the
- *    real review exactly as before this file's `if:` removal.
+ *  - `low-tier` — no cached PASS, but `tierFor` (impact.ts) classifies every
+ *    changed file as Tier 0 or Tier 1: no executable content, or
+ *    instructions/tooling that already earns a code-owner review on its
+ *    own. Concludes the job successfully with no engine call, regardless of
+ *    `requested` — checked BEFORE the label check below, deliberately: a
+ *    docs-only PR that never gets the `review` label must still conclude a
+ *    real, auditable success rather than sitting on `not-requested` forever
+ *    for a review it was never going to need. The tier and the file-level
+ *    reasons are logged (and printed to the job's own stdout by
+ *    `runReviewGate`, cli.ts) so the decision is auditable from the check's
+ *    own output, not just from reading this file's source.
+ *  - `not-requested` — no cached PASS, Tier 2 (a real review is needed), and
+ *    this run was not the `review` label (nor a manual `workflow_dispatch`).
+ *    Fails the job outright: a `fleet/review` a reader has not yet asked for
+ *    is not a passing review, and the old design's mistake was ever treating
+ *    "not asked for" as anything other than a fail-closed red check.
+ *  - `run-engine` — no cached PASS, Tier 2, and the review WAS requested.
+ *    The workflow proceeds through engine install, auth, the smoke test and
+ *    the real review exactly as before this file's `if:` removal.
  *
  * `runReviewCi` itself still opens with the identical cache lookup (see its
  * own comment) — so a direct call to it from anywhere else stays correct on
@@ -423,18 +436,23 @@ export async function runReviewCi(deps: ReviewCiDeps): Promise<CiVerdict> {
  */
 export type ReviewGateOutcome =
   | { kind: 'cache-hit'; cacheKey: ReviewCacheKey; verdict: CachedVerdict }
+  | { kind: 'low-tier'; cacheKey: ReviewCacheKey; tier: ImpactTier; reasons: string[] }
   | { kind: 'not-requested'; cacheKey: ReviewCacheKey }
   | { kind: 'run-engine'; cacheKey: ReviewCacheKey }
 
 export interface ReviewGateDeps {
   ctx: CiContext
   prDiff(): Promise<string>
+  /** The changed-file list this diff touches — `tierFor`'s only input. A
+   *  separate read from `prDiff()` rather than derived from its text (see
+   *  `ciChangedFiles`'s own comment on why a diff-text scan is not enough). */
+  changedFiles(): Promise<string[]>
   cache: ReviewCache
   /** Whether THIS event is the one that asks for a review: the `review`
    *  label being applied, or a manual `workflow_dispatch`. Computed by the
    *  workflow from `github.event_name` / `github.event.label.name` — never
    *  re-derived here, so this function has exactly one job: cache first,
-   *  request second. */
+   *  tier second, request third. */
   requested: boolean
   log(msg: string): void
 }
@@ -456,6 +474,18 @@ export async function decideReviewGate(deps: ReviewGateDeps): Promise<ReviewGate
   if (cached !== undefined) {
     deps.log(`reused verdict for pr=${cacheKey.pr} sha256:${cacheKey.diffHash.slice(0, 12)}… — no engine call`)
     return { kind: 'cache-hit', cacheKey, verdict: cached }
+  }
+
+  // Ordered here — after the cache check, before the label/request check —
+  // per the operator rule this implements: ceremony should scale with
+  // impact. A diff with no reviewable content (Tier 0/1) must conclude a
+  // real success on its own, never wait on a human to apply the `review`
+  // label for a model review it will never need.
+  const changedFiles = await deps.changedFiles()
+  const { tier, reasons } = tierFor(changedFiles)
+  if (tier < 2) {
+    deps.log(`no reviewable content (tier ${tier}) for pr=${cacheKey.pr} — ${reasons.join('; ') || 'no changed files'}`)
+    return { kind: 'low-tier', cacheKey, tier, reasons }
   }
 
   if (!deps.requested) {
@@ -487,4 +517,21 @@ export async function ciDiff(ctx: CiContext): Promise<string> {
     { maxBuffer: 32 * 1024 * 1024 },
   )
   return stdout
+}
+
+/**
+ * The changed-file LIST, not the diff text — `decideReviewGate`'s tier check
+ * (`tierFor`, impact.ts) needs every touched path, including a binary file's
+ * (no `+++`/`---` header a text-diff scan could find). A separate `git
+ * diff --name-only` call, matching `verifyMechanical`'s own (verify.ts), is
+ * simpler and more robust than parsing `ciDiff`'s unified-diff text for file
+ * headers — this is the same trusted base checkout either call runs in, so
+ * the extra `git` invocation costs nothing in trust, only one more process.
+ */
+export async function ciChangedFiles(ctx: CiContext): Promise<string[]> {
+  const { stdout } = await execFileAsync(
+    'git', ['-C', ctx.repoDir, 'diff', '--name-only', `${ctx.baseSha}...${ctx.headSha}`],
+    { maxBuffer: 32 * 1024 * 1024 },
+  )
+  return changedFilesFrom(stdout)
 }
