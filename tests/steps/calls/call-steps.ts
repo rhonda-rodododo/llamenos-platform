@@ -50,6 +50,11 @@ When('I tap the {string} call filter chip', async ({ page }, filterName: string)
   // the sidebar's "Call Notes" nav link. Word-boundary the match, then wait for a settled
   // state (the chip, or confirmation the page itself has loaded) instead of guessing, and
   // click only if the chip actually exists.
+  //
+  // NOTE: a hard assertion (fail loudly if the chip never renders) was tried here first —
+  // it broke every desktop chip-filter scenario, since desktop genuinely never renders
+  // per-status chips (confirmed by reading calls.tsx). This `.or(pageTitle)` fallback is
+  // not a swallowed probe — it's the correct handling of a real platform difference.
   const filterChip = page.getByText(new RegExp(`\\b${filterName}\\b`, 'i')).filter({ visible: true })
   const pageTitle = page.getByTestId(TestIds.PAGE_TITLE)
   await expect(filterChip.first().or(pageTitle)).toBeVisible({ timeout: Timeouts.ELEMENT })
@@ -130,24 +135,23 @@ When('I tap the back button on call history', async ({ page }) => {
 })
 
 Then('I should see the date from filter', async ({ page }) => {
-  const dateInput = page.locator('input[type="date"]').first()
-  await expect(dateInput).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await expect(page.getByTestId(TestIds.CALL_DATE_FROM)).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 Then('I should see the date to filter', async ({ page }) => {
-  const dateInputs = page.locator('input[type="date"]')
-  const count = await dateInputs.count()
-  expect(count).toBeGreaterThanOrEqual(2)
-  await expect(dateInputs.nth(1)).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await expect(page.getByTestId(TestIds.CALL_DATE_TO)).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 Given('a date range is selected', async ({ page }) => {
-  // Fill in date range. Was: filled `.first()`/`.nth(1)` with no assertion that exactly
-  // the expected from/to pair had rendered — a scoped wait replaces the blind assumption.
-  const dateInputs = page.locator('input[type="date"]')
-  await expect(dateInputs).toHaveCount(2, { timeout: Timeouts.ELEMENT })
-  await dateInputs.first().fill('2024-01-01')
-  await dateInputs.nth(1).fill('2024-12-31')
+  // Scoped testids, not CSS-selector `.first()`/`.nth(1)` over every `input[type="date"]`
+  // on the page — each input is waited on before being filled. These testids are already
+  // used for assertions elsewhere in this file (see the from/to filter Then steps above).
+  const dateFrom = page.getByTestId(TestIds.CALL_DATE_FROM)
+  const dateTo = page.getByTestId(TestIds.CALL_DATE_TO)
+  await expect(dateFrom).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await dateFrom.fill('2024-01-01')
+  await expect(dateTo).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await dateTo.fill('2024-12-31')
 })
 
 Then('I should see the date range clear button', async ({ page }) => {

@@ -211,7 +211,11 @@ Then('I should see the note edit button', async ({ page }) => {
 })
 
 When('I tap the note edit button', async ({ page }) => {
-  const editBtn = page.getByTestId(TestIds.NOTE_EDIT_BTN).first()
+  // Scope the edit button to the same card asserted by the preceding step, instead of
+  // `.first()` over every note-card's edit button on the page.
+  const noteCard = page.getByTestId(TestIds.NOTE_CARD).first()
+  await expect(noteCard).toBeVisible({ timeout: Timeouts.ELEMENT })
+  const editBtn = noteCard.getByTestId(TestIds.NOTE_EDIT_BTN)
   await expect(editBtn).toBeVisible({ timeout: Timeouts.ELEMENT })
   await editBtn.click()
 })
