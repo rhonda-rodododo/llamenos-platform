@@ -1457,7 +1457,9 @@
     "rateLimitTitle": "更改频率限制",
     "transcriptionDisable": "禁用通话转录？志愿者的通话将不再自动转录。",
     "transcriptionEnable": "为所有志愿者启用通话转录？这将使用AI实时转录通话。",
-    "transcriptionTitle": "更改转录设置"
+    "transcriptionTitle": "更改转录设置",
+    "biometricDisable": "关闭生物识别解锁？您仍然可以使用PIN码解锁。",
+    "biometricDisableTitle": "关闭生物识别解锁"
   },
   "connectWithOauth": "Connect with OAuth",
   "connectionFailed": "Connection failed",
@@ -3734,7 +3736,11 @@
     "transcriptionSettings": "转录",
     "version": "Version",
     "voicemail": "Voicemail",
-    "webrtcNotConfigured": "浏览器通话不可用。您的管理员需要在电话服务提供商设置中启用WebRTC。"
+    "webrtcNotConfigured": "浏览器通话不可用。您的管理员需要在电话服务提供商设置中启用WebRTC。",
+    "biometricDesc": "使用指纹或面容解锁，而不必输入PIN码。您的PIN码仍然有效，且永远不会被禁用。",
+    "biometricEnrolled": "此设备已开启生物识别解锁。",
+    "biometricInvalidated": "您设备的生物识别信息已更改，因此生物识别解锁已关闭。请在下方重新启用，或继续使用PIN码。",
+    "biometricPinPrompt": "输入PIN码以启用生物识别解锁"
   },
   "serverAddress": {
     "checking": "Checking...",

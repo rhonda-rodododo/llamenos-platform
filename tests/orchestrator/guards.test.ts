@@ -1519,7 +1519,7 @@ describe('rail: fleet/review reviews exactly once per diff, never twice on an id
  * `verify`/`secondOpinion` in sight — a passing test here cannot be mistaken
  * for a passing review.
  */
-describe('rail: decideReviewGate enforces the three fleet/review branches (cache-hit / not-requested / run-engine)', () => {
+describe('rail: decideReviewGate enforces the four fleet/review branches (cache-hit / low-tier / not-requested / run-engine)', () => {
   const ctx = (): CiContext => ({
     branch: 'fleet/ios/123', repoDir: '/base', headDir: '/tmp/head',
     baseSha: 'base111', headSha: 'head222', pr: '42',
@@ -1535,6 +1535,11 @@ describe('rail: decideReviewGate enforces the three fleet/review branches (cache
   }
 
   const diff = 'diff --git a/x b/x\n+hello\n'
+  // A Tier 2 (default — not docs, not an instructions/tooling path) file, so
+  // every pre-existing test below reaches the SAME cache-hit/not-requested/
+  // run-engine branch it always has — the tier check must never change their
+  // outcome, only add a new branch ahead of them.
+  const tier2Files = async (): Promise<string[]> => ['x']
 
   // Branch (a): a cache hit concludes `cache-hit` regardless of whether this
   // event was the `review` label — an unrelated label event on an
@@ -1549,7 +1554,7 @@ describe('rail: decideReviewGate enforces the three fleet/review branches (cache
       verdict: { verdict: 'PASS', text: 'VERDICT: PASS (cached)' },
     })
     const outcome = await decideReviewGate({
-      ctx: ctx(), prDiff: async () => diff, cache, requested: false, log: () => {},
+      ctx: ctx(), prDiff: async () => diff, changedFiles: tier2Files, cache, requested: false, log: () => {},
     })
     expect(outcome.kind).toBe('cache-hit')
   })
@@ -1559,7 +1564,7 @@ describe('rail: decideReviewGate enforces the three fleet/review branches (cache
   it('concludes not-requested on a cache miss when this event did not request a review', async () => {
     const cache = fakeCache()
     const outcome = await decideReviewGate({
-      ctx: ctx(), prDiff: async () => diff, cache, requested: false, log: () => {},
+      ctx: ctx(), prDiff: async () => diff, changedFiles: tier2Files, cache, requested: false, log: () => {},
     })
     expect(outcome.kind).toBe('not-requested')
   })
@@ -1569,7 +1574,7 @@ describe('rail: decideReviewGate enforces the three fleet/review branches (cache
   it('concludes run-engine on a cache miss when this event requested a review', async () => {
     const cache = fakeCache()
     const outcome = await decideReviewGate({
-      ctx: ctx(), prDiff: async () => diff, cache, requested: true, log: () => {},
+      ctx: ctx(), prDiff: async () => diff, changedFiles: tier2Files, cache, requested: true, log: () => {},
     })
     expect(outcome.kind).toBe('run-engine')
   })
@@ -1583,12 +1588,12 @@ describe('rail: decideReviewGate enforces the three fleet/review branches (cache
       record: async () => {},
     }
     const requestedOutcome = await decideReviewGate({
-      ctx: ctx(), prDiff: async () => diff, cache, requested: true, log: () => {},
+      ctx: ctx(), prDiff: async () => diff, changedFiles: tier2Files, cache, requested: true, log: () => {},
     })
     expect(requestedOutcome.kind).toBe('run-engine')
 
     const unrequestedOutcome = await decideReviewGate({
-      ctx: ctx(), prDiff: async () => diff, cache, requested: false, log: () => {},
+      ctx: ctx(), prDiff: async () => diff, changedFiles: tier2Files, cache, requested: false, log: () => {},
     })
     expect(unrequestedOutcome.kind).toBe('not-requested')
   })
@@ -1602,9 +1607,132 @@ describe('rail: decideReviewGate enforces the three fleet/review branches (cache
       verdict: { verdict: 'PASS', text: 'VERDICT: PASS (cached)' },
     })
     const outcome = await decideReviewGate({
-      ctx: { ...ctx(), pr: '7' }, prDiff: async () => diff, cache, requested: false, log: () => {},
+      ctx: { ...ctx(), pr: '7' }, prDiff: async () => diff, changedFiles: tier2Files, cache, requested: false, log: () => {},
     })
     expect(outcome.kind).toBe('not-requested')
+  })
+
+  // Branch (b') — the new one, ordered after cache-hit and before
+  // not-requested/run-engine (impact tiers, orchestrator rule 2026-09-19): a
+  // diff with no cached PASS whose every changed file is Tier 0 (docs) or
+  // Tier 1 (instructions/tooling) concludes `low-tier`, never `not-requested`
+  // — proven with `requested: false`, the harder case: a mutation that
+  // checked `requested` BEFORE the tier would send a docs-only, unlabeled PR
+  // down `not-requested` instead of letting it conclude on its own.
+  it('concludes low-tier for a docs-only diff, even when this event did not request a review', async () => {
+    const cache = fakeCache()
+    const outcome = await decideReviewGate({
+      ctx: ctx(), prDiff: async () => diff, changedFiles: async () => ['docs/epics/EP01-foo.md'],
+      cache, requested: false, log: () => {},
+    })
+    expect(outcome.kind).toBe('low-tier')
+    if (outcome.kind === 'low-tier') {
+      expect(outcome.tier).toBe(0)
+      expect(outcome.reasons.join(' ')).toMatch(/docs\/epics\/EP01-foo\.md/)
+    }
+  })
+
+  it('concludes low-tier for a verified-inert-data-only diff (Tier 1)', async () => {
+    const cache = fakeCache()
+    const outcome = await decideReviewGate({
+      ctx: ctx(), prDiff: async () => diff, changedFiles: async () => ['.editorconfig'],
+      cache, requested: false, log: () => {},
+    })
+    expect(outcome.kind).toBe('low-tier')
+    if (outcome.kind === 'low-tier') expect(outcome.tier).toBe(1)
+  })
+
+  // PR #870's SECOND fix, pinned at the decision-gate level (not just in
+  // impact.test.ts's unit tests on `tierFor` directly): `eslint.config.js`
+  // used to be a `TIER1_PATHS` member, which meant it concluded `low-tier`
+  // here with ZERO CODEOWNERS coverage (verified against the tracked
+  // `CODEOWNERS` file) — a lint CI step `import()`s and executes this file,
+  // so a diff touching only it could disable the lint gate with no review
+  // of any kind. It must now fall through to Tier 2 like any other
+  // unmatched path, and reach `run-engine` once requested — never
+  // `low-tier`, proven the same way the `.claude/agents/` regression above
+  // is proven.
+  it('a diff touching eslint.config.js never concludes low-tier — lint/format config can alter what a gate enforces', async () => {
+    const cache = fakeCache()
+    const outcome = await decideReviewGate({
+      ctx: ctx(), prDiff: async () => diff, changedFiles: async () => ['eslint.config.js'],
+      cache, requested: true, log: () => {},
+    })
+    expect(outcome.kind).toBe('run-engine')
+  })
+
+  // PR #870's own fix, pinned at the decision-gate level (not just in
+  // impact.test.ts's unit tests on `tierFor` directly): a diff touching
+  // `.claude/agents/` — or any other agent-instruction path — must NEVER
+  // conclude `low-tier`. Proven with `requested: false`, the case that
+  // would previously have produced an unattended, no-review pass: before
+  // the fix this concluded `low-tier` (tier 1); after the fix it must
+  // fall through to `not-requested` — a red, fail-closed check, exactly
+  // like any other Tier 2 diff nobody has labeled `review` yet.
+  it('a diff touching .claude/agents/ never concludes low-tier — it is Tier 2, unconditionally', async () => {
+    const cache = fakeCache()
+    const outcome = await decideReviewGate({
+      ctx: ctx(), prDiff: async () => diff, changedFiles: async () => ['.claude/agents/backend-supervisor.md'],
+      cache, requested: false, log: () => {},
+    })
+    expect(outcome.kind).toBe('not-requested')
+  })
+
+  // Same property, proven for the other three paths the PR #870 finding
+  // named explicitly: `.claude/skills/`, `docs/superpowers/specs/`, and a
+  // bare `CLAUDE.md` outside `.claude/`. Each must reach the engine once
+  // requested — never conclude low-tier regardless of the label.
+  it.each([
+    '.claude/skills/fleet-review-and-merge/SKILL.md',
+    'docs/superpowers/specs/2026-09-19-impact-tiers-addendum.md',
+    'CLAUDE.md',
+  ])('a diff touching %s reaches run-engine once requested — never low-tier', async (f) => {
+    const cache = fakeCache()
+    const outcome = await decideReviewGate({
+      ctx: ctx(), prDiff: async () => diff, changedFiles: async () => [f],
+      cache, requested: true, log: () => {},
+    })
+    expect(outcome.kind).toBe('run-engine')
+  })
+
+  // low-tier fires even when the event DID request a review: a Tier 0/1 diff
+  // never needs the engine regardless of the label, so `requested: true`
+  // must not somehow route it to `run-engine`.
+  it('concludes low-tier for a docs-only diff even when this event DID request a review', async () => {
+    const cache = fakeCache()
+    const outcome = await decideReviewGate({
+      ctx: ctx(), prDiff: async () => diff, changedFiles: async () => ['docs/epics/EP01-foo.md'],
+      cache, requested: true, log: () => {},
+    })
+    expect(outcome.kind).toBe('low-tier')
+  })
+
+  // A cached PASS still wins over a docs-only tier, matching the documented
+  // order ("after the cached-PASS check, before the label check") — proves
+  // `low-tier` is the SECOND check, not the first.
+  it('a cache hit is still checked before the tier — cache-hit wins over an otherwise low-tier diff', async () => {
+    const cache = fakeCache({
+      key: { pr: '42', diffHash: diffHash(diff) },
+      verdict: { verdict: 'PASS', text: 'VERDICT: PASS (cached)' },
+    })
+    const outcome = await decideReviewGate({
+      ctx: ctx(), prDiff: async () => diff, changedFiles: async () => ['docs/epics/EP01-foo.md'],
+      cache, requested: false, log: () => {},
+    })
+    expect(outcome.kind).toBe('cache-hit')
+  })
+
+  // A diff spanning tiers takes the HIGHEST tier it touches — a single Tier 2
+  // file alongside a pile of docs must still reach the engine (or
+  // not-requested), never `low-tier`.
+  it('a mixed diff with even one Tier 2 file never concludes low-tier', async () => {
+    const cache = fakeCache()
+    const outcome = await decideReviewGate({
+      ctx: ctx(), prDiff: async () => diff,
+      changedFiles: async () => ['docs/epics/EP01-foo.md', 'packages/crypto/src/lib.rs'],
+      cache, requested: true, log: () => {},
+    })
+    expect(outcome.kind).toBe('run-engine')
   })
 })
 

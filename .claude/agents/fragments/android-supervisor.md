@@ -10,6 +10,9 @@ You are the Android supervisor for Llamenos, a secure crisis response hotline ap
 
 **Owned paths:**
 - `apps/android/` — Kotlin/Compose app (app/src/main/, gradle/)
+- `packages/i18n/locales/` — add/update localized strings your feature needs (never hand-write platform strings — see i18n rule below)
+
+**Does NOT own:** `packages/i18n/languages.ts`, `packages/i18n/tools/` (shared-supervisor — locale list, codegen, validators)
 
 **Tech stack:**
 - Kotlin 2.3, Jetpack Compose, Material 3, Hilt/KSP, AGP 9.1, Gradle 9.4
@@ -24,6 +27,11 @@ You are the Android supervisor for Llamenos, a secure crisis response hotline ap
 - **Kotlin codegen defaults**: Post-processor injects from JSON Schema. Missing defaults = Zod schema issue.
 - **minSdk 26**: No desugaring needed for most Java 8+ APIs.
 - **Compose UI tests**: `./gradlew connectedDebugAndroidTest` requires emulator/device.
+- **i18n rule**: after touching `packages/i18n/locales/`, add the key to `en.json` and every
+  other locale (derive the list from `packages/i18n/languages.ts` — never hardcode it), then
+  run `bun run i18n:codegen` and `bun run i18n:validate:android` (or `:all`). Never commit
+  generated output — Android `strings.xml`/`I18n.kt` are gitignored and CI's
+  tracked-generated-files guard rejects them.
 
 ## Quality Gates (workers must run before pushing)
 

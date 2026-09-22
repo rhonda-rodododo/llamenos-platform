@@ -1,0 +1,154 @@
+# Nightly CI base image (issue #903).
+#
+# Builds deploy/docker/Dockerfile.ci-base (baked Bun + Rust toolchains, warmed
+# Bun/Cargo DOWNLOAD caches — see that file's header for why rebuilding this
+# nightly is safe: nothing in it is ever authoritative) and publishes it to
+# GHCR. Only THIS workflow, running with the repo's own GITHUB_TOKEN, is
+# trusted to publish — never a manual `docker push` from a workstation.
+#
+# A floating `:nightly` tag is never consumed directly by CI: every action in
+# these workflows is SHA-pinned, and a mutable tag rebuilt nightly is the
+# opposite — a bad nightly would break every open PR at once, with CI secrets
+# in scope. So a successful publish opens a bot PR that pins the fresh digest
+# into the consuming workflows, exactly the same reviewable, bisectable
+# pattern as a Dependabot action bump.
+#
+# Bootstrap note: as of this workflow landing, no consuming workflow
+# references `ghcr.io/rhonda-rodododo/llamenos-ci-base@sha256:...` yet — that
+# digest can't exist until the first successful run of THIS workflow
+# publishes it. The `bump-digest` job below only ever does a plain
+# find-and-replace of an existing pin; it does not add the first one (adding
+# a `container:` block via scripted YAML editing is exactly the kind of
+# blind mutation this repo's determinism rules warn about). Wiring
+# desktop-e2e.yml's `build` job and ci.yml's `build` / `crypto-tests` jobs
+# onto the published digest — the actual "start with the non-compose jobs"
+# rollout — is a short, hand-reviewed follow-up once this workflow has
+# published at least once. See #903 for the full design and the E2E-job
+# blocker (compose networking under `container:`) that keeps that job
+# deliberately out of scope here.
+
+name: CI Base Image — Nightly Build
+
+on:
+  schedule:
+    # Nightly, offset from security-audit.yml's 2:00 AM UTC run so the two
+    # don't contend for the same runner slot.
+    - cron: '17 3 * * *'
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - deploy/docker/Dockerfile.ci-base
+      - .github/workflows/ci-base-image-nightly.yml
+
+permissions: {}  # deny-all; per-job permissions below
+
+env:
+  IMAGE: ghcr.io/rhonda-rodododo/llamenos-ci-base
+
+jobs:
+  # Builds on every PR that touches the Dockerfile so a reviewer sees proof
+  # it still builds before merge. Never pushes on `pull_request` — only a
+  # schedule / workflow_dispatch / main-push run is trusted to publish,
+  # the same trust boundary docker.yml uses for release images.
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      digest: ${{ steps.build.outputs.digest }}
+      published: ${{ steps.push-gate.outputs.published }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Determine whether this run may publish
+        id: push-gate
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "published=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "published=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
+
+      - name: Log in to GHCR
+        if: steps.push-gate.outputs.published == 'true'
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build (push only on schedule / workflow_dispatch / main-branch push)
+        id: build
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: .
+          file: deploy/docker/Dockerfile.ci-base
+          push: ${{ steps.push-gate.outputs.published == 'true' }}
+          tags: ${{ env.IMAGE }}:nightly
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # Opens or updates the bot PR that pins a freshly published digest into the
+  # consuming workflows. Plain find-and-replace only — see the bootstrap
+  # note above for why this job does not add the first pin.
+  bump-digest:
+    needs: build
+    if: needs.build.outputs.published == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0
+
+      # needs.*.outputs is a `needs` context value, not usable inside a
+      # job-level `env:` block (env context isn't available while defining
+      # env itself) — compute it into $GITHUB_ENV instead so every
+      # subsequent step in this job sees $NEW_REF.
+      - name: Compute new image ref
+        run: echo "NEW_REF=${IMAGE}@${{ needs.build.outputs.digest }}" >> "$GITHUB_ENV"
+
+      - name: Configure git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Replace existing digest pin (no-op if none is wired yet)
+        run: |
+          MATCHES=$(grep -rlF "${IMAGE}@sha256:" .github/workflows/ || true)
+          if [ -z "$MATCHES" ]; then
+            echo "No workflow currently pins ${IMAGE} — nothing to bump yet."
+            echo "See this workflow's header: the first pin is added by hand, not scripted."
+            exit 0
+          fi
+          echo "$MATCHES" | xargs -r sed -i -E "s#${IMAGE}@sha256:[0-9a-f]{64}#${NEW_REF}#g"
+
+      - name: Open or update bot PR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if git diff --quiet; then
+            echo "No consuming workflow changed — nothing to bump."
+            exit 0
+          fi
+          BRANCH="bot/ci-base-image-digest"
+          BODY=$(printf 'Automated nightly rebuild of `deploy/docker/Dockerfile.ci-base`.\n\nNew digest: `%s`\n\nCaches only, never resolved trees - see the Dockerfile header. This pin can only make CI installs faster or colder, never wrong. Merge once checks pass.\n' "$NEW_REF")
+          git checkout -B "$BRANCH"
+          git add -A
+          git commit -m "ci: bump CI base image to ${NEW_REF}"
+          git push --force-with-lease origin "$BRANCH"
+          if ! gh pr view "$BRANCH" --json state -q .state >/dev/null 2>&1; then
+            gh pr create --base main --head "$BRANCH" \
+              --title "ci: bump CI base image digest" \
+              --body "$BODY"
+          else
+            gh pr comment "$BRANCH" --body "Updated to ${NEW_REF}"
+          fi
