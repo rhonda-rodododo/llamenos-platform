@@ -40,11 +40,30 @@ describe('failureBreaker', () => {
     const rows = [r('FAILED', 1), r('FAILED', 2), r('FAILED', 3)]
     expect(failureBreaker(rows, LIMITS, 100)).toBeUndefined()
   })
-  it('trips on three consecutive REJECTED outcomes', () => {
-    // REJECTED means a worker's output failed verification — that is exactly
-    // the fleet misbehaving, so it must be able to trip the breaker.
-    const rows = [r('REJECTED', 1), r('REJECTED', 2), r('REJECTED', 3)]
+  it('trips on three consecutive FAILED outcomes alone (genuine execution failures)', () => {
+    const rows = [r('FAILED', 1), r('FAILED', 2), r('FAILED', 3)]
     expect(failureBreaker(rows, LIMITS, 0)).toMatch(/consecutive/i)
+  })
+
+  // Issue #944: a full queue with no genuinely dispatchable work produced
+  // three independent, unrelated mechanical-verify REJECTEDs (three
+  // different items, three different lanes, one common root cause — a
+  // lane-scope config gap, fixed separately in #938) and the fleet halted
+  // itself, then kept re-halting for over a day needing more than a dozen
+  // manual `resume`s. REJECTED sits in the exact same per-item
+  // `TERMINAL_FAILURES` bound as BLOCKED (ledger.ts) — a mechanical
+  // scope/test failure or a review FAIL is the verification pipeline
+  // catching a bad diff and refusing to merge it, the system working as
+  // designed, not a runaway fleet — so it must not also feed a fleet-wide
+  // halt, the same way BLOCKED does not.
+  it('does not trip on three consecutive REJECTED outcomes — issue #944', () => {
+    const rows = [r('REJECTED', 1), r('REJECTED', 2), r('REJECTED', 3)]
+    expect(failureBreaker(rows, LIMITS, 0)).toBeUndefined()
+  })
+
+  it('a SUCCESS still resets the streak even with REJECTED rows before and after it', () => {
+    const rows = [r('REJECTED', 1), r('REJECTED', 2), r('SUCCESS', 3), r('FAILED', 4)]
+    expect(failureBreaker(rows, LIMITS, 0)).toBeUndefined()
   })
   it('trips on three FAILED rows interleaved with SHADOW rows', () => {
     // F4: a shadow lane writes a SHADOW row every pass it runs, so in the
@@ -60,7 +79,7 @@ describe('failureBreaker', () => {
     // BLOCKED means a worker correctly reported it cannot proceed (e.g. a
     // scope conflict) — that is the system working as designed, and the
     // per-item attempt limit already bounds it, so it must not also feed a
-    // fleet-wide halt the way REJECTED does.
+    // fleet-wide halt — the same treatment REJECTED now gets (issue #944).
     const rows = [r('BLOCKED', 1), r('BLOCKED', 2), r('BLOCKED', 3)]
     expect(failureBreaker(rows, LIMITS, 0)).toBeUndefined()
   })
@@ -160,6 +179,18 @@ describe('quotaBreaker', () => {
   it('never fires from FAILED/TIMEOUT/REJECTED rows — only QUOTA counts', () => {
     const rows = [r('FAILED', 1000, 'a', { engine: 'opencode' }), r('TIMEOUT', 2000, 'b', { engine: 'opencode' })]
     expect(quotaBreaker(rows, 0, 3000)).toBeUndefined()
+  })
+
+  // Issue #944 changed only STREAK_FAILURES (failureBreaker's input set);
+  // quotaBreaker never looked at REJECTED before and must not start now —
+  // it groups strictly by `outcome === 'QUOTA'` and `engine`.
+  it('is unaffected by three consecutive REJECTED rows, even for the same engine', () => {
+    const rows = [
+      r('REJECTED', 1000, 'a', { engine: 'opencode' }),
+      r('REJECTED', 2000, 'b', { engine: 'opencode' }),
+      r('REJECTED', 3000, 'c', { engine: 'opencode' }),
+    ]
+    expect(quotaBreaker(rows, 0, 4000)).toBeUndefined()
   })
 })
 
