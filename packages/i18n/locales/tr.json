@@ -462,7 +462,9 @@
     "rateLimitTitle": "Hız Sınırlamayı Değiştir",
     "transcriptionDisable": "Arama transkripsiyonu devre dışı bırakılsın mı? Kullanıcıların aramaları artık otomatik olarak transkript edilmeyecek.",
     "transcriptionEnable": "Tüm gönüllüler için arama transkripsiyonu etkinleştirilsin mi? Bu, aramaları gerçek zamanlı olarak transkript etmek için yapay zeka kullanır.",
-    "transcriptionTitle": "Transkripsiyon Ayarını Değiştir"
+    "transcriptionTitle": "Transkripsiyon Ayarını Değiştir",
+    "biometricDisable": "Biyometrik kilit açma kapatılsın mı? PIN'inizle kilidi açmaya devam edebileceksiniz.",
+    "biometricDisableTitle": "Biyometrik Kilit Açmayı Kapat"
   },
   "contacts": {
     "noContacts": "Henüz kişi yok",
@@ -1244,7 +1246,11 @@
     "encryptionPubkey": "Encryption Public Key",
     "logoutDescription": "Are you sure you want to log out? Your encrypted keys will be removed from this device.",
     "logoutTitle": "Log Out",
-    "signingPubkey": "Signing Public Key"
+    "signingPubkey": "Signing Public Key",
+    "biometricDesc": "PIN yazmak yerine parmak izinizi veya yüzünüzü kullanarak kilidi açın. PIN'iniz çalışmaya devam eder ve asla devre dışı bırakılmaz.",
+    "biometricEnrolled": "Bu cihazda biyometrik kilit açma etkin.",
+    "biometricInvalidated": "Cihazınızın biyometrik verileri değiştiği için biyometrik kilit açma kapatıldı. Aşağıdan yeniden etkinleştirin veya PIN'inizi kullanmaya devam edin.",
+    "biometricPinPrompt": "Biyometrik kilit açmayı etkinleştirmek için PIN'inizi girin"
   },
   "serverAddress": {
     "checking": "Checking...",

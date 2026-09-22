@@ -1457,7 +1457,9 @@
     "rateLimitTitle": "Ratenbegrenzung ändern",
     "transcriptionDisable": "Anruftranskription deaktivieren? Die Anrufe der Freiwilligen werden nicht mehr automatisch transkribiert.",
     "transcriptionEnable": "Anruftranskription für alle Freiwilligen aktivieren? Dabei wird KI verwendet, um Anrufe in Echtzeit zu transkribieren.",
-    "transcriptionTitle": "Transkriptionseinstellung ändern"
+    "transcriptionTitle": "Transkriptionseinstellung ändern",
+    "biometricDisable": "Biometrische Entsperrung deaktivieren? Sie können weiterhin mit Ihrer PIN entsperren.",
+    "biometricDisableTitle": "Biometrische Entsperrung deaktivieren"
   },
   "connectWithOauth": "Connect with OAuth",
   "connectionFailed": "Connection failed",
@@ -3734,7 +3736,11 @@
     "transcriptionSettings": "Transkription",
     "version": "Version",
     "voicemail": "Voicemail",
-    "webrtcNotConfigured": "Browser-Telefonie ist nicht verfügbar. Ihr Administrator muss WebRTC in den Telefonieanbieter-Einstellungen aktivieren."
+    "webrtcNotConfigured": "Browser-Telefonie ist nicht verfügbar. Ihr Administrator muss WebRTC in den Telefonieanbieter-Einstellungen aktivieren.",
+    "biometricDesc": "Entsperren Sie mit Fingerabdruck oder Gesicht, statt Ihre PIN einzugeben. Ihre PIN funktioniert weiterhin und wird nie deaktiviert.",
+    "biometricEnrolled": "Die biometrische Entsperrung ist für dieses Gerät aktiviert.",
+    "biometricInvalidated": "Die Biometrie Ihres Geräts hat sich geändert, daher wurde die biometrische Entsperrung deaktiviert. Aktivieren Sie sie unten erneut, oder verwenden Sie weiterhin Ihre PIN.",
+    "biometricPinPrompt": "Geben Sie Ihre PIN ein, um die biometrische Entsperrung zu aktivieren"
   },
   "serverAddress": {
     "checking": "Checking...",

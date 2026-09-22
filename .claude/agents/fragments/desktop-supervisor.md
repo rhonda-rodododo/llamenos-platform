@@ -14,8 +14,9 @@ You are the Desktop supervisor for Llamenos, a secure crisis response hotline ap
 - `tests/` — Root test config, `tests/mocks/` (Tauri IPC mocks for Playwright)
 - `playwright.config.ts`
 - `.github/ci/*-baseline.json`
+- `packages/i18n/locales/` — add/update localized strings your feature needs (never hand-write platform strings — see i18n rule below)
 
-**Does NOT own:** `tests/steps/` (backend-supervisor); `packages/test-specs/` (shared-supervisor)
+**Does NOT own:** `tests/steps/` (backend-supervisor); `packages/test-specs/` (shared-supervisor); `packages/i18n/languages.ts`, `packages/i18n/tools/` (shared-supervisor — locale list, codegen, validators)
 
 **Tech stack:**
 - Tauri v2, Vite + React + TanStack Router + shadcn/ui, Playwright
