@@ -18,9 +18,10 @@ import {
   ADMIN_NSEC,
   listEntityTypesViaApi,
   createEntityTypeViaApi,
+  updateEntityTypeViaApi,
   createRecordViaApi,
+  updateRecordViaApi,
   listRecordsViaApi,
-  linkRecordToEventViaApi,
   linkReportToEventViaApi,
   createReportViaApi,
 } from '../../api-helpers'
@@ -49,21 +50,34 @@ async function ensureEventEntityType(
     const cat = (et as { category?: string }).category
     const name = (et as { name?: string }).name
     return cat === 'event' || name === 'event' || name === 'protest'
-  })
-  const id = eventType
-    ? (eventType as { id: string }).id
-    : ((await createEntityTypeViaApi(request, {
-        name: 'event',
-        category: 'event',
-        hubId: workerHub,
-        statuses: [
-          { value: 'active', label: 'Active', order: 0 },
-          { value: 'concluded', label: 'Concluded', order: 1, isClosed: true },
-        ],
-      })) as { id: string }).id
+  }) as { id: string; statuses?: Array<{ value: string; label: string; order?: number; isClosed?: boolean }> } | undefined
 
-  casesWorld.eventEntityTypeId = id
-  return id
+  if (!eventType) {
+    const id = ((await createEntityTypeViaApi(request, {
+      name: 'event',
+      category: 'event',
+      hubId: workerHub,
+      statuses: [
+        { value: 'active', label: 'Active', order: 0 },
+        { value: 'concluded', label: 'Concluded', order: 1, isClosed: true },
+      ],
+    })) as { id: string }).id
+    casesWorld.eventEntityTypeId = id
+    return id
+  }
+
+  // Template-provided event types (e.g. jail-support's mass_arrest_event with
+  // active/processing/completed) lack the concluded status the status-change
+  // scenario exercises — add it once per hub.
+  const statuses = eventType.statuses ?? []
+  if (!statuses.some(s => s.value === 'concluded')) {
+    await updateEntityTypeViaApi(request, eventType.id, {
+      statuses: [...statuses, { value: 'concluded', label: 'Concluded', order: statuses.length, isClosed: true }],
+    }, ADMIN_NSEC, workerHub)
+  }
+
+  casesWorld.eventEntityTypeId = eventType.id
+  return eventType.id
 }
 
 // --- Background: event entity type exists ---
@@ -216,13 +230,14 @@ Given('an event with linked cases exists', async ({ backendRequest: request, cas
   const event = await createRecordViaApi(request, entityTypeId, { statusHash: 'active', hubId: workerHub })
   casesWorld.lastEventId = (event as { id: string }).id
 
-  // Create and link a case
+  // Create and link a case. Record-based events link via record parent/child —
+  // POST /events/:id/records targets the separate events table and 404s here.
   const entityTypes = await listEntityTypesViaApi(request, workerHub)
   const arrestType = entityTypes.find(et => (et as { name?: string }).name === 'arrest_case')
   if (arrestType) {
     const etId = (arrestType as { id: string }).id
     const record = await createRecordViaApi(request, etId, { statusHash: 'reported', hubId: workerHub })
-    await linkRecordToEventViaApi(request, casesWorld.lastEventId!, (record as { id: string }).id, ADMIN_NSEC, workerHub).catch(() => {})
+    await updateRecordViaApi(request, (record as { id: string }).id, { parentRecordId: casesWorld.lastEventId! }, workerHub)
   }
 })
 
@@ -238,7 +253,7 @@ Given('an event with {int} linked cases exists', async ({ backendRequest: reques
     const etId = (arrestType as { id: string }).id
     for (let i = 0; i < count; i++) {
       const record = await createRecordViaApi(request, etId, { statusHash: 'reported', hubId: workerHub })
-      await linkRecordToEventViaApi(request, casesWorld.lastEventId!, (record as { id: string }).id, ADMIN_NSEC, workerHub).catch(() => {})
+      await updateRecordViaApi(request, (record as { id: string }).id, { parentRecordId: casesWorld.lastEventId! }, workerHub)
     }
   }
 })
@@ -264,12 +279,10 @@ When('I view the event detail', async ({ page }) => {
 })
 
 Then('linked case records should be visible', async ({ page }) => {
-  // Cases tab in the detail panel
-  const tab = page.getByTestId('case-contacts-tab')
-    .or(page.getByTestId('case-related-tab'))
-  if (await tab.isVisible({ timeout: 3000 }).catch(() => false)) {
-    await tab.click()
-  }
+  // Event detail "Cases" tab lists records linked to the event
+  const list = page.getByTestId('event-linked-cases-list')
+  await expect(list).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await expect(list.getByTestId('event-linked-case-card').first()).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 Then('each case link should show a case number', async ({ page }) => {
@@ -278,13 +291,14 @@ Then('each case link should show a case number', async ({ page }) => {
   await expect(detailHeader).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
-Then('the linked cases count should show {int}', async ({ page }, _count: number) => {
-  // The contact count badge is shown on the Contacts tab button
-  const contactsTab = page.getByTestId('case-contacts-tab')
-  if (await contactsTab.isVisible({ timeout: 3000 }).catch(() => false)) {
-    // Accept that the count badge may or may not show exact count
-    await expect(contactsTab).toBeVisible()
-  }
+Then('the linked cases count should show {int}', async ({ page }, count: number) => {
+  // The linked count is the number of case cards on the detail "Cases" tab
+  const casesTab = page.getByTestId('case-tab-cases')
+  await expect(casesTab).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await casesTab.click()
+  const list = page.getByTestId('event-linked-cases-list')
+  await expect(list).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await expect(list.getByTestId('event-linked-case-card')).toHaveCount(count, { timeout: Timeouts.ELEMENT })
 })
 
 Then('the linked cases count should increase by {int}', async ({ page }, _increment: number) => {
@@ -314,11 +328,10 @@ Given('an event exists', async ({ backendRequest: request, casesWorld, workerHub
 // "I click the {string} button" is handled by common/interaction-steps.ts
 
 When('I search for a case by number', async ({ page }) => {
-  // In the link dialog, search for a case
-  const searchInput = page.locator('input[placeholder*="search" i], input[type="search"]').first()
-  if (await searchInput.isVisible({ timeout: 3000 }).catch(() => false)) {
-    await searchInput.fill('case')
-  }
+  // Search input inside the link-case dialog
+  const searchInput = page.getByRole('dialog').getByTestId('event-link-case-search')
+  await expect(searchInput).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await searchInput.fill('case')
 })
 
 When('I select the case from the search results', async ({ page }) => {
@@ -352,33 +365,19 @@ Given('an event with status {string} exists', async ({ backendRequest: request, 
 })
 
 When('I change the event status to {string}', async ({ page }, newStatus: string) => {
-  const pill = page.getByTestId('case-status-pill')
+  const header = page.getByTestId('case-detail-header')
+  const pill = header.getByTestId('case-status-pill')
   await expect(pill).toBeVisible({ timeout: Timeouts.ELEMENT })
   await pill.click()
 
-  const dropdown = page.getByTestId('case-status-dropdown')
-  const option = dropdown.locator('[role="option"]').filter({ hasText: new RegExp(newStatus, 'i') })
-  if (await option.isVisible({ timeout: 3000 }).catch(() => false)) {
-    await option.click()
-  }
+  const option = page.getByTestId('case-status-dropdown')
+    .getByRole('option', { name: new RegExp(newStatus, 'i') })
+  await expect(option).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await option.click()
 })
 
 Then('the event status should reflect {string}', async ({ page }, status: string) => {
-  const pill = page.getByTestId('case-status-pill')
-  await expect(pill).toBeVisible({ timeout: Timeouts.ELEMENT })
-
-  // Wait for API round-trip + React re-render
-
-  // Check pill text OR toast confirmation
-  const pillText = await pill.textContent() ?? ''
-  if (new RegExp(status, 'i').test(pillText)) return
-
-  // Check for a status update toast
-  const toast = page.locator('[role="status"], [role="alert"]')
-    .filter({ hasText: /status|updated/i })
-  const toastVisible = await toast.first().isVisible({ timeout: 5000 }).catch(() => false)
-  if (toastVisible) return
-
-  // Final wait and accept pill being visible
-  await expect(pill).toBeVisible()
+  // Waits for the status PATCH + re-render to update the pill label
+  const pill = page.getByTestId('case-detail-header').getByTestId('case-status-pill')
+  await expect(pill).toContainText(new RegExp(status, 'i'), { timeout: Timeouts.ELEMENT })
 })
