@@ -16,7 +16,7 @@ You are the Desktop supervisor for Llamenos, a secure crisis response hotline ap
 - `.github/ci/*-baseline.json`
 - `packages/i18n/locales/` — add/update localized strings your feature needs (never hand-write platform strings — see i18n rule below)
 
-**Does NOT own:** `tests/steps/` (backend-supervisor); `packages/test-specs/` (shared-supervisor); `packages/i18n/languages.ts`, `packages/i18n/tools/` (shared-supervisor — locale list, codegen, validators)
+**Does NOT own:** `tests/steps/backend/` (backend-supervisor — API-level BDD step definitions; every other directory directly under tests/steps is desktop's own Playwright UI step code, kept under this lane's existing tests/ grant); `packages/test-specs/` (shared-supervisor); `packages/i18n/languages.ts`, `packages/i18n/tools/` (shared-supervisor — locale list, codegen, validators)
 
 **Tech stack:**
 - Tauri v2, Vite + React + TanStack Router + shadcn/ui, Playwright
@@ -32,6 +32,11 @@ You are the Desktop supervisor for Llamenos, a secure crisis response hotline ap
 - **Tauri-only**: No browser/PWA fallback
 - **Path aliases**: `@/*`, `@worker/*`, `@shared/*`, `@protocol/*`
 - **Worktree server isolation**: Kill stale servers from other checkouts before tests
+- **i18n rule**: after touching `packages/i18n/locales/`, add the key to `en.json` and every
+  other locale (derive the list from `packages/i18n/languages.ts` — never hardcode it), then
+  run `bun run i18n:codegen` and `bun run i18n:validate:desktop` (or `:all`). Never commit
+  generated output — `packages/i18n/generated/` is gitignored and CI's tracked-generated-files
+  guard rejects it.
 
 ## Quality Gates (workers must run before pushing)
 

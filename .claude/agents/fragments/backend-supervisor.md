@@ -12,10 +12,11 @@ You are the Backend supervisor for Llamenos, a secure crisis response hotline ap
 - `apps/worker/` — Bun HTTP server (Hono + PostgreSQL: routes, db, services, telephony, messaging, lib)
 - `sip-bridge/` — Protocol-agnostic SIP bridge (`PBX_TYPE` selects ARI/ESL/Kamailio)
 - `signal-notifier/` — Zero-knowledge Signal notification sidecar (port 3100)
-- `tests/steps/` — Step definitions organized by domain
+- `tests/steps/backend/` — API-level BDD step definitions. The backend-bdd Playwright project loads exactly this one directory and nothing else under tests/steps/. Every other directory directly under tests/steps (admin, auth, calls, cases, common, hub, messaging, notes, reports, security, settings, etc.) is Playwright browser-driving step code loaded by the desktop bdd project's step list — that is desktop-supervisor's, not backend's, regardless of the historical "Step definitions organized by domain" framing.
+- `.github/ci/*-baseline.json` — tsc/lint baseline trackers for backend's own owned paths, same grant desktop already has for its baselines
 - `packages/i18n/locales/` — add/update localized strings your feature needs (never hand-write platform strings — see i18n rule below)
 
-**Does NOT own:** `tests/` root, `tests/mocks/` (desktop-supervisor); `packages/test-specs/` (shared-supervisor — serves all four platform lanes; coordinate rather than assume ownership even for `@backend`-tagged scenarios); `packages/i18n/languages.ts`, `packages/i18n/tools/` (shared-supervisor — locale list, codegen, validators)
+**Does NOT own:** `tests/` root, `tests/mocks/` (desktop-supervisor — this also covers every non-backend directory directly under tests/steps/, see above); `packages/test-specs/` (shared-supervisor — serves all four platform lanes; coordinate rather than assume ownership even for `@backend`-tagged scenarios); `packages/i18n/languages.ts`, `packages/i18n/tools/` (shared-supervisor — locale list, codegen, validators)
 
 **Tech stack:**
 - Bun + Hono + PostgreSQL/Drizzle, `playwright-bdd` for BDD tests
@@ -32,6 +33,10 @@ You are the Backend supervisor for Llamenos, a secure crisis response hotline ap
 - **BDD test isolation**: Each scenario gets its own hub via `createTestHub()`
 - **Schemas**: Import from `@protocol/schemas` (not `apps/worker/schemas/`)
 - **Workers testing backend** MUST start dev server from their worktree, not main
+- **i18n rule**: after touching `packages/i18n/locales/`, add the key to `en.json` and every
+  other locale (derive the list from `packages/i18n/languages.ts` — never hardcode it), then
+  run `bun run i18n:codegen` and `bun run i18n:validate:all`. Never commit generated output —
+  `packages/i18n/generated/` is gitignored and CI's tracked-generated-files guard rejects it.
 
 ## Quality Gates (workers must run before pushing)
 

@@ -12,7 +12,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import org.llamenos.hotline.api.ApiService
 import org.llamenos.hotline.model.AddBanRequest
-import org.llamenos.hotline.model.AuditEntry
+import org.llamenos.protocol.SharedEntry
 import org.llamenos.hotline.model.AuditLogResponse
 import org.llamenos.hotline.model.BanEntry
 import org.llamenos.hotline.model.BanListResponse
@@ -101,7 +101,7 @@ data class AdminUiState(
     val showBulkImportDialog: Boolean = false,
 
     // Audit log
-    val auditEntries: List<AuditEntry> = emptyList(),
+    val auditEntries: List<SharedEntry> = emptyList(),
     val isLoadingAudit: Boolean = false,
     val auditError: String? = null,
     val auditPage: Int = 1,
