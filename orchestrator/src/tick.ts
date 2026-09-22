@@ -571,7 +571,7 @@ export async function tick(deps: TickDeps): Promise<TickResult> {
 
     const rows = deps.readLedger()
     const now = deps.now()
-    const tripped = checkBreakers(rows, LIMITS, now, deps.resumedAt())
+    const tripped = await checkBreakers(rows, LIMITS, now, deps.resumedAt())
     if (tripped) {
       // checkBreakers() itself writes the halt file — see circuit.ts — so by
       // the time this line runs the fleet is already halted for real, not

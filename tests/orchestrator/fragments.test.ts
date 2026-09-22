@@ -8,9 +8,26 @@ const IOS = `
 **Owned paths:**
 - \`apps/ios/\` — SwiftUI app (Sources/, Tests/, Package.swift, project.yml)
 - \`.github/workflows/ios*.yml\` — iOS CI workflows
+- \`packages/i18n/locales/\` — add/update localized strings your feature needs (never hand-write platform strings — see i18n rule below)
+
+**Does NOT own:** \`packages/i18n/languages.ts\`, \`packages/i18n/tools/\` (shared-supervisor — locale list, codegen, validators)
 
 **Tech stack:**
 - SwiftUI (iOS 17+, \`@Observable\` macro), SPM, xcodegen, XCUITest, UniFFI XCFramework
+`
+
+// Verbatim excerpt of .claude/agents/fragments/android-supervisor.md
+const ANDROID = `
+## Your Domain
+
+**Owned paths:**
+- \`apps/android/\` — Kotlin/Compose app (app/src/main/, gradle/)
+- \`packages/i18n/locales/\` — add/update localized strings your feature needs (never hand-write platform strings — see i18n rule below)
+
+**Does NOT own:** \`packages/i18n/languages.ts\`, \`packages/i18n/tools/\` (shared-supervisor — locale list, codegen, validators)
+
+**Tech stack:**
+- Kotlin 2.3, Jetpack Compose, Material 3, Hilt/KSP, AGP 9.1, Gradle 9.4
 `
 
 // Verbatim excerpt of .claude/agents/fragments/desktop-supervisor.md — the
@@ -60,7 +77,11 @@ const INFRA = `
 
 describe('parseOwnedPaths', () => {
   it('extracts backticked paths from the Owned paths bullets', () => {
-    expect(parseOwnedPaths(IOS).owned).toEqual(['apps/ios/', '.github/workflows/ios*.yml'])
+    expect(parseOwnedPaths(IOS).owned).toEqual([
+      'apps/ios/',
+      '.github/workflows/ios*.yml',
+      'packages/i18n/locales/',
+    ])
   })
 
   it('stops at the next bold heading', () => {
@@ -174,14 +195,48 @@ describe('loadLaneScopes against the real fragments', () => {
         'tests/mocks/',
         'playwright.config.ts',
         '.github/ci/*-baseline.json',
+        'packages/i18n/locales/',
       ],
-      notOwned: ['tests/steps/', 'packages/test-specs/'],
+      notOwned: [
+        'tests/steps/backend/',
+        'packages/test-specs/',
+        'packages/i18n/languages.ts',
+        'packages/i18n/tools/',
+      ],
     })
 
     expect(scopes.backend).toEqual({
-      owned: ['apps/worker/', 'sip-bridge/', 'signal-notifier/', 'tests/steps/'],
-      notOwned: ['tests/', 'tests/mocks/', 'packages/test-specs/'],
+      owned: [
+        'apps/worker/',
+        'sip-bridge/',
+        'signal-notifier/',
+        'tests/steps/backend/',
+        '.github/ci/*-baseline.json',
+        'packages/i18n/locales/',
+      ],
+      notOwned: [
+        'tests/',
+        'tests/mocks/',
+        'packages/test-specs/',
+        'packages/i18n/languages.ts',
+        'packages/i18n/tools/',
+      ],
     })
+  })
+
+  // i18n lane-scope fix: ios and android previously had no packages/i18n/
+  // presence at all — no owned entry (so a locale-file diff was structurally
+  // out of scope) and no notOwned entry either (nothing to document the
+  // exclusion). Both now own packages/i18n/locales/ only.
+  it('parses ios and android to own packages/i18n/locales/ only, not the rest of packages/i18n/', () => {
+    const scopes = {
+      ios: parseOwnedPaths(IOS),
+      android: parseOwnedPaths(ANDROID),
+    }
+    expect(scopes.ios.owned).toContain('packages/i18n/locales/')
+    expect(scopes.ios.notOwned).toEqual(['packages/i18n/languages.ts', 'packages/i18n/tools/'])
+    expect(scopes.android.owned).toContain('packages/i18n/locales/')
+    expect(scopes.android.notOwned).toEqual(['packages/i18n/languages.ts', 'packages/i18n/tools/'])
   })
 
   // ios, android, shared, and infra don't have that overlap shape, so what

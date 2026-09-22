@@ -18,7 +18,7 @@ import { secondOpinion, postReview } from './review.js'
 import { artifactReviewCache } from './review-cache.js'
 import { runReviewAndMerge, defaultReviewAndMergeDeps, describeOutcome } from './review-and-merge.js'
 import {
-  runVerifyCi, runReviewCi, decideReviewGate, ciContextFromEnv, ciDiff,
+  runVerifyCi, runReviewCi, decideReviewGate, ciContextFromEnv, ciDiff, ciChangedFiles,
   REVIEW_JOB, REVIEW_KEY_ENV, VERIFY_JOB, itemIdFromBranch, fleetBranchFor, legacyFleetBranchFor,
   type CiContext, type CiVerdict,
 } from './ci.js'
@@ -39,6 +39,13 @@ import { runBoard } from './board.js'
 import { notify } from './notify.js'
 import { FLEET_DIR, LOG_FILE, HALT_REASON_FILE, DISPATCH_SCRIPT, FLEET_ENV_FILE } from './paths.js'
 import { REPO, gh, ghJson } from './gh.js'
+import { GitHubSink } from './sink.js'
+import {
+  ensureDigestIssue, postDigestComment, digestRunId,
+  readLastDigestAt, writeLastDigestAt,
+  fleetPrsFromRuns, resolveFleetPrStates, renderFleetPrsSection,
+  defaultFetchHumanQueue, renderHumanQueueSection,
+} from './digest-issue.js'
 import { proposeIssues, buildIssueCreateArgs, type ProposedIssue } from './roles/planner.js'
 import { updateBranchFromMain, type UpdateBranchInput, type UpdateBranchResult } from './roles/integrator.js'
 import { armStandardAutoMergeAtOpen } from './automerge.js'
@@ -983,12 +990,48 @@ async function runDigest(hoursArg?: string): Promise<number> {
     awaitingHuman,
   )
   const body = renderDigest(input)
+  // Issue #838: journal/stdout output is unchanged by this fix — this is the
+  // secondary, best-effort channel `notify.ts` and `log()` already covered;
+  // the GitHub post below is the new deterministic, always-visible one.
   process.stdout.write(body + '\n')
+
+  // The deterministic, always-visible channel (issue #838): a dedicated,
+  // pinned GitHub issue, posted to via the WorkSink port. Best-effort by
+  // construction — GitHub being unreachable must never fail this command,
+  // since the digest was already printed above.
+  try {
+    const issueId = await ensureDigestIssue()
+    if (issueId === undefined) {
+      log('digest: could not resolve or create the digest issue — GitHub comment skipped this pass')
+    } else {
+      const lastDigestAt = readLastDigestAt()
+      // First run ever (no marker yet): fall back to the same `hours`
+      // window already used for `recentRuns` above rather than every ledger
+      // row this fleet has ever written.
+      const sinceRows = lastDigestAt !== undefined ? readAll().filter((r) => r.ts > lastDigestAt) : recentRuns
+      const [fleetPrs, humanQueue] = await Promise.all([
+        resolveFleetPrStates(fleetPrsFromRuns(sinceRows)),
+        defaultFetchHumanQueue(),
+      ])
+      const githubBody = [
+        body,
+        renderHumanQueueSection(humanQueue ?? []),
+        renderFleetPrsSection(fleetPrs),
+      ].join('\n\n')
+      const now = Date.now()
+      await postDigestComment(new GitHubSink(), issueId, digestRunId(now), githubBody)
+      writeLastDigestAt(now)
+    }
+  } catch (e) {
+    log(`digest: posting to GitHub failed: ${errMsg(e)}`)
+  }
 
   // Best-effort, per notify.ts's own contract: a webhook or command sink
   // being unreachable must never fail this command — the digest was still
   // printed above (and to LOG_FILE via `log`), which is the fallback
-  // delivery a fresh checkout with nothing configured relies on.
+  // delivery a fresh checkout with nothing configured relies on. This is
+  // the operator's OWN notification client (§5.9) — optional and secondary
+  // to the GitHub post above, not a replacement for it.
   const result = await notify('Llámenos fleet digest', body)
   if (!result.ok) {
     for (const e of result.errors) log(`digest notify sink failed: ${e}`)
@@ -1246,6 +1289,7 @@ async function runReviewGate(): Promise<number> {
   const outcome = await decideReviewGate({
     ctx,
     prDiff: () => ciDiff(ctx),
+    changedFiles: () => ciChangedFiles(ctx),
     cache: artifactReviewCache(process.env['FLEET_REVIEW_CACHE_DIR'], ciLog),
     requested: process.env['FLEET_REVIEW_REQUESTED'] === 'true',
     log: ciLog,
@@ -1257,6 +1301,17 @@ async function runReviewGate(): Promise<number> {
       `${REVIEW_JOB}: review not requested — add the \`review\` label to run the non-author review\n`,
     )
     return 1
+  }
+  // Tier 0/1 (no reviewable content): a real, explicit success — never a
+  // skip — with the tier and the contributing files printed to stdout, which
+  // IS this check's own output. Never silent: a required check that goes
+  // green with no stated reason is the exact fail-open shape this file's own
+  // header (and #848 before it) exists to prevent.
+  if (outcome.kind === 'low-tier') {
+    process.stdout.write(
+      `${REVIEW_JOB}: no reviewable content (tier ${outcome.tier}) — skipping the non-author review\n` +
+      (outcome.reasons.length > 0 ? `${outcome.reasons.map((r) => `  - ${r}`).join('\n')}\n` : '  (no changed files)\n'),
+    )
   }
   ciLog(`${REVIEW_JOB}: gate outcome = ${outcome.kind}`)
   return 0
@@ -1303,8 +1358,11 @@ const HANDLERS: Record<string, CommandHandler> = {
   // computed live from the ledger, `gh`, and `git`, nothing from a label.
   // With no argument: the existing fleet-wide overview, unchanged.
   status: (rest) => (rest[0] !== undefined ? runStatusForItem(rest[0]) : status()),
-  halt: (rest) => { halt(rest.join(' ') || 'halted by hand'); log('HALTED'); return 0 },
-  resume: () => { resume(); log('RESUMED'); return 0 },
+  // Issue #838: awaited (not fire-and-forget) — halt()/resume()'s BLOCKED/
+  // RESUMED GitHub ping must be in flight before `main()`'s
+  // `process.exit(await handler(...))` can kill this one-shot process.
+  halt: async (rest) => { await halt(rest.join(' ') || 'halted by hand'); log('HALTED'); return 0 },
+  resume: async () => { await resume(); log('RESUMED'); return 0 },
   revert: (rest) => {
     const runId = rest[0]
     if (runId === undefined) {

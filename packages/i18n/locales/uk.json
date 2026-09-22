@@ -462,7 +462,9 @@
     "rateLimitTitle": "Змінити обмеження частоти",
     "transcriptionDisable": "Вимкнути транскрипцію дзвінків? Дзвінки користувачів більше не будуть транскрибуватися автоматично.",
     "transcriptionEnable": "Увімкнути транскрипцію дзвінків для всіх волонтерів? Це використовує ШІ для транскрипції дзвінків у реальному часі.",
-    "transcriptionTitle": "Змінити налаштування транскрипції"
+    "transcriptionTitle": "Змінити налаштування транскрипції",
+    "biometricDisable": "Вимкнути біометричне розблокування? Ви й надалі зможете розблоковувати PIN-кодом.",
+    "biometricDisableTitle": "Вимкнути біометричне розблокування"
   },
   "contacts": {
     "noContacts": "Контактів ще немає",
@@ -1244,7 +1246,11 @@
     "encryptionPubkey": "Encryption Public Key",
     "logoutDescription": "Are you sure you want to log out? Your encrypted keys will be removed from this device.",
     "logoutTitle": "Log Out",
-    "signingPubkey": "Signing Public Key"
+    "signingPubkey": "Signing Public Key",
+    "biometricDesc": "Розблоковуйте за допомогою відбитка пальця або обличчя замість введення PIN-коду. Ваш PIN-код продовжує працювати і ніколи не вимикається.",
+    "biometricEnrolled": "Біометричне розблокування увімкнено на цьому пристрої.",
+    "biometricInvalidated": "Біометричні дані вашого пристрою змінилися, тому біометричне розблокування було вимкнено. Увімкніть його знову нижче або продовжуйте користуватися PIN-кодом.",
+    "biometricPinPrompt": "Введіть PIN-код, щоб увімкнути біометричне розблокування"
   },
   "serverAddress": {
     "checking": "Checking...",

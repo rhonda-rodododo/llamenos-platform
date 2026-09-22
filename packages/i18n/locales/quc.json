@@ -462,7 +462,9 @@
     "rateLimitTitle": "Tijalwachix Ruch'uyik Jachike",
     "transcriptionDisable": "¿Titz'apix ri rutz'ib'axik ch'ab'al? Ri aj samajela' man ketz'ib'ax ta chik ri koyonik ruyonil.",
     "transcriptionEnable": "¿Tijaqax ri rutz'ib'axik ch'ab'al rech oyonik chi ke ronojel aj samajela'? Kakojo' retal winaq rech katz'ib'ax ri oyonik pa ramaj.",
-    "transcriptionTitle": "Tijalwachix Uchojmixik Rutz'ib'axik Ch'ab'al"
+    "transcriptionTitle": "Tijalwachix Uchojmixik Rutz'ib'axik Ch'ab'al",
+    "biometricDisable": "Turn off biometric unlock? You'll still be able to unlock with your PIN.",
+    "biometricDisableTitle": "Turn Off Biometric Unlock"
   },
   "contacts": {
     "noContacts": "Majun taq winaq k'o",
@@ -1244,7 +1246,11 @@
     "encryptionPubkey": "Encryption Public Key",
     "logoutDescription": "Are you sure you want to log out? Your encrypted keys will be removed from this device.",
     "logoutTitle": "Log Out",
-    "signingPubkey": "Signing Public Key"
+    "signingPubkey": "Signing Public Key",
+    "biometricDesc": "Unlock with your fingerprint or face instead of typing your PIN. Your PIN still works and is never disabled.",
+    "biometricEnrolled": "Biometric unlock is on for this device.",
+    "biometricInvalidated": "Your device's biometrics changed, so biometric unlock was turned off. Re-enable it below, or continue using your PIN.",
+    "biometricPinPrompt": "Enter your PIN to enable biometric unlock"
   },
   "serverAddress": {
     "checking": "Checking...",

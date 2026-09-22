@@ -10,7 +10,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 import org.llamenos.hotline.api.ApiService
-import org.llamenos.hotline.model.AuditEntry
+import org.llamenos.protocol.SharedEntry
 import org.llamenos.hotline.model.AuditLogResponse
 import org.llamenos.hotline.model.User
 import org.llamenos.hotline.model.UsersListResponse
@@ -33,7 +33,7 @@ data class VolunteerShiftInfo(
 data class VolunteerDetailUiState(
     val volunteer: User? = null,
     val shifts: List<VolunteerShiftInfo> = emptyList(),
-    val auditEntries: List<AuditEntry> = emptyList(),
+    val auditEntries: List<SharedEntry> = emptyList(),
     val isLoading: Boolean = false,
     val isLoadingAudit: Boolean = false,
     val error: String? = null,
