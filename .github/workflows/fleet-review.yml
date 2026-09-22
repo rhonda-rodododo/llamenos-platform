@@ -51,15 +51,26 @@
 #       This is what makes applying an unrelated label to an already-reviewed
 #       PR cheap and non-destructive instead of either a wasted model call or
 #       (the old bug) a silently-satisfied skip.
-#   (b) no cached PASS, and this event IS the `review` label (or a manual
-#       `workflow_dispatch`) → the step exits 0 with `outcome=run-engine`,
-#       and the pipeline runs exactly as before: install the engine,
-#       authenticate, smoke-test it, then the real review.
-#   (c) no cached PASS, and this event is any OTHER label → the step FAILS
-#       (exit 1) with "review not requested — add the `review` label to run
-#       the non-author review". No engine call, no skip — the job goes red,
-#       which is the correct, honest state for a PR nobody has asked to be
-#       reviewed yet.
+#   (b') no cached PASS, but every changed file classifies Tier 0 or Tier 1
+#       (`tierFor`, orchestrator/src/impact.ts — no executable content, or
+#       instructions/tooling that already earns a code-owner review on its
+#       own) → the step logs "no reviewable content (tier N)" with the
+#       contributing files, exits 0, and every later step is skipped exactly
+#       as in (a) — the job concludes SUCCESS with no engine call, regardless
+#       of `requested`. This is checked BEFORE (c) below, deliberately: a
+#       docs-only PR must never sit red waiting for someone to apply the
+#       `review` label for a review it will never need. Operator rule,
+#       2026-09-19: "the ceremony should scale with impact too."
+#   (b) no cached PASS, Tier 2 (a real review is needed), and this event IS
+#       the `review` label (or a manual `workflow_dispatch`) → the step exits
+#       0 with `outcome=run-engine`, and the pipeline runs exactly as before:
+#       install the engine, authenticate, smoke-test it, then the real
+#       review.
+#   (c) no cached PASS, Tier 2, and this event is any OTHER label → the step
+#       FAILS (exit 1) with "review not requested — add the `review` label to
+#       run the non-author review". No engine call, no skip — the job goes
+#       red, which is the correct, honest state for a PR nobody has asked to
+#       be reviewed yet.
 #
 # A step failing mid-job is not a "skipped" job: GitHub Actions still runs
 # the job to a real conclusion (failure) and that conclusion IS what
@@ -523,10 +534,17 @@ jobs:
       # moved inside the job, as a real step with a real exit code, so the
       # JOB always reaches a conclusion instead of sometimes not running at
       # all. `decideReviewGate` (ci.ts) does the actual work; this step only
-      # wires its three outcomes to the pipeline:
+      # wires its four outcomes to the pipeline:
       #   - `cache-hit`     → exits 0. Every later step's `if:` below reads
       #     `outcome == 'run-engine'` and skips, so nothing past this point
       #     spends a model call — the job still concludes SUCCESS.
+      #   - `low-tier`      → exits 0, with the tier and contributing files
+      #     printed to this step's own stdout (`runReviewGate`, cli.ts) —
+      #     `tierFor` (impact.ts) classified every changed file as Tier 0/1
+      #     (no executable content, or instructions/tooling already earning a
+      #     code-owner review). Every later step skips exactly as in
+      #     `cache-hit` — the job concludes SUCCESS with no engine call,
+      #     regardless of `requested`.
       #   - `run-engine`    → exits 0, later steps proceed exactly as before.
       #   - `not-requested` → exits 1 (see `runReviewGate` in cli.ts), which
       #     stops every later step from running at all (GitHub Actions does

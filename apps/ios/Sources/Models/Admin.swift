@@ -123,11 +123,13 @@ struct AppBanEntry: Codable, Identifiable, Sendable {
 }
 
 // MARK: - AppAuditEntry
-// Client-only: generated `Entry`/`AuditEntryResponse` uses `details: [String: JSONAny]`
+// Client-only: generated `SharedEntry`/`AuditEntryResponse` uses `details: [String: JSONAny]`
 // while this client model uses `details: String?`.
+// `SharedEntry` (formerly a distinct per-schema type) is now shared with
+// `EvidenceAccessLogResponse.entries` — codegen dedups identical entry shapes across schemas.
 
 /// A hash-chained audit log entry from the API (client-side model with UI properties).
-/// Named `AppAuditEntry` to avoid conflict with generated `AuditEntryResponse`/`Entry`.
+/// Named `AppAuditEntry` to avoid conflict with generated `AuditEntryResponse`/`SharedEntry`.
 struct AppAuditEntry: Codable, Identifiable, Sendable {
     let id: String
     let action: String

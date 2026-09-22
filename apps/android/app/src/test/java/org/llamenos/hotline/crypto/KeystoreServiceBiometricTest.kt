@@ -47,4 +47,19 @@ class KeystoreServiceBiometricTest {
         val hasMethod = KeystoreService::class.java.methods.any { it.name == "getBiometricDecryptCipher" }
         assertTrue(hasMethod, "KeystoreService.getBiometricDecryptCipher method must exist")
     }
+
+    @Test
+    fun `removeBiometricPIN method exists on KeystoreService`() {
+        val hasMethod = KeystoreService::class.java.methods.any { it.name == "removeBiometricPIN" }
+        assertTrue(hasMethod, "KeystoreService.removeBiometricPIN method must exist")
+    }
+
+    @Test
+    fun `KeystoreService implements BiometricKeyStore`() {
+        // The Settings enrollment screen (BiometricSettingsViewModel) and the
+        // PIN-unlock screen (AuthViewModel) both depend on the BiometricKeyStore
+        // interface, not the concrete class, so they're unit-testable against
+        // a fake. This is what makes that possible on the real implementation.
+        assertTrue(BiometricKeyStore::class.java.isAssignableFrom(KeystoreService::class.java))
+    }
 }

@@ -462,7 +462,9 @@
     "rateLimitTitle": "Sînorkirina Rêjeyê Biguherîne",
     "transcriptionDisable": "Transkrîpsîyona bangê neçalak bikî? Êdî bangên bikarhêneran bixweber nayên transkrîbekirin.",
     "transcriptionEnable": "Transkrîpsîyona bangê ji bo hemû xwebexşan çalak bikî? Ev AI bikar tîne da ku bangan di wextê rast de transkrîbe bike.",
-    "transcriptionTitle": "Mîhenga Transkrîpsîyonê Biguherîne"
+    "transcriptionTitle": "Mîhenga Transkrîpsîyonê Biguherîne",
+    "biometricDisable": "Turn off biometric unlock? You'll still be able to unlock with your PIN.",
+    "biometricDisableTitle": "Turn Off Biometric Unlock"
   },
   "contacts": {
     "noContacts": "Hêj tu têkilî tune",
@@ -1244,7 +1246,11 @@
     "encryptionPubkey": "Encryption Public Key",
     "logoutDescription": "Are you sure you want to log out? Your encrypted keys will be removed from this device.",
     "logoutTitle": "Log Out",
-    "signingPubkey": "Signing Public Key"
+    "signingPubkey": "Signing Public Key",
+    "biometricDesc": "Unlock with your fingerprint or face instead of typing your PIN. Your PIN still works and is never disabled.",
+    "biometricEnrolled": "Biometric unlock is on for this device.",
+    "biometricInvalidated": "Your device's biometrics changed, so biometric unlock was turned off. Re-enable it below, or continue using your PIN.",
+    "biometricPinPrompt": "Enter your PIN to enable biometric unlock"
   },
   "serverAddress": {
     "checking": "Checking...",
