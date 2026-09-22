@@ -129,13 +129,12 @@ When('I change the note text to {string}', async ({ page }, newText: string) => 
     await noteContent.click({ clickCount: 3 })
     await noteContent.fill(newText)
   } else {
-    // Try the sheet note text field (used by note sheet edit mode)
+    // Neither the inline edit input nor the direct note-content field rendered —
+    // the only remaining edit surface is the note sheet. One of the three must exist.
     const sheetText = page.getByTestId(TestIds.SHEET_NOTE_TEXT)
-    const isSheetVisible = await sheetText.isVisible({ timeout: 3000 }).catch(() => false)
-    if (isSheetVisible) {
-      await sheetText.click({ clickCount: 3 })
-      await sheetText.fill(newText)
-    }
+    await expect(sheetText).toBeVisible({ timeout: Timeouts.ELEMENT })
+    await sheetText.click({ clickCount: 3 })
+    await sheetText.fill(newText)
   }
 })
 

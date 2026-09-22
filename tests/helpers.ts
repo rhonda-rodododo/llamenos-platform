@@ -559,3 +559,25 @@ export async function mockConfigWithHub(page: Page, hubId = 'test-hub-1'): Promi
     })
   })
 }
+
+/**
+ * Shared "seed failed" signal for step definitions that create a resource via a
+ * backend simulation helper (e.g. simulateIncomingMessage) and then need every
+ * downstream step to take one deterministic branch instead of re-probing
+ * visibility with isVisible().catch(() => false) at each step. Given steps that
+ * seed data should call flagSeedFailed(page) exactly once when seeding did not
+ * produce the expected UI element; When/Then steps should check
+ * readSeedFailedFlag(page) first and return early (after asserting a safe
+ * fallback state) rather than guarding their own click/fill on a fresh probe.
+ */
+type SeedFlagWindow = Window & { __test_seed_failed?: boolean }
+
+export async function flagSeedFailed(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    (window as unknown as SeedFlagWindow).__test_seed_failed = true
+  })
+}
+
+export async function readSeedFailedFlag(page: Page): Promise<boolean> {
+  return page.evaluate(() => (window as unknown as SeedFlagWindow).__test_seed_failed === true).catch(() => false)
+}
