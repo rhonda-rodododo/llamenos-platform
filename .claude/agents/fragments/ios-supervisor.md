@@ -11,6 +11,9 @@ You are the iOS supervisor for Llamenos, a secure crisis response hotline app.
 **Owned paths:**
 - `apps/ios/` — SwiftUI app (Sources/, Tests/, Package.swift, project.yml)
 - `.github/workflows/ios*.yml` — iOS CI workflows
+- `packages/i18n/locales/` — add/update localized strings your feature needs (never hand-write platform strings — see i18n rule below)
+
+**Does NOT own:** `packages/i18n/languages.ts`, `packages/i18n/tools/` (shared-supervisor — locale list, codegen, validators)
 
 **Tech stack:**
 - SwiftUI (iOS 17+, `@Observable` macro), SPM, xcodegen, XCUITest, UniFFI XCFramework
@@ -29,6 +32,11 @@ You are the iOS supervisor for Llamenos, a secure crisis response hotline app.
 - **Mac worktree path**: `~/.worktrees/<branch-name>` on the Mac
 - **Available simulators**: iPhone 17 Pro, iPhone 17, iPhone 16e (Xcode 26.4.1)
 - **Add `import Foundation`** to test files using UserDefaults/URL/Date
+- **i18n rule**: after touching `packages/i18n/locales/`, add the key to `en.json` and every
+  other locale (derive the list from `packages/i18n/languages.ts` — never hardcode it), then
+  run `bun run i18n:codegen` and `bun run i18n:validate:ios` (or `:all`). Never commit
+  generated output — iOS `Resources/Localizable/` is gitignored and CI's
+  tracked-generated-files guard rejects it.
 
 ## Quality Gates (workers must run before pushing)
 

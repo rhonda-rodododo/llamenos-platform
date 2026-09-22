@@ -17,7 +17,14 @@
 
 # Stage 1: Install runtime deps
 FROM oven/bun:1.4.0@sha256:5ff609364c049b54eb0ff560ec96319729a972078ef2c755d758f0c6ef89c2d6 AS deps
-# oven/bun:1.3.5 pinned to match .mise.toml — update via Dependabot or on new minor release
+# This runtime base is pinned independently of .mise.toml's `bun = "1.3.5"`.
+# .mise.toml pins the *developer/CI tool* version (kept in sync with
+# .github/workflows/ci.yml's bun-version input); this image is the
+# *production container* base and tracks its own Dependabot-driven minor
+# bumps on its own schedule. The two are allowed to diverge — Bun's runtime
+# compatibility across 1.3.x/1.4.x minors is not the same contract as "CI
+# uses the same tool version everywhere". Update via Dependabot or on a new
+# minor release.
 WORKDIR /app
 COPY package.json bun.lockb ./
 # Copy workspace package.json stubs so bun can resolve the workspace graph from the
@@ -44,7 +51,9 @@ RUN cargo build --release --manifest-path packages/crypto/Cargo.toml --features 
 
 # Stage 3: Production
 FROM oven/bun:1.4.0-slim@sha256:e0ee68d16ccb9927bf02aa7dd8fd4bf3369ee6d46da04faa72b05ce8bfd135f6 AS app
-# oven/bun:1.3.5-slim pinned to match .mise.toml — update via Dependabot
+# Pinned independently of .mise.toml's dev/CI `bun = "1.3.5"` — see the
+# `deps` stage comment above for why the two are allowed to diverge. Update
+# via Dependabot.
 
 # Apply outstanding Debian security updates on top of the pinned base.
 # The base digest above is the newest published for the `1.4.0-slim` tag, so a

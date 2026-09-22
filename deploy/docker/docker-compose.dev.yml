@@ -63,9 +63,10 @@ services:
     profiles: ["signal"]
     ports:
       - "8090:8080"
+    # AUTO_RECEIVE_SCHEDULE is NOT set — incompatible with MODE=json-rpc, see
+    # deploy/docker/docker-compose.yml for the full explanation (#944).
     environment:
       - MODE=json-rpc
-      - AUTO_RECEIVE_SCHEDULE=0 * * * *
     volumes:
       - signal-data:/home/.local/share/signal-cli
     healthcheck:

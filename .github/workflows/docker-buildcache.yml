@@ -1,0 +1,107 @@
+# Refreshes the registry-hosted BuildKit layer cache for
+# `deploy/docker/Dockerfile`'s `app` target.
+#
+# Why this exists (#902): `.github/actions/bootstrap-backend/action.yml` runs
+# `docker compose up -d --build --wait app` on every `ci.yml` / `desktop-e2e.yml`
+# / `ios-e2e.yml` run. Those all use `ubuntu-latest` — a fresh, ephemeral
+# runner with an empty local BuildKit cache every time — so ~1m17s of that
+# job was a full `deps` (bun install) + `rust-builder` (cargo build --release
+# on packages/crypto) rebuild, paid by every workflow that bootstraps the
+# backend, even when neither `bun.lockb` nor `packages/crypto/**` changed.
+#
+# This job builds the same target from `main` and exports a full-layer
+# (`mode=max`) BuildKit cache to a GHCR tag. `docker-compose.test.yml`'s
+# `app` service then imports it via `build.cache_from`. Docker still
+# invalidates by content hash on import — a PR that changes `bun.lockb`
+# still rebuilds `deps`, one that touches `packages/crypto/**` still
+# rebuilds `rust-builder` — this workflow only keeps a same-content cache
+# entry warm so the common case (neither changed) pulls instead of rebuilds.
+# There is no hand-written "is this stale?" predicate to get wrong (see
+# #903's "nothing baked is authoritative" principle) — Docker's content
+# hashing is what decides, always.
+#
+# Registry choice: GHCR, not Docker Hub — free for a public repo, and keeps
+# this off the Docker Hub pull quota that docker.yml's release builds use.
+# The cache tag lives in the same package release.yml's `docker-stable` job
+# already publishes real images to (`ghcr.io/${{ github.repository }}`),
+# which is already public — see that job's "Log in to GHCR" comment — so
+# `bootstrap-backend`'s `docker compose --build` can pull this cache
+# anonymously with no login step added to ci.yml/desktop-e2e.yml/ios-e2e.yml.
+# Cache import is a soft dependency: if the pull fails or the tag doesn't
+# exist yet, BuildKit silently falls back to a full build rather than
+# failing the job.
+#
+# Deliberately NOT wired into ci.yml/desktop-e2e.yml/ios-e2e.yml as a
+# `cache_to` (export): those jobs run against PR head content (including
+# forks), and giving every PR run `packages: write` to push cache blobs is a
+# supply-chain hole this workflow avoids by only ever running against `main`.
+name: Docker Build Cache Refresh
+
+on:
+  schedule:
+    # Nightly, offset from security-audit.yml's 2:00 AM UTC run so the two
+    # don't contend for the same runner pool at once.
+    - cron: '17 3 * * *'
+  push:
+    branches: [main]
+    paths:
+      - 'bun.lockb'
+      - 'package.json'
+      - 'apps/worker/package.json'
+      - 'packages/crypto/**'
+      - 'packages/i18n/package.json'
+      - 'packages/protocol/package.json'
+      - 'packages/test-specs/package.json'
+      - 'site/package.json'
+      - 'deploy/docker/Dockerfile'
+      - '.github/workflows/docker-buildcache.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: docker-buildcache-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions: {}  # deny-all; per-job permissions below
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
+
+      - name: Log in to GHCR
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # `push: true` here targets the `:buildcache` tag only — never `:latest`
+      # or a version tag, so this can't be mistaken for (or collide with)
+      # release.yml's `docker-stable` job. The image content is identical to
+      # what a real build of `main` would produce; publishing it is what lets
+      # `cache-to: type=registry,mode=max` embed the full per-layer cache
+      # manifest that a plain `docker push` doesn't produce.
+      - name: Build app image and export layer cache
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: .
+          file: deploy/docker/Dockerfile
+          target: app
+          push: true
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:buildcache
+          cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:buildcache
+          cache-to: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:buildcache,mode=max

@@ -203,7 +203,7 @@ export function CreateRecordDialog({
                 </SelectTrigger>
                 <SelectContent>
                   {entityTypes.map(et => (
-                    <SelectItem key={et.id} value={et.id}>
+                    <SelectItem key={et.id} value={et.id} data-testid={`case-type-option-${et.name}`}>
                       <span className="flex items-center gap-2">
                         {et.color && (
                           <span
@@ -222,7 +222,7 @@ export function CreateRecordDialog({
               )}
             </div>
           ) : entityTypes.length === 1 ? (
-            <div className="flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm">
+            <div data-testid="case-type-single" className="flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm">
               {entityTypes[0].color && (
                 <span
                   className="inline-block h-3 w-3 rounded-full shrink-0"
