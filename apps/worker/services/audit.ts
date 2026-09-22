@@ -62,6 +62,10 @@ const EVENT_CATEGORIES: Record<string, string[]> = {
   tags: [
     'tagCreated', 'tagUpdated', 'tagDeleted',
   ],
+  evidence: [
+    'evidenceUploaded', 'evidenceAccessed', 'evidenceIntegrityVerified',
+    'evidenceAccessDenied',
+  ],
 }
 
 // ---------------------------------------------------------------------------
@@ -277,6 +281,29 @@ export class AuditService {
     ])
 
     return { entries: rows, total: Number(total) }
+  }
+
+  /**
+   * List hash-chained audit entries whose `details` reference a specific
+   * evidence item (evidence chain-of-custody access log — Issue #730).
+   *
+   * Reuses the Epic 77 hash-chained audit_log table rather than a parallel
+   * unchained table, so entries carry the same tamper-evidence guarantees
+   * as every other audit entry: `verifyChain()` covers these rows too.
+   *
+   * Returned in chronological order (oldest first) to read as a timeline.
+   */
+  async listForEvidence(evidenceId: string, hubId?: string): Promise<AuditEntry[]> {
+    const conditions = [sql`${auditLog.details} ->> 'evidenceId' = ${evidenceId}`]
+    if (hubId) {
+      conditions.push(eq(auditLog.hubId, hubId))
+    }
+
+    return await this.db
+      .select()
+      .from(auditLog)
+      .where(and(...conditions))
+      .orderBy(asc(auditLog.createdAt))
   }
 
   /**

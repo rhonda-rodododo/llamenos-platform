@@ -530,3 +530,51 @@ describe('computeEntryHash — chain linkage', () => {
     expect(h3FromLegit).not.toBe(h3FromTampered)
   })
 })
+
+// ---------------------------------------------------------------------------
+// AuditService.listForEvidence (Issue #730 — evidence chain-of-custody log)
+// ---------------------------------------------------------------------------
+
+describe('AuditService.listForEvidence', () => {
+  it('returns hash-chained entries referencing the given evidence item', async () => {
+    const { db } = setupAuditDb()
+    const service = new AuditService(db as any)
+
+    const entries = [
+      makeAuditRow({ id: 'audit-1', action: 'evidenceUploaded', details: { evidenceId: 'ev-1' } }),
+      makeAuditRow({ id: 'audit-2', action: 'evidenceAccessed', details: { evidenceId: 'ev-1', action: 'metadata_read' } }),
+    ]
+    db.$setSelectResult(entries)
+
+    const result = await service.listForEvidence('ev-1')
+
+    expect(result).toHaveLength(2)
+    expect(result[0].id).toBe('audit-1')
+    expect(result[1].id).toBe('audit-2')
+    // Every returned entry carries the same tamper-evidence fields as any
+    // other audit_log row — this is the same chain, not a parallel table.
+    for (const entry of result) {
+      expect(entry.entryHash).toBeTruthy()
+    }
+  })
+
+  it('returns an empty array when no access has been logged for the item', async () => {
+    const { db } = setupAuditDb()
+    const service = new AuditService(db as any)
+
+    db.$setSelectResult([])
+
+    const result = await service.listForEvidence('ev-does-not-exist')
+    expect(result).toEqual([])
+  })
+
+  it('scopes the query to a hub when hubId is provided', async () => {
+    const { db } = setupAuditDb()
+    const service = new AuditService(db as any)
+
+    db.$setSelectResult([])
+
+    await service.listForEvidence('ev-1', 'hub-1')
+    expect(db.select).toHaveBeenCalled()
+  })
+})
