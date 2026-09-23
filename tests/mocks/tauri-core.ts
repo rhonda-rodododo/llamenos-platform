@@ -456,6 +456,20 @@ const MOCK_ALLOW_LOOPBACK_HTTP = true
 const PROBE_MIN_INTERVAL_MS = 1000
 let lastProbeAt: number | null = null
 
+// --- api_config_clear confirmation gate (#788) — mirrors the ClearConfirmState
+// token dance in apps/desktop/src/api_config.rs. Rust blocks on a real native
+// OS dialog before issuing a token; Playwright can't drive that dialog, so
+// this mock simulates an always-confirmed answer. Negative-path coverage (no
+// token / wrong token / expired / reused) lives in the Rust unit tests and in
+// src/client/lib/*.test.ts, which call `api_config_clear` directly without
+// ever requesting a token — exactly the bypass this gate exists to refuse.
+const MOCK_CLEAR_TOKEN_TTL_MS = 30_000
+let mockPendingClearToken: { token: string; issuedAt: number } | null = null
+
+function mockGenerateClearToken(): string {
+  return bytesToHex(randomBytes(16))
+}
+
 const FORBIDDEN_REQUEST_HEADERS = new Set([
   'host', 'content-length', 'transfer-encoding', 'connection', 'keep-alive',
   'proxy-connection', 'proxy-authenticate', 'proxy-authorization', 'te', 'trailer', 'upgrade',
@@ -1415,7 +1429,32 @@ const commands: Record<string, CommandHandler> = {
     return origin
   },
 
-  api_config_clear: async () => {
+  // Simulates the user confirming the native dialog Rust would show — see the
+  // MOCK_CLEAR_TOKEN_TTL_MS comment above.
+  api_config_request_clear: async () => {
+    const token = mockGenerateClearToken()
+    mockPendingClearToken = { token, issuedAt: Date.now() }
+    return token
+  },
+
+  // Single-use on SUCCESS only — mirrors api_config.rs's consume_clear_token.
+  // A mismatched guess is refused WITHOUT clearing whatever token is actually
+  // pending, so a bad guess (or an attacker probing) can never invalidate a
+  // real confirmation the user is about to submit.
+  api_config_clear: async (a) => {
+    const token = a.token as string | undefined
+    const pending = mockPendingClearToken
+    if (!pending) {
+      throw new Error('refused: confirm clearing the server address first')
+    }
+    if (Date.now() - pending.issuedAt > MOCK_CLEAR_TOKEN_TTL_MS) {
+      mockPendingClearToken = null
+      throw new Error('refused: confirmation expired — confirm again')
+    }
+    if (!token || token !== pending.token) {
+      throw new Error('refused: confirm clearing the server address first')
+    }
+    mockPendingClearToken = null
     const store = await Store.load(CONFIG_STORE_NAME)
     await store.delete(CONFIG_KEY)
     await store.save()

@@ -65,15 +65,11 @@ Then('transcription should be enabled', async ({ page }) => {
   await expect(toggle).toBeChecked()
 })
 
-Then('they should receive a {int} forbidden response', async ({ page }, _statusCode: number) => {
-  // On the desktop client, a 403 is shown as missing admin nav or "Access denied" text
-  const accessDenied = page.getByText(/access denied/i).first()
-  const adminSection = page.getByTestId(TestIds.NAV_ADMIN_SECTION)
-  // Either admin nav is hidden OR access denied text is shown OR we're on a restricted page
-  const hasAccessDenied = await accessDenied.isVisible({ timeout: 3000 }).catch(() => false)
-  const hasAdmin = await adminSection.isVisible({ timeout: 1000 }).catch(() => false)
-  // If still in admin context (test didn't switch user), accept as pass — scenario precondition not met
-  if (!hasAccessDenied && hasAdmin) return
-  if (hasAccessDenied) return
-  await expect(adminSection).not.toBeVisible({ timeout: 3000 })
+Then('they should receive a {int} forbidden response', async ({}, statusCode: number) => {
+  // The preceding When step ("...attempts to access an unauthorized endpoint") is a
+  // pure API call — it never navigates the UI, so there is no admin nav / "access
+  // denied" text to probe for. Read the real signal it recorded instead of racing
+  // the page with a non-waiting isVisible() guess.
+  const status = (globalThis as Record<string, unknown>).__test_endpoint_status as number
+  expect(status).toBe(statusCode)
 })

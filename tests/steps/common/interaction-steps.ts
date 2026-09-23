@@ -10,7 +10,8 @@
 import { expect } from '@playwright/test'
 import { When, Then } from '../fixtures'
 import { TestIds, navTestIdMap, sectionTestIdMap } from '../../test-ids'
-import { Timeouts, navigateViaSpa } from '../../helpers'
+import { Timeouts, navigateViaSpa, readSeedFailedFlag } from '../../helpers'
+import { Navigation } from '../../pages/index'
 
 /**
  * Map from feature-file button text to data-testid values.
@@ -61,14 +62,15 @@ const buttonTextToTestIdMap: Record<string, string> = {
  * the actual button accessible name.
  */
 async function clickByTextOrTestId(page: import('@playwright/test').Page, text: string): Promise<void> {
-  // Guard: if "Send" is clicked but __test_no_conversation is set (messaging backend
-  // unavailable), skip gracefully instead of timing out on the send button.
+  // Guard: if "Send" is clicked after a conversation seeding failure (messaging
+  // backend unavailable), skip gracefully instead of timing out on the send button.
   if (text === 'Send') {
-    const noConvo = await page.evaluate(() => (window as unknown as Record<string, unknown>).__test_no_conversation).catch(() => false)
-    if (noConvo) return
-    // Check conversation send button first
+    if (await readSeedFailedFlag(page)) return
+    // Check conversation send button first. isVisible()'s `timeout` option is a
+    // documented no-op (it never waits) — use waitFor(), which actually polls,
+    // so this branch doesn't race the button's render against page load.
     const sendBtn = page.getByTestId('conv-send-btn')
-    const hasSend = await sendBtn.isVisible({ timeout: 3000 }).catch(() => false)
+    const hasSend = await sendBtn.waitFor({ state: 'visible', timeout: 3000 }).then(() => true).catch(() => false)
     if (hasSend) {
       await expect(sendBtn).toBeEnabled({ timeout: Timeouts.ELEMENT })
       await sendBtn.click()
@@ -76,7 +78,7 @@ async function clickByTextOrTestId(page: import('@playwright/test').Page, text: 
     }
     // Fallback: blast send button (draft blast detail panel)
     const blastSendBtn = page.getByTestId('blast-send-btn')
-    const hasBlastSend = await blastSendBtn.isVisible({ timeout: 3000 }).catch(() => false)
+    const hasBlastSend = await blastSendBtn.waitFor({ state: 'visible', timeout: 3000 }).then(() => true).catch(() => false)
     if (hasBlastSend) {
       await blastSendBtn.click()
     }
@@ -97,7 +99,7 @@ async function clickByTextOrTestId(page: import('@playwright/test').Page, text: 
   // 0b. If a confirm dialog is open, "Cancel"/"Confirm" target the dialog buttons
   if (text === 'Cancel' || text === 'Confirm') {
     const dialog = page.getByTestId(TestIds.CONFIRM_DIALOG)
-    const dialogOpen = await dialog.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
+    const dialogOpen = await dialog.waitFor({ state: 'visible', timeout: Timeouts.ELEMENT }).then(() => true).catch(() => false)
     if (dialogOpen) {
       const testId = text === 'Cancel' ? TestIds.CONFIRM_DIALOG_CANCEL : TestIds.CONFIRM_DIALOG_OK
       const btn = page.getByTestId(testId)
@@ -107,12 +109,17 @@ async function clickByTextOrTestId(page: import('@playwright/test').Page, text: 
     }
   }
   // 0. Check button-text-to-testid map — resolves Gherkin text → data-testid
+  // Each lookup below uses waitFor() (a real poll) rather than isVisible() (a
+  // documented non-wait, even with a `timeout` option) to decide whether this
+  // strategy's element rendered before falling through to the next strategy —
+  // otherwise the check races the page render and can skip straight to a
+  // fallback that clicks the wrong element.
   const buttonTestId = buttonTextToTestIdMap[text]
   if (buttonTestId) {
     const el = page.getByTestId(buttonTestId)
     // Use ELEMENT timeout for testid lookup — gives enough time for
     // buttons to render after navigation before falling through
-    if (await el.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)) {
+    if (await el.waitFor({ state: 'visible', timeout: Timeouts.ELEMENT }).then(() => true).catch(() => false)) {
       await expect(el).toBeEnabled({ timeout: Timeouts.ELEMENT })
       await el.click()
       return
@@ -122,26 +129,26 @@ async function clickByTextOrTestId(page: import('@playwright/test').Page, text: 
   const navTestId = navTestIdMap[text]
   if (navTestId) {
     const el = page.getByTestId(navTestId)
-    if (await el.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)) {
+    if (await el.waitFor({ state: 'visible', timeout: Timeouts.ELEMENT }).then(() => true).catch(() => false)) {
       await el.click()
       return
     }
   }
   // 2. Fallback: button role, link role, tab role, then text
   const button = page.getByRole('button', { name: text }).first()
-  if (await button.isVisible({ timeout: 2000 }).catch(() => false)) {
+  if (await button.waitFor({ state: 'visible', timeout: 2000 }).then(() => true).catch(() => false)) {
     // Wait for the button to be enabled before clicking
     await expect(button).toBeEnabled({ timeout: Timeouts.ELEMENT })
     await button.click()
     return
   }
   const link = page.getByRole('link', { name: text }).first()
-  if (await link.isVisible({ timeout: 2000 }).catch(() => false)) {
+  if (await link.waitFor({ state: 'visible', timeout: 2000 }).then(() => true).catch(() => false)) {
     await link.click()
     return
   }
   const tab = page.getByRole('tab', { name: text }).first()
-  if (await tab.isVisible({ timeout: 2000 }).catch(() => false)) {
+  if (await tab.waitFor({ state: 'visible', timeout: 2000 }).then(() => true).catch(() => false)) {
     await tab.click()
     return
   }
@@ -168,7 +175,7 @@ When('I click the {string} button', async ({ page }, text: string) => {
   const testId = buttonTextToTestIdMap[text]
   if (testId) {
     const el = page.getByTestId(testId)
-    if (await el.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)) {
+    if (await el.waitFor({ state: 'visible', timeout: Timeouts.ELEMENT }).then(() => true).catch(() => false)) {
       await el.click()
       return
     }
@@ -256,7 +263,7 @@ When('I expand the {string} section', async ({ page }, sectionName: string) => {
   if (!isExpanded) {
     // Click the trigger element (CardHeader with data-testid="{id}-trigger")
     const trigger = page.getByTestId(`${testId}-trigger`)
-    if (await trigger.isVisible({ timeout: 1000 }).catch(() => false)) {
+    if (await trigger.waitFor({ state: 'visible', timeout: 1000 }).then(() => true).catch(() => false)) {
       await trigger.click()
     } else {
       // Fallback: click the first heading/title within the section
@@ -283,12 +290,18 @@ When('I reload and re-authenticate', async ({ page }) => {
 })
 
 When('I log out', async ({ page }) => {
-  await page.getByTestId(TestIds.LOGOUT_BTN).click()
-  // Logout now shows a confirmation dialog — confirm it
+  // The sidebar logout button signs out immediately without a confirmation;
+  // the settings-page logout is the flow that requires confirming key removal.
+  // Use the settings flow so the confirmation dialog assertion below exercises
+  // real app behavior.
+  await Navigation.goToSettings(page)
+  const logoutBtn = page.getByTestId(TestIds.SETTINGS_LOGOUT_BTN)
+  await expect(logoutBtn).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await logoutBtn.scrollIntoViewIfNeeded()
+  await logoutBtn.click()
   const confirmBtn = page.getByTestId(TestIds.CONFIRM_DIALOG_OK)
-  if (await confirmBtn.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)) {
-    await confirmBtn.click()
-  }
+  await expect(confirmBtn).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await confirmBtn.click()
   await page.waitForURL(/\/login/, { timeout: Timeouts.ELEMENT })
 })
 
@@ -334,35 +347,30 @@ Then('the {string} button should not be visible', async ({ page }, name: string)
 // --- Text visibility patterns ---
 
 Then('I should see {string}', async ({ page }, text: string) => {
-  // First try exact match
+  // Match exact text, case-insensitive substring (validation messages like
+  // "invalid phone" matching "Invalid phone number. Use E.164 format..."),
+  // toasts (Sonner renders [data-sonner-toast]; also role=status/alert), and
+  // inline error elements — combined into a single locator via `.or()` so
+  // there is one real waiting assertion instead of four non-waiting
+  // isVisible() probes racing the page to decide which strategy "won".
+  //
+  // These alternatives are NOT mutually exclusive: a toast like
+  // `<div role="status" data-testid="toast-success">…<span>Profile updated</span></div>`
+  // matches both `toastEl` (the container, via `.filter({ hasText })`) and `exactEl`
+  // (the nested `<span>` text node) at the same time. `.or()` unions the matches, and an
+  // inner `.first()` on each branch only narrows *within* that branch — the union can
+  // still resolve to 2+ elements, which trips Playwright strict mode on `toBeVisible()`.
+  // The outer `.first()` takes the first DOM match across the whole union, which is
+  // safe here because we only care that *some* strategy matched (CI evidence: PR #916,
+  // e2e shard 1/2, `strict mode violation: … resolved to 2 elements` on every toast
+  // assertion — `toast-success` container + its nested text span).
   const exactEl = page.getByText(text, { exact: true }).first()
-  const exactVisible = await exactEl.isVisible({ timeout: 2000 }).catch(() => false)
-  if (exactVisible) return
-
-  // Fallback: case-insensitive substring match (handles validation messages like
-  // "invalid phone" matching "Invalid phone number. Use E.164 format...")
   const regexEl = page.getByText(new RegExp(text, 'i')).first()
-  const regexVisible = await regexEl.isVisible({ timeout: 2000 }).catch(() => false)
-  if (regexVisible) return
-
-  // Also check toasts (validation errors shown via toast in some forms)
-  // Sonner toasts render with [data-sonner-toast]; also check role=status/alert
-  // Use longer timeout — toasts may take a moment to appear after form submission
   const toastEl = page.locator('[data-sonner-toast], [data-testid="toast-message"], [role="status"], [role="alert"], .toast-message')
     .filter({ hasText: new RegExp(text, 'i') }).first()
-  const toastVisible = await toastEl.isVisible({ timeout: 5000 }).catch(() => false)
-  if (toastVisible) return
-
-  // Check for text in any error element (inline validation)
   const errorEl = page.locator('[data-testid="error-message"], [role="alert"]')
     .filter({ hasText: new RegExp(text, 'i') }).first()
-  const errorVisible = await errorEl.isVisible({ timeout: 2000 }).catch(() => false)
-  if (errorVisible) return
-
-  // Final assertion — will fail with a clear error
-  await expect(
-    page.getByText(new RegExp(text, 'i')).first()
-  ).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await expect(exactEl.or(regexEl).or(toastEl).or(errorEl).first()).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 Then('I should see the {string} heading', async ({ page }, heading: string) => {
@@ -389,7 +397,7 @@ Then('I should not see {string}', async ({ page }, text: string) => {
   // unrelated notes don't cause false failures.
   if (page.url().includes('/notes')) {
     const firstNoteCard = page.getByTestId(TestIds.NOTE_CARD).first()
-    const cardExists = await firstNoteCard.isVisible({ timeout: 2000 }).catch(() => false)
+    const cardExists = await firstNoteCard.waitFor({ state: 'visible', timeout: 2000 }).then(() => true).catch(() => false)
     if (cardExists) {
       await expect(firstNoteCard.getByText(text, { exact: true }).first()).not.toBeVisible({ timeout: Timeouts.ELEMENT })
       return
@@ -476,14 +484,12 @@ Then('they should see a phone input', async ({ page }) => {
 })
 
 Then('they should see their public key', async ({ page }) => {
-  // Public key is displayed as hex in the settings/profile code block
-  // Look for the public key hex string or npub format
+  // Public key is displayed as hex in the settings/profile code block, or as
+  // npub format — combine both into one waiting assertion via `.or()` rather
+  // than probing the hex form with a non-waiting isVisible() first.
   const hexKey = page.locator('code').filter({ hasText: /[0-9a-f]{32,}/i }).first()
-  const isHex = await hexKey.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
-  if (isHex) return
-  // Fallback: npub format
   const npub = page.getByText(/npub1/).first()
-  await expect(npub).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await expect(hexKey.or(npub)).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 Then('they should not see a {string} link', async ({ page }, text: string) => {
@@ -525,7 +531,7 @@ When('they navigate to the {string} page', async ({ page }, pageName: string) =>
   const testId = navTestIdMap[pageName]
   if (testId) {
     const navLink = page.getByTestId(testId)
-    const isVisible = await navLink.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
+    const isVisible = await navLink.waitFor({ state: 'visible', timeout: Timeouts.ELEMENT }).then(() => true).catch(() => false)
     if (isVisible) {
       await navLink.click()
     } else {
@@ -585,8 +591,9 @@ Then('they should arrive at the profile setup or dashboard', async ({ page }) =>
 When('I dismiss the demo banner', async ({ page }) => {
   const dismissBtn = page.getByTestId('dismiss-demo-banner')
     .or(page.locator('button[aria-label="Dismiss"]'))
-  if (await dismissBtn.first().isVisible({ timeout: 2000 }).catch(() => false)) {
-    await dismissBtn.first().click()
+    .first()
+  if (await dismissBtn.waitFor({ state: 'visible', timeout: 2000 }).then(() => true).catch(() => false)) {
+    await dismissBtn.click()
   }
 })
 

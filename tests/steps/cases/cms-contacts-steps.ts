@@ -8,8 +8,8 @@
  * groups), and PII restriction indicators. Hard assertions on
  * contact-card.tsx, contact-profile.tsx, and create-contact-dialog.tsx test IDs.
  */
-import { expect } from '@playwright/test'
-import { Given, When, Then } from '../fixtures'
+import { expect, type APIRequestContext } from '@playwright/test'
+import { Given, When, Then, type CasesWorld } from '../fixtures'
 import { Timeouts, navigateAfterLogin } from '../../helpers'
 import {
   ADMIN_NSEC,
@@ -42,50 +42,75 @@ When('I navigate to the {string} admin page', async ({ page }, pageName: string)
  * Contacts created via API may not appear in the directory listing due to
  * blind index / encryption constraints in the test mock environment.
  * This helper creates a contact through the UI as a fallback.
+ *
+ * Every branch is decided only after a waiting assertion on a settled directory
+ * state (cards, the "no match" notice, or the empty state) — never on a
+ * non-waiting isVisible() probe. A failed UI creation fails the step loudly
+ * instead of being force-dismissed with Escape.
  */
+async function waitForDirectorySettled(page: import('@playwright/test').Page): Promise<void> {
+  // While contacts load, the list pane (with its search input and filter) is already
+  // rendered around a spinner, so "contact-list is visible" is NOT a settled state.
+  // Settled means: cards rendered, the no-results notice, or the empty-state card.
+  await expect(
+    page.getByTestId('directory-contact-card').first()
+      .or(page.getByTestId('contact-list-no-results'))
+      .or(page.getByTestId('empty-state')),
+  ).toBeVisible({ timeout: Timeouts.ELEMENT })
+}
+
 async function ensureContactVisibleInDirectory(
   page: import('@playwright/test').Page,
   name?: string,
 ): Promise<void> {
-  const card = page.getByTestId('directory-contact-card').first()
-  const isVisible = await card.isVisible({ timeout: 5000 }).catch(() => false)
-  if (isVisible) return
+  const card = page.getByTestId('directory-contact-card')
+  // When a specific name is requested, the presence of SOME other card (e.g. left
+  // over from an earlier scenario in the same hub) must not short-circuit creation —
+  // only a card matching that name satisfies the caller.
+  const target = name ? card.filter({ hasText: name }) : card
+  await waitForDirectorySettled(page)
+  if (await target.count() > 0) return
 
-  const newBtn = page.getByTestId('new-contact-btn')
-  const emptyBtn = page.getByTestId('empty-state-create-btn')
-  const createBtn = newBtn.or(emptyBtn)
-  if (await createBtn.first().isVisible({ timeout: 3000 }).catch(() => false)) {
-    await createBtn.first().click()
-    const contactName = name ?? `Test Contact ${Date.now()}`
-    await page.getByTestId('contact-name-input').fill(contactName)
-    await page.getByTestId('create-contact-submit').click()
+  // The target contact doesn't exist yet — create it through the UI. The header
+  // button always renders; the empty state has its own create button.
+  const createBtn = page.getByTestId('new-contact-btn').or(page.getByTestId('empty-state-create-btn'))
+  await expect(createBtn.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await createBtn.first().click()
 
-    // Wait for dialog to close
-    const dialog = page.getByTestId('create-contact-dialog')
-    await dialog.waitFor({ state: 'hidden', timeout: Timeouts.ELEMENT }).catch(() => {})
+  const dialog = page.getByTestId('create-contact-dialog')
+  await expect(dialog).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await page.getByTestId('contact-name-input').fill(name ?? `Test Contact ${Date.now()}`)
+  await page.getByTestId('create-contact-submit').click()
 
-    // If dialog is still open (e.g. submission pending), force-close with Escape
-    const stillOpen = await dialog.isVisible({ timeout: 1000 }).catch(() => false)
-    if (stillOpen) {
-      await page.keyboard.press('Escape')
-      await dialog.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {})
-    }
+  // On success the parent prepends the contact, selects it, and closes the dialog
+  // (handleContactCreated). Both are required outcomes — assert them.
+  await expect(dialog).toBeHidden({ timeout: Timeouts.ELEMENT })
+  await expect(target.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
+}
 
-    // Check if card appeared after creation
-    const appeared = await card.isVisible({ timeout: 5000 }).catch(() => false)
-    if (!appeared) {
-      // Contact may have been created but directory needs a reload to show it
-      await navigateAfterLogin(page, '/contacts-directory')
-    }
-  }
-
-  // Ensure any residual create-contact-dialog is dismissed before returning,
-  // so subsequent card clicks are not blocked by the dialog overlay.
-  const residualDialog = page.getByTestId('create-contact-dialog')
-  if (await residualDialog.isVisible({ timeout: 500 }).catch(() => false)) {
-    await page.keyboard.press('Escape')
-    await residualDialog.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {})
-  }
+/**
+ * Locate a specific contact's card via the search box (server-side, blind-
+ * index/trigram search), rather than relying on `.first()` in the default
+ * directory list. The default list is capped at 50 and sorted by last
+ * interaction, so once other scenarios sharing this worker's hub have
+ * created dozens of contacts, the intended contact is not reliably the
+ * first (or even present) in the unfiltered list. Searching by the exact
+ * name used at creation finds it deterministically regardless of how much
+ * state has accumulated. Returns null if the search genuinely finds nothing.
+ */
+async function findContactCardByName(
+  page: import('@playwright/test').Page,
+  name: string,
+): Promise<import('@playwright/test').Locator | null> {
+  // The search box always renders on the contacts directory page — wait for
+  // it deterministically rather than gating the fill on a non-waiting probe.
+  const searchInput = page.getByTestId('contact-search-input')
+  await expect(searchInput).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await searchInput.fill(name)
+  const card = page.getByTestId('directory-contact-card').filter({ hasText: name })
+  const found = await card.first().isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
+  if (!found) return null
+  return card.first()
 }
 
 // --- Contact directory page elements ---
@@ -95,22 +120,21 @@ Then('the new contact button should be visible', async ({ page }) => {
 })
 
 Then('the contact search input should be visible', async ({ page }) => {
-  // Search input is inside contact-list which only renders when contacts exist.
-  // If empty state is showing, create a contact to make the list appear.
-  const contactList = page.getByTestId('contact-list')
-  if (!await contactList.isVisible({ timeout: 5000 }).catch(() => false)) {
+  // The search input is inside the contact-list pane, which only renders when the
+  // directory is non-empty. Seed a contact through the UI if it is empty.
+  await waitForDirectorySettled(page)
+  if (await page.getByTestId('contact-search-input').count() === 0) {
     await ensureContactVisibleInDirectory(page)
   }
-  const searchInput = page.getByTestId('contact-search-input')
-  const emptyState = page.getByTestId('empty-state')
-  const combined = searchInput.or(emptyState)
-  await expect(combined.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await expect(page.getByTestId('contact-search-input')).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 Then('the contact type filter should be visible', async ({ page }) => {
-  // Type filter is inside contact-list which only renders when contacts exist.
-  const contactList = page.getByTestId('contact-list')
-  if (!await contactList.isVisible({ timeout: 3000 }).catch(() => false)) return
+  // Same render condition as the search input — never return early on a probe.
+  await waitForDirectorySettled(page)
+  if (await page.getByTestId('contact-type-filter').count() === 0) {
+    await ensureContactVisibleInDirectory(page)
+  }
   await expect(page.getByTestId('contact-type-filter')).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
@@ -153,24 +177,19 @@ Given('contacts of type {string} and {string} exist', async ({ backendRequest: r
 })
 
 When('I type {string} in the contact search input', async ({ page }, query: string) => {
+  // The Given seeded contacts, so the settled directory shows the list pane.
+  await waitForDirectorySettled(page)
   const input = page.getByTestId('contact-search-input')
-  if (!await input.isVisible({ timeout: 5000 }).catch(() => false)) {
-    // Search input only shows when contact-list is rendered (i.e., contacts exist).
-    // If not visible, create contacts via UI so they appear in the directory.
-    await ensureContactVisibleInDirectory(page, query)
-    // Reload the page to get the search input
-    await navigateAfterLogin(page, '/contacts-directory')
-  }
-  // If input still not visible after helper, accept empty state gracefully
-  if (!await input.isVisible({ timeout: 5000 }).catch(() => false)) return
+  await expect(input).toBeVisible({ timeout: Timeouts.ELEMENT })
   await input.fill(query)
-  // Wait for debounce (300ms) + API round-trip + re-render
+  await expect(input).toHaveValue(query)
 })
 
 When('I clear the contact search input', async ({ page }) => {
   const input = page.getByTestId('contact-search-input')
-  if (!await input.isVisible({ timeout: 3000 }).catch(() => false)) return
+  await expect(input).toBeVisible({ timeout: Timeouts.ELEMENT })
   await input.clear()
+  await expect(input).toHaveValue('')
 })
 
 Then('the contact list should update after debounce', async ({ page }) => {
@@ -179,33 +198,24 @@ Then('the contact list should update after debounce', async ({ page }) => {
 })
 
 Then('a contact card for {string} should be visible', async ({ page }, name: string) => {
-  // Contacts from API may not be searchable by text if blind indexes aren't built.
-  // Accept either: the card is visible with the name, or any cards are visible,
-  // or the contact list is visible (even if empty after search — search works).
+  // Earlier scenarios in the worker hub may have seeded the same name, so several
+  // matching cards are legitimate; at least one must render.
   const card = page.getByTestId('directory-contact-card').filter({ hasText: name })
-  const isNameVisible = await card.first().isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
-  if (!isNameVisible) {
-    const anyCard = page.getByTestId('directory-contact-card').first()
-    const anyVisible = await anyCard.isVisible({ timeout: 5000 }).catch(() => false)
-    if (!anyVisible) {
-      // Accept: the contact list is visible (search completed, even if no match)
-      const contactList = page.getByTestId('contact-list')
-      await expect(contactList).toBeVisible({ timeout: Timeouts.ELEMENT })
-    }
-  }
+  await expect(card.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 Then('a contact card for {string} should not be visible', async ({ page }, name: string) => {
-  // Search may not support text-based filtering via blind indexes.
-  // Soft assertion: accept current state.
+  // Runs after a positive card assertion on the same search, so the results are settled.
   const card = page.getByTestId('directory-contact-card').filter({ hasText: name })
-  void await card.isVisible({ timeout: 3000 }).catch(() => false)
+  await expect(card).toHaveCount(0, { timeout: Timeouts.ELEMENT })
 })
 
-Then('both {string} and {string} should be visible', async ({ page }, _name1: string, _name2: string) => {
-  // Accept if at least some contacts are visible
-  const anyCard = page.getByTestId('directory-contact-card').first()
-  await expect(anyCard).toBeVisible({ timeout: Timeouts.ELEMENT })
+Then('both {string} and {string} should be visible', async ({ page }, name1: string, name2: string) => {
+  // Both named contacts must be visible, not just any card in the list.
+  const card1 = page.getByTestId('directory-contact-card').filter({ hasText: name1 })
+  const card2 = page.getByTestId('directory-contact-card').filter({ hasText: name2 })
+  await expect(card1.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await expect(card2.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 Then('the contact list should show {string}', async ({ page }, message: string) => {
@@ -217,18 +227,19 @@ Then('the contact list should show {string}', async ({ page }, message: string) 
 // --- Type filter ---
 
 When('I select {string} from the contact type filter', async ({ page }, filterLabel: string) => {
-  const filter = page.getByTestId('contact-type-filter')
-  if (!await filter.isVisible({ timeout: 5000 }).catch(() => false)) {
+  // The type filter renders inside the contact-list pane, which only exists when
+  // the directory is non-empty — seed a contact through the UI if it is empty.
+  await waitForDirectorySettled(page)
+  if (await page.getByTestId('contact-type-filter').count() === 0) {
     await ensureContactVisibleInDirectory(page)
   }
-  if (!await filter.isVisible({ timeout: 3000 }).catch(() => false)) return
+  const filter = page.getByTestId('contact-type-filter')
+  await expect(filter).toBeVisible({ timeout: Timeouts.ELEMENT })
   await filter.click()
-  const option = page.locator('[role="option"]').filter({ hasText: new RegExp(filterLabel, 'i') })
-  if (await option.first().isVisible({ timeout: 3000 }).catch(() => false)) {
-    await option.first().click()
-  } else {
-    await page.keyboard.press('Escape')
-  }
+  // The option must exist — pressing Escape instead would silently skip the write.
+  const option = page.getByRole('option', { name: new RegExp(filterLabel, 'i') })
+  await expect(option.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await option.first().click()
 })
 
 Then('only individual contacts should appear in the list', async ({ page }) => {
@@ -299,17 +310,10 @@ Then('{string} should appear in the contact list', async ({ page }, name: string
 })
 
 Then('{string} should be auto-selected in the detail panel', async ({ page }, name: string) => {
-  const detailPanel = page.getByTestId('contact-detail')
-  await expect(detailPanel).toBeVisible({ timeout: Timeouts.ELEMENT })
-  const header = page.getByTestId('contact-profile-header')
-  const headerVisible = await header.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
-  if (headerVisible) {
-    // Accept either the expected name or "Restricted"
-    const headerText = await header.textContent() ?? ''
-    if (!headerText.includes(name) && !headerText.includes('Restricted')) {
-      // Header visible but doesn't contain expected text — still acceptable
-    }
-  }
+  // handleContactCreated selects the new contact; its creator can always decrypt it,
+  // so the profile header shows the real name (never "Restricted").
+  const header = page.getByTestId('contact-detail').getByTestId('contact-profile-header')
+  await expect(header).toContainText(name, { timeout: Timeouts.ELEMENT })
 })
 
 When('I leave the contact name empty', async ({ page }) => {
@@ -353,14 +357,35 @@ When('I click the remove button on the second identifier', async ({ page }) => {
 
 // --- Contact profile detail ---
 
+/**
+ * Create a contact via API and track BOTH its id and display name on
+ * casesWorld. The name is required so later steps (e.g. the unnamed
+ * "I click on the contact card") can deterministically locate THIS contact
+ * via the directory search box, instead of guessing at `.first()` in a
+ * directory that accumulates contacts from every earlier scenario sharing
+ * this worker's hub. See issue #796 — clicking the wrong (unrelated) card
+ * is what produced the shard-2 "Profile tab shows empty state" failure.
+ */
+async function createTrackedContact(
+  request: APIRequestContext,
+  casesWorld: CasesWorld,
+  name: string,
+  opts?: { contactTypeHash?: string; hubId?: string },
+): Promise<Record<string, unknown>> {
+  const created = await createContactByNameViaApi(request, name, opts)
+  casesWorld.contactWithDataId = (created as { id: string }).id
+  casesWorld.contactWithDataName = name
+  return created
+}
+
 Given('a contact {string} exists', async ({ backendRequest: request, casesWorld, workerHub }, name: string) => {
   const existing = await listContactsViaApi(request, { hubId: workerHub })
   const found = existing.contacts.find(c => (c as { displayName?: string }).displayName === name)
   if (found) {
     casesWorld.contactWithDataId = (found as { id: string }).id
+    casesWorld.contactWithDataName = name
   } else {
-    const created = await createContactByNameViaApi(request, name, { hubId: workerHub })
-    casesWorld.contactWithDataId = (created as { id: string }).id
+    await createTrackedContact(request, casesWorld, name, { hubId: workerHub })
   }
 })
 
@@ -369,47 +394,40 @@ Given('a contact {string} exists with profile data', async ({ backendRequest: re
   const found = existing.contacts.find(c => (c as { displayName?: string }).displayName === name)
   if (found) {
     casesWorld.contactWithDataId = (found as { id: string }).id
+    casesWorld.contactWithDataName = name
   } else {
-    const created = await createContactByNameViaApi(request, name, { hubId: workerHub })
-    casesWorld.contactWithDataId = (created as { id: string }).id
+    await createTrackedContact(request, casesWorld, name, { hubId: workerHub })
   }
 })
 
 Given('a contact exists with no profile data', async ({ backendRequest: request, casesWorld, workerHub }) => {
-  const created = await createContactByNameViaApi(request, `No-Profile ${Date.now()}`, { hubId: workerHub })
-  casesWorld.contactWithDataId = (created as { id: string }).id
+  await createTrackedContact(request, casesWorld, `No-Profile ${Date.now()}`, { hubId: workerHub })
 })
 
 Given('a contact exists with phone and email identifiers', async ({ backendRequest: request, casesWorld, workerHub }) => {
-  const created = await createContactByNameViaApi(request, `Identifiers Contact ${Date.now()}`, { hubId: workerHub })
-  casesWorld.contactWithDataId = (created as { id: string }).id
+  await createTrackedContact(request, casesWorld, `Identifiers Contact ${Date.now()}`, { hubId: workerHub })
 })
 
 Given('a contact exists with no identifiers', async ({ backendRequest: request, casesWorld, workerHub }) => {
-  const created = await createContactByNameViaApi(request, `No-ID Contact ${Date.now()}`, { hubId: workerHub })
-  casesWorld.contactWithDataId = (created as { id: string }).id
+  await createTrackedContact(request, casesWorld, `No-ID Contact ${Date.now()}`, { hubId: workerHub })
 })
 
 Given('a contact exists with linked cases', async ({ backendRequest: request, casesWorld, workerHub }) => {
   const entityTypes = await listEntityTypesViaApi(request, workerHub)
   const arrestType = entityTypes.find(et => (et as { name?: string }).name === 'arrest_case')
-  const contact = await createContactByNameViaApi(request, `Cases Contact ${Date.now()}`, { hubId: workerHub })
-  casesWorld.contactWithDataId = (contact as { id: string }).id
-  if (arrestType) {
-    const etId = (arrestType as { id: string }).id
-    const record = await createRecordViaApi(request, etId, { statusHash: 'reported', hubId: workerHub })
-    await linkContactToRecordViaApi(request, (record as { id: string }).id, casesWorld.contactWithDataId, 'defendant', ADMIN_NSEC, workerHub)
-  }
+  expect(arrestType, 'jail-support template should define the arrest_case entity type').toBeDefined()
+  const contact = await createTrackedContact(request, casesWorld, `Cases Contact ${Date.now()}`, { hubId: workerHub })
+  const record = await createRecordViaApi(request, (arrestType as { id: string }).id, { statusHash: 'reported', hubId: workerHub })
+  await linkContactToRecordViaApi(request, (record as { id: string }).id, (contact as { id: string }).id, 'defendant', ADMIN_NSEC, workerHub)
 })
 
 Given('a contact exists with no linked cases', async ({ backendRequest: request, casesWorld, workerHub }) => {
-  const created = await createContactByNameViaApi(request, `No-Cases Contact ${Date.now()}`, { hubId: workerHub })
-  casesWorld.contactWithDataId = (created as { id: string }).id
+  await createTrackedContact(request, casesWorld, `No-Cases Contact ${Date.now()}`, { hubId: workerHub })
 })
 
 Given('a contact exists with relationships', async ({ backendRequest: request, casesWorld, workerHub }) => {
-  const c1 = await createContactByNameViaApi(request, `Rel Source ${Date.now()}`, { hubId: workerHub })
   const c2 = await createContactByNameViaApi(request, `Rel Target ${Date.now()}`, { hubId: workerHub })
+  const c1 = await createTrackedContact(request, casesWorld, `Rel Source ${Date.now()}`, { hubId: workerHub })
   casesWorld.contactWithDataId = (c1 as { id: string }).id
   await createRelationshipViaApi(
     request,
@@ -419,32 +437,27 @@ Given('a contact exists with relationships', async ({ backendRequest: request, c
     'bidirectional',
     ADMIN_NSEC,
     workerHub,
-  ).catch(() => {})
+  )
 })
 
 Given('a contact exists with no relationships', async ({ backendRequest: request, casesWorld, workerHub }) => {
-  const created = await createContactByNameViaApi(request, `No-Rel Contact ${Date.now()}`, { hubId: workerHub })
-  casesWorld.contactWithDataId = (created as { id: string }).id
+  await createTrackedContact(request, casesWorld, `No-Rel Contact ${Date.now()}`, { hubId: workerHub })
 })
 
 Given('a contact exists in groups', async ({ backendRequest: request, casesWorld, workerHub }) => {
-  const contact = await createContactByNameViaApi(request, `Group Contact ${Date.now()}`, { hubId: workerHub })
-  casesWorld.contactWithDataId = (contact as { id: string }).id
-  const group = await createAffinityGroupViaApi(
+  const contact = await createTrackedContact(request, casesWorld, `Group Contact ${Date.now()}`, { hubId: workerHub })
+  // A failed group write must fail the Given, not leave the scenario asserting nothing.
+  await createAffinityGroupViaApi(
     request,
     `Test Group ${Date.now()}`,
-    [{ contactId: casesWorld.contactWithDataId }],
+    [{ contactId: (contact as { id: string }).id }],
     ADMIN_NSEC,
     workerHub,
-  ).catch(() => null)
-  if (!group) {
-    // Group creation may fail if API is not available — continue anyway
-  }
+  )
 })
 
 Given('a contact exists not in any groups', async ({ backendRequest: request, casesWorld, workerHub }) => {
-  const created = await createContactByNameViaApi(request, `No-Group Contact ${Date.now()}`, { hubId: workerHub })
-  casesWorld.contactWithDataId = (created as { id: string }).id
+  await createTrackedContact(request, casesWorld, `No-Group Contact ${Date.now()}`, { hubId: workerHub })
 })
 
 Given('no contacts have been created', async ({ backendRequest: request, workerHub }) => {
@@ -463,43 +476,52 @@ Given('no contacts have been created', async ({ backendRequest: request, workerH
 })
 
 When('I click on the {string} contact card', async ({ page }, name: string) => {
-  // Contacts created via API may not appear in the directory listing (blind index issue).
-  const card = page.getByTestId('directory-contact-card').filter({ hasText: name })
-  const isNameVisible = await card.first().isVisible({ timeout: 5000 }).catch(() => false)
-  if (isNameVisible) {
-    await card.first().click()
-  } else {
-    await ensureContactVisibleInDirectory(page, name)
-    // Dismiss any open dialog before clicking (ensureContactVisibleInDirectory may have left one open)
-    const openDialog = page.getByTestId('create-contact-dialog')
-    if (await openDialog.isVisible({ timeout: 500 }).catch(() => false)) {
-      await page.keyboard.press('Escape')
-      await openDialog.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {})
-    }
-    const anyCard = page.getByTestId('directory-contact-card').first()
-    if (await anyCard.isVisible({ timeout: 5000 }).catch(() => false)) {
-      await anyCard.click()
-    }
+  // Search deterministically by name rather than trusting the default
+  // (capped, last-interaction-sorted) list to contain — let alone lead
+  // with — this specific contact once other scenarios sharing this
+  // worker's hub have accumulated dozens of contacts (issue #796).
+  const card = await findContactCardByName(page, name)
+  if (card) {
+    await card.click()
+    return
   }
+  // Genuinely not found via search (e.g. contact creation itself failed) —
+  // fall back to creating one through the UI so the scenario can proceed.
+  // ensureContactVisibleInDirectory already waits for the dialog to close
+  // and the target card to render before returning.
+  await ensureContactVisibleInDirectory(page, name)
+  const namedCard = page.getByTestId('directory-contact-card').filter({ hasText: name })
+  await expect(namedCard.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await namedCard.first().click()
 })
 
-When('I click on the contact card', async ({ page }) => {
-  // If no contacts appear, create one through the UI first.
-  const card = page.getByTestId('directory-contact-card').first()
-  let isVisible = await card.isVisible({ timeout: 8000 }).catch(() => false)
-  if (!isVisible) {
-    await ensureContactVisibleInDirectory(page)
-    // Dismiss any open dialog before clicking the card
-    const openDialog = page.getByTestId('create-contact-dialog')
-    if (await openDialog.isVisible({ timeout: 500 }).catch(() => false)) {
-      await page.keyboard.press('Escape')
-      await openDialog.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {})
+When('I click on the contact card', async ({ page, casesWorld }) => {
+  // When a prior Given step tracked the display name of the contact under
+  // test, search for it deterministically — the same reasoning as the
+  // named step above. `.first()` on the unfiltered list is only safe when
+  // no specific contact is being targeted.
+  if (casesWorld.contactWithDataName) {
+    const named = await findContactCardByName(page, casesWorld.contactWithDataName)
+    if (named) {
+      await named.click()
+      return
     }
-    isVisible = await card.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
   }
-  if (isVisible) {
-    await card.click()
+  // No tracked name, or search found nothing — fall back to the first
+  // card, seeding one through the UI if the directory is empty.
+  const card = page.getByTestId('directory-contact-card')
+  await expect(
+    card.first()
+      .or(page.getByTestId('contact-list').getByText(/no contacts match/i))
+      .or(page.getByTestId('empty-state')),
+  ).toBeVisible({ timeout: Timeouts.ELEMENT })
+  if (await card.count() === 0) {
+    await ensureContactVisibleInDirectory(page)
   }
+  // The directory orders never-contacted contacts newest-first, and the scenario's
+  // Given seeded its contact last, so the first card is that contact.
+  await expect(card.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await card.first().click()
 })
 
 Then('the contact profile header should be visible', async ({ page }) => {
@@ -511,17 +533,22 @@ Then('the contact profile tabs should be visible', async ({ page }) => {
 })
 
 Then('the contact profile content should be visible', async ({ page }) => {
-  const content = page.getByTestId('contact-profile-content')
-    .or(page.getByTestId('contact-profile-empty'))
-  await expect(content.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
+  // contact-profile-content is the decrypted-profile wrapper — it only
+  // renders when the admin device successfully decrypted the contact
+  // summary. Accepting contact-profile-empty here as well (as this used
+  // to) let the assertion pass even when decryption silently failed and
+  // the contact rendered as Restricted, masking issue #796.
+  await expect(page.getByTestId('contact-profile-content')).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 Then('the contact profile empty state should be visible', async ({ page }) => {
-  // Profile may show content or empty — accept either
-  const empty = page.getByTestId('contact-profile-empty')
-  const content = page.getByTestId('contact-profile-content')
-  const combined = empty.or(content)
-  await expect(combined.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
+  // contact-profile-empty is nested inside contact-profile-content and
+  // renders only when decryption succeeded AND no profile fields are set —
+  // exactly what "a contact exists with no profile data" sets up. Accepting
+  // contact-profile-content alone (as this used to) would also pass for a
+  // Restricted/undecryptable contact if it happened to render some other
+  // element with that testid, defeating the point of this assertion.
+  await expect(page.getByTestId('contact-profile-empty')).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 // --- Identifiers tab ---
@@ -533,20 +560,19 @@ Then('the contact identifiers list should be visible', async ({ page }) => {
 })
 
 Then('identifier cards should show type and value', async ({ page }) => {
-  const list = page.getByTestId('contact-identifiers-list')
-  if (await list.isVisible({ timeout: 3000 }).catch(() => false)) {
-    const cards = list.locator('[class*="CardContent"]')
-    if (await cards.count() > 0) {
-      await expect(cards.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
-    }
+  const items = page.getByTestId('contact-identifiers-list').getByTestId('contact-identifier-item')
+  await expect(items.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
+  for (const item of await items.all()) {
+    await expect(item.getByTestId('contact-identifier-type')).toHaveText(/\S/)
+    await expect(item.getByTestId('contact-identifier-value')).toHaveText(/\S/)
   }
 })
 
 Then('the primary identifier should show a {string} badge', async ({ page }, badgeText: string) => {
-  const badge = page.getByTestId('identifier-primary-badge')
-  if (await badge.isVisible({ timeout: 3000 }).catch(() => false)) {
-    await expect(badge).toContainText(new RegExp(badgeText, 'i'))
-  }
+  // Exactly one identifier is primary.
+  const badge = page.getByTestId('contact-identifiers-list').getByTestId('identifier-primary-badge')
+  await expect(badge).toHaveCount(1, { timeout: Timeouts.ELEMENT })
+  await expect(badge).toContainText(new RegExp(badgeText, 'i'))
 })
 
 Then('the contact identifiers empty state should be visible', async ({ page }) => {
@@ -565,9 +591,12 @@ Then('the contact cases list should be visible', async ({ page }) => {
 })
 
 Then('each case link should show a case number and role', async ({ page }) => {
-  const list = page.getByTestId('contact-cases-list')
-  if (await list.isVisible({ timeout: 3000 }).catch(() => false)) {
-    await expect(list).toBeVisible({ timeout: Timeouts.ELEMENT })
+  // The Given linked a case with role "defendant".
+  const items = page.getByTestId('contact-cases-list').getByTestId('contact-case-item')
+  await expect(items.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
+  for (const item of await items.all()) {
+    await expect(item.getByTestId('contact-case-number')).toHaveText(/\S/)
+    await expect(item.getByTestId('contact-case-role')).toHaveText(/\S/)
   }
 })
 
@@ -581,37 +610,21 @@ Then('the contact cases empty state should be visible', async ({ page }) => {
 // --- Relationships tab ---
 
 Then('the contact relationships list should be visible', async ({ page }) => {
-  // If no contact is selected (profile tabs not visible), try to select one
-  const profileTabs = page.getByTestId('contact-profile-tabs')
-  if (!await profileTabs.isVisible({ timeout: 5000 }).catch(() => false)) {
-    // Try clicking the first contact card
-    await ensureContactVisibleInDirectory(page)
-    const card = page.getByTestId('directory-contact-card').first()
-    if (await card.isVisible({ timeout: 5000 }).catch(() => false)) {
-      await card.click()
-    }
-  }
-
-  // Ensure Relationships tab is active
-  const relTab = page.getByTestId('contact-tab-relationships')
-  if (await relTab.isVisible({ timeout: 5000 }).catch(() => false)) {
-    const cls = await relTab.getAttribute('class') ?? ''
-    if (!cls.includes('border-primary')) {
-      await relTab.click()
-    }
-  }
-
-  // Wait for loading to finish — either the list or empty state should appear
-  const list = page.getByTestId('contact-relationships-list')
-    .or(page.getByTestId('contact-relationships-empty'))
-  await expect(list.first()).toBeVisible({ timeout: Timeouts.ELEMENT * 2 })
+  // The previous steps selected the contact and opened its Relationships tab, and
+  // the Given created a relationship — the list (not the empty state) must render.
+  // Rendering this tab depends on the same admin-side HPKE decrypt of the contact
+  // (and its relationship data) that gates the Profile tab — see issue #796 and
+  // Timeouts.DECRYPT's doc comment. Observed timing out under contended CI shard-2
+  // runs at ELEMENT's 10s even for a freshly (correctly) seeded, decryptable contact.
+  await expect(page.getByTestId('contact-tab-relationships')).toHaveClass(/border-primary/, { timeout: Timeouts.ELEMENT })
+  await expect(page.getByTestId('contact-relationships-list')).toBeVisible({ timeout: Timeouts.DECRYPT })
 })
 
 Then('the contact relationships empty state should be visible', async ({ page }) => {
   const empty = page.getByTestId('contact-relationships-empty')
   const list = page.getByTestId('contact-relationships-list')
   const combined = empty.or(list)
-  await expect(combined.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await expect(combined.first()).toBeVisible({ timeout: Timeouts.DECRYPT })
 })
 
 // --- Groups tab ---
@@ -619,13 +632,14 @@ Then('the contact relationships empty state should be visible', async ({ page })
 Then('the contact groups list should be visible', async ({ page }) => {
   const list = page.getByTestId('contact-groups-list')
     .or(page.getByTestId('contact-groups-empty'))
-  await expect(list.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await expect(list.first()).toBeVisible({ timeout: Timeouts.DECRYPT })
 })
 
 Then('each group should show a member count', async ({ page }) => {
-  const list = page.getByTestId('contact-groups-list')
-  if (await list.isVisible({ timeout: 3000 }).catch(() => false)) {
-    await expect(list.getByText(/member/i).first()).toBeVisible({ timeout: Timeouts.ELEMENT })
+  const items = page.getByTestId('contact-groups-list').getByTestId('contact-group-item')
+  await expect(items.first()).toBeVisible({ timeout: Timeouts.DECRYPT })
+  for (const item of await items.all()) {
+    await expect(item.getByTestId('contact-group-member-count')).toHaveText(/\d/)
   }
 })
 
@@ -633,14 +647,13 @@ Then('the contact groups empty state should be visible', async ({ page }) => {
   const empty = page.getByTestId('contact-groups-empty')
   const list = page.getByTestId('contact-groups-list')
   const combined = empty.or(list)
-  await expect(combined.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await expect(combined.first()).toBeVisible({ timeout: Timeouts.DECRYPT })
 })
 
 // --- Privacy-aware display ---
 
 Given('a contact with PII data exists', async ({ backendRequest: request, casesWorld, workerHub }) => {
-  const contact = await createContactByNameViaApi(request, `PII Contact ${Date.now()}`, { hubId: workerHub })
-  casesWorld.contactWithDataId = (contact as { id: string }).id
+  await createTrackedContact(request, casesWorld, `PII Contact ${Date.now()}`, { hubId: workerHub })
 })
 
 Given('I am logged in as a volunteer without PII access', async ({ page, backendRequest: request }) => {
@@ -666,40 +679,25 @@ Given('I am logged in as a volunteer without PII access', async ({ page, backend
 })
 
 When('I click on the restricted contact card', async ({ page }) => {
-  // After re-login as volunteer, contacts should be visible but undecryptable (showing "Restricted").
-  // If no contacts are visible, create one via UI so we have something to click.
-  const card = page.getByTestId('directory-contact-card').first()
-  let cardVisible = await card.isVisible({ timeout: 8000 }).catch(() => false)
-
-  if (!cardVisible) {
-    // No contacts visible — try creating one via the UI
+  // After re-login as a volunteer without PII access, undecryptable contacts list
+  // as "Restricted". Wait for the directory to settle, seeding one through the UI
+  // if it is empty.
+  const card = page.getByTestId('directory-contact-card')
+  await expect(
+    card.first()
+      .or(page.getByTestId('contact-list').getByText(/no contacts match/i))
+      .or(page.getByTestId('empty-state')),
+  ).toBeVisible({ timeout: Timeouts.ELEMENT })
+  if (await card.count() === 0) {
     await ensureContactVisibleInDirectory(page)
-    cardVisible = await card.isVisible({ timeout: 5000 }).catch(() => false)
   }
-
-  if (!cardVisible) {
-    // Still not visible — navigate again in case the page needs a refresh
-    const { navigateAfterLogin } = await import('../../helpers')
-    await navigateAfterLogin(page, '/contacts-directory')
-    cardVisible = await card.isVisible({ timeout: 8000 }).catch(() => false)
-  }
-
-  // Close any open dialog that may be blocking clicks (e.g. create-contact-dialog
-  // left open after ensureContactVisibleInDirectory ran its UI creation fallback)
-  const openDialog = page.getByTestId('create-contact-dialog')
-  if (await openDialog.isVisible({ timeout: 1000 }).catch(() => false)) {
-    await page.keyboard.press('Escape')
-    await openDialog.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {})
-  }
-
-  if (cardVisible) {
-    // Prefer a card showing "Restricted" text
-    const restricted = page.getByTestId('directory-contact-card').filter({ hasText: /restricted/i })
-    if (await restricted.first().isVisible({ timeout: 3000 }).catch(() => false)) {
-      await restricted.first().click()
-    } else {
-      await card.click()
-    }
+  // Prefer a card showing "Restricted" text; fall back to the first card.
+  const restricted = card.filter({ hasText: /restricted/i })
+  await expect(card.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
+  if (await restricted.count() > 0) {
+    await restricted.first().click()
+  } else {
+    await card.first().click()
   }
 })
 
@@ -710,14 +708,10 @@ Then('the contact profile header should show a lock icon', async ({ page }) => {
 })
 
 Then('the display name should show {string}', async ({ page }, text: string) => {
+  // The scenario is logged in as a volunteer without PII access, so the header
+  // must show the restricted label.
   const header = page.getByTestId('contact-profile-header')
-  if (await header.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)) {
-    // Admin can decrypt, so name shows instead of "Restricted". Accept either.
-    const headerText = await header.textContent() ?? ''
-    if (!new RegExp(text, 'i').test(headerText)) {
-      // Not the expected text — admin decrypted the name, which is acceptable
-    }
-  }
+  await expect(header).toContainText(new RegExp(text, 'i'), { timeout: Timeouts.ELEMENT })
 })
 
 Then('the restricted placeholder should be visible', async ({ page }) => {

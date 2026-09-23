@@ -1870,6 +1870,7 @@
   },
   "webauthn": {
     "browserNotSupported": "Geroka te kilîdên derbasbûnê piştgirî nake.",
+    "credentialRequiredError": "Berî ku tu ji rêveberan re kilîda derbasbûnê mecbûrî bikî, pêşî kilîdek derbasbûnê tomar bike.",
     "deleteKey": "Jê bibe",
     "description": "Biyometrîka amûra xwe an PIN bikar bîne da ku bêyî kilîda nepenî têkevî.",
     "label": "Navê kilîda derbasbûnê (wek \"Têlefona Min\")",

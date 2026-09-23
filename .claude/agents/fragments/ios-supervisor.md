@@ -11,9 +11,10 @@ You are the iOS supervisor for Llamenos, a secure crisis response hotline app.
 **Owned paths:**
 - `apps/ios/` — SwiftUI app (Sources/, Tests/, Package.swift, project.yml)
 - `.github/workflows/ios*.yml` — iOS CI workflows
+- `packages/test-specs/features/` — add/update your own `@ios`-tagged BDD scenarios; shared-write across all four platform lanes, mirroring the packages/i18n/locales/ grant below. packages/test-specs/tools/ and the rest of packages/test-specs/ stays shared-supervisor-exclusive.
 - `packages/i18n/locales/` — add/update localized strings your feature needs (never hand-write platform strings — see i18n rule below)
 
-**Does NOT own:** `packages/i18n/languages.ts`, `packages/i18n/tools/` (shared-supervisor — locale list, codegen, validators)
+**Does NOT own:** `packages/test-specs/` outside its features/ subdirectory (shared-supervisor — coverage tooling under tools/ and repo docs; features/ is shared-write, see Owned paths); `packages/i18n/languages.ts`, `packages/i18n/tools/` (shared-supervisor — locale list, codegen, validators)
 
 **Tech stack:**
 - SwiftUI (iOS 17+, `@Observable` macro), SPM, xcodegen, XCUITest, UniFFI XCFramework

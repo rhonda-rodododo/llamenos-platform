@@ -21,6 +21,13 @@ export const Timeouts = {
   /** Time to wait for auth-related operations (includes PBKDF2 600K iterations).
    *  CI containers have limited CPU which makes PBKDF2 significantly slower. */
   AUTH: 55000,
+  /** Time to wait for message content that depends on client-side HPKE/AES-GCM
+   *  decryption completing and a subsequent React re-render (e.g. an outbound
+   *  message's plaintext appearing in ConversationThread after a fresh fetch).
+   *  Individually fast, but the shared self-hosted CI runners are frequently
+   *  under contention from concurrent jobs, and ELEMENT's 10s has been observed
+   *  to occasionally not be enough for fetch + decrypt + render to land. */
+  DECRYPT: 20000,
 } as const
 
 // Re-export TestIds for convenience
@@ -558,4 +565,26 @@ export async function mockConfigWithHub(page: Page, hubId = 'test-hub-1'): Promi
       }),
     })
   })
+}
+
+/**
+ * Shared "seed failed" signal for step definitions that create a resource via a
+ * backend simulation helper (e.g. simulateIncomingMessage) and then need every
+ * downstream step to take one deterministic branch instead of re-probing
+ * visibility with isVisible().catch(() => false) at each step. Given steps that
+ * seed data should call flagSeedFailed(page) exactly once when seeding did not
+ * produce the expected UI element; When/Then steps should check
+ * readSeedFailedFlag(page) first and return early (after asserting a safe
+ * fallback state) rather than guarding their own click/fill on a fresh probe.
+ */
+type SeedFlagWindow = Window & { __test_seed_failed?: boolean }
+
+export async function flagSeedFailed(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    (window as unknown as SeedFlagWindow).__test_seed_failed = true
+  })
+}
+
+export async function readSeedFailedFlag(page: Page): Promise<boolean> {
+  return page.evaluate(() => (window as unknown as SeedFlagWindow).__test_seed_failed === true).catch(() => false)
 }
