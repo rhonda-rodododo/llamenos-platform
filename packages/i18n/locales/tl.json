@@ -4563,6 +4563,7 @@
   "voiceStatusWebhook": "Voice Status Webhook",
   "webauthn": {
     "browserNotSupported": "Hindi sinusuportahan ng iyong browser ang mga passkey.",
+    "credentialRequiredError": "Magrehistro ng passkey bago mo kailanganin ang mga passkey para sa mga admin.",
     "deleteKey": "Tanggalin",
     "description": "Gamitin ang biometrics o PIN ng iyong device para mag-sign in nang walang secret key.",
     "label": "Pangalan ng passkey (hal. \"Aking Telepono\")",

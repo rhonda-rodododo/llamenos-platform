@@ -1870,6 +1870,7 @@
   },
   "webauthn": {
     "browserNotSupported": "Navegador miíún ña xáꞌnda chiꞌña ji passkey.",
+    "credentialRequiredError": "Chikaa iin passkey nu̱ú xíni̱ñúꞌú ña admin.",
     "deleteKey": "Xíta",
     "description": "Kuniñúꞌú biométrico xi PIN de dispositivo miíún ña kivi ñá xíni̱ñúꞌú llave secreta.",
     "label": "Sivi passkey (ejemplo \"Teléfono Mií\")",

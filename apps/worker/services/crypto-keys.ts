@@ -26,6 +26,8 @@ export interface SigchainLinkRecord {
   signature: string
   prevHash: string
   hash: string
+  signerDeviceId: string
+  signerPubkey: string
   createdAt: string
 }
 
@@ -87,7 +89,14 @@ function canonicalizeJson(value: unknown): unknown {
  * - `prevHash` is `null` (not `""`) for genesis links (matches Rust Option<String>).
  * - `seq` is a number (matches Rust u64).
  */
-function computeEntryHash(
+/**
+ * Exported for reuse by services that append specialized sigchain link types
+ * outside the generic `appendSigchainLink` path (e.g. `recovery-group.ts`'s
+ * self-authorizing `recovery-device-add` link, which is verified against the
+ * recovering device's own key rather than the account's identity key and
+ * must be appended atomically alongside other recovery-session state).
+ */
+export function computeEntryHash(
   seq: number,
   prevHash: string | null,
   timestamp: string,
@@ -137,6 +146,14 @@ export class CryptoKeysService {
       signature: r.signature,
       prevHash: r.prevHash,
       hash: r.hash,
+      // GET /users/:pubkey/sigchain previously omitted these two fields even
+      // though appendSigchainLink's own POST response includes them (and the
+      // DB column defaults to '', so every pre-existing row still round-trips
+      // fine). Verifiers need signerPubkey to check self-authorizing link
+      // types like recovery-device-add, whose signature is NOT verifiable
+      // against userPubkey the way every other link type's is.
+      signerDeviceId: r.signerDeviceId,
+      signerPubkey: r.signerPubkey,
       createdAt: r.createdAt.toISOString(),
     }))
   }
@@ -255,6 +272,8 @@ export class CryptoKeysService {
       signature: inserted.signature,
       prevHash: inserted.prevHash,
       hash: inserted.hash,
+      signerDeviceId: inserted.signerDeviceId,
+      signerPubkey: inserted.signerPubkey,
       createdAt: inserted.createdAt.toISOString(),
     }
   }

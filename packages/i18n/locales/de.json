@@ -4563,6 +4563,7 @@
   "voiceStatusWebhook": "Voice Status Webhook",
   "webauthn": {
     "browserNotSupported": "Ihr Browser unterstützt keine Passkeys.",
+    "credentialRequiredError": "Registrieren Sie einen Passkey, bevor Sie Passkeys für Administratoren verlangen.",
     "deleteKey": "Löschen",
     "description": "Verwenden Sie die Biometrie oder PIN Ihres Geräts, um sich ohne Ihren geheimen Schlüssel anzumelden.",
     "label": "Passkey-Name (z.B. \"Mein Telefon\")",

@@ -4563,6 +4563,7 @@
   "voiceStatusWebhook": "Voice Status Webhook",
   "webauthn": {
     "browserNotSupported": "Navigatè ou pa sipòte kle aksè.",
+    "credentialRequiredError": "Anrejistre yon kle aksè anvan ou egzije kle aksè pou administratè yo.",
     "deleteKey": "Efase",
     "description": "Sèvi ak biyometri oswa PIN aparèy ou pou konekte san kle sekrè ou.",
     "label": "Non kle aksè (egz. \"Telefòn Mwen\")",
