@@ -8,8 +8,8 @@
  * groups), and PII restriction indicators. Hard assertions on
  * contact-card.tsx, contact-profile.tsx, and create-contact-dialog.tsx test IDs.
  */
-import { expect } from '@playwright/test'
-import { Given, When, Then } from '../fixtures'
+import { expect, type APIRequestContext } from '@playwright/test'
+import { Given, When, Then, type CasesWorld } from '../fixtures'
 import { Timeouts, navigateAfterLogin } from '../../helpers'
 import {
   ADMIN_NSEC,
@@ -86,6 +86,31 @@ async function ensureContactVisibleInDirectory(
   // (handleContactCreated). Both are required outcomes — assert them.
   await expect(dialog).toBeHidden({ timeout: Timeouts.ELEMENT })
   await expect(target.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
+}
+
+/**
+ * Locate a specific contact's card via the search box (server-side, blind-
+ * index/trigram search), rather than relying on `.first()` in the default
+ * directory list. The default list is capped at 50 and sorted by last
+ * interaction, so once other scenarios sharing this worker's hub have
+ * created dozens of contacts, the intended contact is not reliably the
+ * first (or even present) in the unfiltered list. Searching by the exact
+ * name used at creation finds it deterministically regardless of how much
+ * state has accumulated. Returns null if the search genuinely finds nothing.
+ */
+async function findContactCardByName(
+  page: import('@playwright/test').Page,
+  name: string,
+): Promise<import('@playwright/test').Locator | null> {
+  // The search box always renders on the contacts directory page — wait for
+  // it deterministically rather than gating the fill on a non-waiting probe.
+  const searchInput = page.getByTestId('contact-search-input')
+  await expect(searchInput).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await searchInput.fill(name)
+  const card = page.getByTestId('directory-contact-card').filter({ hasText: name })
+  const found = await card.first().isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
+  if (!found) return null
+  return card.first()
 }
 
 // --- Contact directory page elements ---
@@ -332,14 +357,35 @@ When('I click the remove button on the second identifier', async ({ page }) => {
 
 // --- Contact profile detail ---
 
+/**
+ * Create a contact via API and track BOTH its id and display name on
+ * casesWorld. The name is required so later steps (e.g. the unnamed
+ * "I click on the contact card") can deterministically locate THIS contact
+ * via the directory search box, instead of guessing at `.first()` in a
+ * directory that accumulates contacts from every earlier scenario sharing
+ * this worker's hub. See issue #796 — clicking the wrong (unrelated) card
+ * is what produced the shard-2 "Profile tab shows empty state" failure.
+ */
+async function createTrackedContact(
+  request: APIRequestContext,
+  casesWorld: CasesWorld,
+  name: string,
+  opts?: { contactTypeHash?: string; hubId?: string },
+): Promise<Record<string, unknown>> {
+  const created = await createContactByNameViaApi(request, name, opts)
+  casesWorld.contactWithDataId = (created as { id: string }).id
+  casesWorld.contactWithDataName = name
+  return created
+}
+
 Given('a contact {string} exists', async ({ backendRequest: request, casesWorld, workerHub }, name: string) => {
   const existing = await listContactsViaApi(request, { hubId: workerHub })
   const found = existing.contacts.find(c => (c as { displayName?: string }).displayName === name)
   if (found) {
     casesWorld.contactWithDataId = (found as { id: string }).id
+    casesWorld.contactWithDataName = name
   } else {
-    const created = await createContactByNameViaApi(request, name, { hubId: workerHub })
-    casesWorld.contactWithDataId = (created as { id: string }).id
+    await createTrackedContact(request, casesWorld, name, { hubId: workerHub })
   }
 })
 
@@ -348,45 +394,40 @@ Given('a contact {string} exists with profile data', async ({ backendRequest: re
   const found = existing.contacts.find(c => (c as { displayName?: string }).displayName === name)
   if (found) {
     casesWorld.contactWithDataId = (found as { id: string }).id
+    casesWorld.contactWithDataName = name
   } else {
-    const created = await createContactByNameViaApi(request, name, { hubId: workerHub })
-    casesWorld.contactWithDataId = (created as { id: string }).id
+    await createTrackedContact(request, casesWorld, name, { hubId: workerHub })
   }
 })
 
 Given('a contact exists with no profile data', async ({ backendRequest: request, casesWorld, workerHub }) => {
-  const created = await createContactByNameViaApi(request, `No-Profile ${Date.now()}`, { hubId: workerHub })
-  casesWorld.contactWithDataId = (created as { id: string }).id
+  await createTrackedContact(request, casesWorld, `No-Profile ${Date.now()}`, { hubId: workerHub })
 })
 
 Given('a contact exists with phone and email identifiers', async ({ backendRequest: request, casesWorld, workerHub }) => {
-  const created = await createContactByNameViaApi(request, `Identifiers Contact ${Date.now()}`, { hubId: workerHub })
-  casesWorld.contactWithDataId = (created as { id: string }).id
+  await createTrackedContact(request, casesWorld, `Identifiers Contact ${Date.now()}`, { hubId: workerHub })
 })
 
 Given('a contact exists with no identifiers', async ({ backendRequest: request, casesWorld, workerHub }) => {
-  const created = await createContactByNameViaApi(request, `No-ID Contact ${Date.now()}`, { hubId: workerHub })
-  casesWorld.contactWithDataId = (created as { id: string }).id
+  await createTrackedContact(request, casesWorld, `No-ID Contact ${Date.now()}`, { hubId: workerHub })
 })
 
 Given('a contact exists with linked cases', async ({ backendRequest: request, casesWorld, workerHub }) => {
   const entityTypes = await listEntityTypesViaApi(request, workerHub)
   const arrestType = entityTypes.find(et => (et as { name?: string }).name === 'arrest_case')
   expect(arrestType, 'jail-support template should define the arrest_case entity type').toBeDefined()
-  const contact = await createContactByNameViaApi(request, `Cases Contact ${Date.now()}`, { hubId: workerHub })
-  casesWorld.contactWithDataId = (contact as { id: string }).id
+  const contact = await createTrackedContact(request, casesWorld, `Cases Contact ${Date.now()}`, { hubId: workerHub })
   const record = await createRecordViaApi(request, (arrestType as { id: string }).id, { statusHash: 'reported', hubId: workerHub })
-  await linkContactToRecordViaApi(request, (record as { id: string }).id, casesWorld.contactWithDataId, 'defendant', ADMIN_NSEC, workerHub)
+  await linkContactToRecordViaApi(request, (record as { id: string }).id, (contact as { id: string }).id, 'defendant', ADMIN_NSEC, workerHub)
 })
 
 Given('a contact exists with no linked cases', async ({ backendRequest: request, casesWorld, workerHub }) => {
-  const created = await createContactByNameViaApi(request, `No-Cases Contact ${Date.now()}`, { hubId: workerHub })
-  casesWorld.contactWithDataId = (created as { id: string }).id
+  await createTrackedContact(request, casesWorld, `No-Cases Contact ${Date.now()}`, { hubId: workerHub })
 })
 
 Given('a contact exists with relationships', async ({ backendRequest: request, casesWorld, workerHub }) => {
-  const c1 = await createContactByNameViaApi(request, `Rel Source ${Date.now()}`, { hubId: workerHub })
   const c2 = await createContactByNameViaApi(request, `Rel Target ${Date.now()}`, { hubId: workerHub })
+  const c1 = await createTrackedContact(request, casesWorld, `Rel Source ${Date.now()}`, { hubId: workerHub })
   casesWorld.contactWithDataId = (c1 as { id: string }).id
   await createRelationshipViaApi(
     request,
@@ -400,26 +441,23 @@ Given('a contact exists with relationships', async ({ backendRequest: request, c
 })
 
 Given('a contact exists with no relationships', async ({ backendRequest: request, casesWorld, workerHub }) => {
-  const created = await createContactByNameViaApi(request, `No-Rel Contact ${Date.now()}`, { hubId: workerHub })
-  casesWorld.contactWithDataId = (created as { id: string }).id
+  await createTrackedContact(request, casesWorld, `No-Rel Contact ${Date.now()}`, { hubId: workerHub })
 })
 
 Given('a contact exists in groups', async ({ backendRequest: request, casesWorld, workerHub }) => {
-  const contact = await createContactByNameViaApi(request, `Group Contact ${Date.now()}`, { hubId: workerHub })
-  casesWorld.contactWithDataId = (contact as { id: string }).id
+  const contact = await createTrackedContact(request, casesWorld, `Group Contact ${Date.now()}`, { hubId: workerHub })
   // A failed group write must fail the Given, not leave the scenario asserting nothing.
   await createAffinityGroupViaApi(
     request,
     `Test Group ${Date.now()}`,
-    [{ contactId: casesWorld.contactWithDataId }],
+    [{ contactId: (contact as { id: string }).id }],
     ADMIN_NSEC,
     workerHub,
   )
 })
 
 Given('a contact exists not in any groups', async ({ backendRequest: request, casesWorld, workerHub }) => {
-  const created = await createContactByNameViaApi(request, `No-Group Contact ${Date.now()}`, { hubId: workerHub })
-  casesWorld.contactWithDataId = (created as { id: string }).id
+  await createTrackedContact(request, casesWorld, `No-Group Contact ${Date.now()}`, { hubId: workerHub })
 })
 
 Given('no contacts have been created', async ({ backendRequest: request, workerHub }) => {
@@ -438,29 +476,40 @@ Given('no contacts have been created', async ({ backendRequest: request, workerH
 })
 
 When('I click on the {string} contact card', async ({ page }, name: string) => {
-  const namedCard = page.getByTestId('directory-contact-card').filter({ hasText: name })
-  // Wait for the directory to settle before deciding whether the contact is listed.
-  // namedCard is a subset of the unfiltered card locator, so waiting on the
-  // unfiltered card's first element (or the empty state) is sufficient — adding
-  // namedCard.first() here as a separate OR branch is redundant and, once other
-  // non-matching cards exist, resolves to two distinct elements (strict-mode
-  // violation) instead of one settled state.
-  await expect(
-    page.getByTestId('directory-contact-card').first()
-      .or(page.getByTestId('empty-state')),
-  ).toBeVisible({ timeout: Timeouts.ELEMENT })
-  // API-created contacts may not list in the test mock env (blind index
-  // constraints) — create one through the UI, which shows immediately by name.
-  if (await namedCard.count() === 0) {
-    await ensureContactVisibleInDirectory(page, name)
+  // Search deterministically by name rather than trusting the default
+  // (capped, last-interaction-sorted) list to contain — let alone lead
+  // with — this specific contact once other scenarios sharing this
+  // worker's hub have accumulated dozens of contacts (issue #796).
+  const card = await findContactCardByName(page, name)
+  if (card) {
+    await card.click()
+    return
   }
+  // Genuinely not found via search (e.g. contact creation itself failed) —
+  // fall back to creating one through the UI so the scenario can proceed.
+  // ensureContactVisibleInDirectory already waits for the dialog to close
+  // and the target card to render before returning.
+  await ensureContactVisibleInDirectory(page, name)
+  const namedCard = page.getByTestId('directory-contact-card').filter({ hasText: name })
   await expect(namedCard.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
   await namedCard.first().click()
 })
 
-When('I click on the contact card', async ({ page }) => {
+When('I click on the contact card', async ({ page, casesWorld }) => {
+  // When a prior Given step tracked the display name of the contact under
+  // test, search for it deterministically — the same reasoning as the
+  // named step above. `.first()` on the unfiltered list is only safe when
+  // no specific contact is being targeted.
+  if (casesWorld.contactWithDataName) {
+    const named = await findContactCardByName(page, casesWorld.contactWithDataName)
+    if (named) {
+      await named.click()
+      return
+    }
+  }
+  // No tracked name, or search found nothing — fall back to the first
+  // card, seeding one through the UI if the directory is empty.
   const card = page.getByTestId('directory-contact-card')
-  // Wait for the directory to settle, seeding a contact through the UI if empty.
   await expect(
     card.first()
       .or(page.getByTestId('contact-list').getByText(/no contacts match/i))
@@ -484,17 +533,22 @@ Then('the contact profile tabs should be visible', async ({ page }) => {
 })
 
 Then('the contact profile content should be visible', async ({ page }) => {
-  const content = page.getByTestId('contact-profile-content')
-    .or(page.getByTestId('contact-profile-empty'))
-  await expect(content.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
+  // contact-profile-content is the decrypted-profile wrapper — it only
+  // renders when the admin device successfully decrypted the contact
+  // summary. Accepting contact-profile-empty here as well (as this used
+  // to) let the assertion pass even when decryption silently failed and
+  // the contact rendered as Restricted, masking issue #796.
+  await expect(page.getByTestId('contact-profile-content')).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 Then('the contact profile empty state should be visible', async ({ page }) => {
-  // Profile may show content or empty — accept either
-  const empty = page.getByTestId('contact-profile-empty')
-  const content = page.getByTestId('contact-profile-content')
-  const combined = empty.or(content)
-  await expect(combined.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
+  // contact-profile-empty is nested inside contact-profile-content and
+  // renders only when decryption succeeded AND no profile fields are set —
+  // exactly what "a contact exists with no profile data" sets up. Accepting
+  // contact-profile-content alone (as this used to) would also pass for a
+  // Restricted/undecryptable contact if it happened to render some other
+  // element with that testid, defeating the point of this assertion.
+  await expect(page.getByTestId('contact-profile-empty')).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 // --- Identifiers tab ---
@@ -558,15 +612,19 @@ Then('the contact cases empty state should be visible', async ({ page }) => {
 Then('the contact relationships list should be visible', async ({ page }) => {
   // The previous steps selected the contact and opened its Relationships tab, and
   // the Given created a relationship — the list (not the empty state) must render.
+  // Rendering this tab depends on the same admin-side HPKE decrypt of the contact
+  // (and its relationship data) that gates the Profile tab — see issue #796 and
+  // Timeouts.DECRYPT's doc comment. Observed timing out under contended CI shard-2
+  // runs at ELEMENT's 10s even for a freshly (correctly) seeded, decryptable contact.
   await expect(page.getByTestId('contact-tab-relationships')).toHaveClass(/border-primary/, { timeout: Timeouts.ELEMENT })
-  await expect(page.getByTestId('contact-relationships-list')).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await expect(page.getByTestId('contact-relationships-list')).toBeVisible({ timeout: Timeouts.DECRYPT })
 })
 
 Then('the contact relationships empty state should be visible', async ({ page }) => {
   const empty = page.getByTestId('contact-relationships-empty')
   const list = page.getByTestId('contact-relationships-list')
   const combined = empty.or(list)
-  await expect(combined.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await expect(combined.first()).toBeVisible({ timeout: Timeouts.DECRYPT })
 })
 
 // --- Groups tab ---
@@ -574,12 +632,12 @@ Then('the contact relationships empty state should be visible', async ({ page })
 Then('the contact groups list should be visible', async ({ page }) => {
   const list = page.getByTestId('contact-groups-list')
     .or(page.getByTestId('contact-groups-empty'))
-  await expect(list.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await expect(list.first()).toBeVisible({ timeout: Timeouts.DECRYPT })
 })
 
 Then('each group should show a member count', async ({ page }) => {
   const items = page.getByTestId('contact-groups-list').getByTestId('contact-group-item')
-  await expect(items.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await expect(items.first()).toBeVisible({ timeout: Timeouts.DECRYPT })
   for (const item of await items.all()) {
     await expect(item.getByTestId('contact-group-member-count')).toHaveText(/\d/)
   }
@@ -589,14 +647,13 @@ Then('the contact groups empty state should be visible', async ({ page }) => {
   const empty = page.getByTestId('contact-groups-empty')
   const list = page.getByTestId('contact-groups-list')
   const combined = empty.or(list)
-  await expect(combined.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await expect(combined.first()).toBeVisible({ timeout: Timeouts.DECRYPT })
 })
 
 // --- Privacy-aware display ---
 
 Given('a contact with PII data exists', async ({ backendRequest: request, casesWorld, workerHub }) => {
-  const contact = await createContactByNameViaApi(request, `PII Contact ${Date.now()}`, { hubId: workerHub })
-  casesWorld.contactWithDataId = (contact as { id: string }).id
+  await createTrackedContact(request, casesWorld, `PII Contact ${Date.now()}`, { hubId: workerHub })
 })
 
 Given('I am logged in as a volunteer without PII access', async ({ page, backendRequest: request }) => {
