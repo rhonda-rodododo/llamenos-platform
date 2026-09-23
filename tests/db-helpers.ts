@@ -65,7 +65,7 @@ export class TestDB {
       throw new Error(`No row found in ${table} where ${idColumn} = '${id}'`)
     }
 
-    const row = rows[0] as { pg_type: string; val: unknown }
+    const row = rows[0] as unknown as { pg_type: string; val: unknown }
     const pgType = row.pg_type
     const value = row.val
 
@@ -198,7 +198,7 @@ export class TestDB {
   /**
    * Update a single column on a row identified by id.
    */
-  static async updateColumn(table: string, id: string, column: string, value: unknown): Promise<void> {
+  static async updateColumn(table: string, id: string, column: string, value: postgres.Serializable): Promise<void> {
     validateIdentifier(table)
     validateIdentifier(column)
     await sql.unsafe(

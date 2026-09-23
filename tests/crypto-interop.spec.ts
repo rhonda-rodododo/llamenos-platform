@@ -376,7 +376,7 @@ async function hpkeUnwrap(
   secretKeyHex: string,
   label: string,
 ): Promise<Uint8Array> {
-  const recipientSk = await hpkeSuite.importKey('raw', hexToBytes(secretKeyHex), false)
+  const recipientSk = await hpkeSuite.importKey('raw', Uint8Array.from(hexToBytes(secretKeyHex)).buffer, false)
   const enc = hexToBytes(envelope.enc)
   const ct = hexToBytes(envelope.ct)
   const info = utf8ToBytes(label)

@@ -109,7 +109,7 @@ export async function wrapKeyForRecipient(
   _senderSkHex: string,
   label: string,
 ): Promise<{ ct: string; enc: string }> {
-  const recipientPub = await hpkeSuite.importKey('raw', hexToBytes(recipientPubkeyHex), true)
+  const recipientPub = await hpkeSuite.importKey('raw', Uint8Array.from(hexToBytes(recipientPubkeyHex)).buffer, true)
   const info = utf8ToBytes(label)
   const aad = utf8ToBytes(`${label}:key-wrap`)
 
@@ -137,7 +137,7 @@ export async function unwrapKey(
   recipientSkHex: string,
   label: string,
 ): Promise<Uint8Array> {
-  const recipientSk = await hpkeSuite.importKey('raw', hexToBytes(recipientSkHex), false)
+  const recipientSk = await hpkeSuite.importKey('raw', Uint8Array.from(hexToBytes(recipientSkHex)).buffer, false)
   const enc = hexToBytes(encHex)
   const ct = hexToBytes(ctHex)
   const info = utf8ToBytes(label)
