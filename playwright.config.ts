@@ -86,7 +86,7 @@ export default defineConfig({
         features: "packages/test-specs/features/**/*.feature",
         steps: "tests/steps/backend/**/*.ts",
         featuresRoot: "packages/test-specs/features",
-        tags: "@backend and not @wip and not @fixme",
+        tags: "@backend and not @wip and not @fixme and not @global-setting",
         // Desktop/mobile-only scenarios have steps not defined in backend — skip them
         missingSteps: "skip-scenario",
       }),
@@ -99,6 +99,33 @@ export default defineConfig({
       // backend-bdd scenarios create a hub per-scenario via workerHub fixture —
       // if bootstrap's test-reset-no-admin runs concurrently, the admin is gone
       // and hub creation returns 401.
+      dependencies: ["bootstrap"],
+    },
+    {
+      // Serial project for @global-setting scenarios (#676, follow-up to #672/#670/#671).
+      // backend-bdd above runs fullyParallel against one shared server; some scenarios
+      // mutate a *global*, server-wide system setting (not scenario- or hub-scoped), which
+      // would poison every concurrent scenario the way #671 did. Those scenarios are tagged
+      // @global-setting and excluded from backend-bdd's tag filter above — this is the only
+      // project allowed to run them, one at a time, with workers:1 forcing serial execution.
+      // Step files for these scenarios are responsible for resetting the setting through the
+      // API in an `After` hook (see tests/steps/backend/webauthn-policy.steps.ts) — this
+      // project intentionally has no separate teardown project, since a per-scenario reset
+      // is required regardless (a later scenario in the same file must never inherit a prior
+      // scenario's mutation either).
+      ...defineBddProject({
+        name: "backend-bdd-global-setting",
+        features: "packages/test-specs/features/**/*.feature",
+        steps: "tests/steps/backend/**/*.ts",
+        featuresRoot: "packages/test-specs/features",
+        tags: "@backend and @global-setting and not @wip and not @fixme",
+        missingSteps: "skip-scenario",
+      }),
+      use: {
+        baseURL: process.env.TEST_HUB_URL || "http://localhost:3000",
+      },
+      fullyParallel: false,
+      workers: 1,
       dependencies: ["bootstrap"],
     },
     {
