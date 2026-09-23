@@ -17,12 +17,101 @@
 //! captured for it (#775, `cert_pin.rs`): `apiCertPins`, written atomically
 //! with `apiBaseUrl` by `api_config_set` and deleted together with it by
 //! `clear()`, so the two can never drift independently.
+//!
+//! ## Confirmation gate on `api_config_clear` (#788)
+//!
+//! `api_config_clear` is destructive — it forgets the configured backend and
+//! forces the app back to first-run — and every `#[tauri::command]` is
+//! reachable from any script running in the webview. Without a gate, a
+//! compromised renderer (or a stray click handler wired to the wrong handler)
+//! could invoke it directly with zero user involvement.
+//!
+//! The gate is a one-time token that only `api_config_request_clear` can
+//! issue, and it only issues one after the user answers a native OS dialog
+//! (`tauri-plugin-dialog`, called from Rust — never exposed to the webview as
+//! its own IPC command). That dialog is rendered outside the webview's
+//! DOM/JS sandbox: a compromised renderer can call `api_config_request_clear`
+//! all day, but it cannot script the resulting native dialog into clicking its
+//! own "confirm" button. `api_config_clear` refuses to run without the exact
+//! token that dialog answer produced; the token is single-use and expires
+//! (`CLEAR_TOKEN_TTL`) so it cannot be hoarded or replayed. See
+//! `src/client/lib/platform.ts::clearConfiguredApiBase` for the frontend side
+//! of this handshake.
 
 use std::net::{Ipv4Addr, Ipv6Addr};
+use std::sync::Mutex;
+use std::time::{Duration, Instant};
 
+use rand::RngCore;
 use tauri::{AppHandle, Manager};
+use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogKind};
 use tauri_plugin_store::StoreExt;
 use url::{Host, Url};
+
+/// How long an issued clear-confirmation token remains valid. Short enough
+/// that a token can't be hoarded and replayed long after the dialog it came
+/// from; long enough that the frontend's immediate follow-up IPC call never
+/// races it. Reduced under test so expiry is verifiable without a fake clock.
+#[cfg(not(test))]
+const CLEAR_TOKEN_TTL: Duration = Duration::from_secs(30);
+#[cfg(test)]
+const CLEAR_TOKEN_TTL: Duration = Duration::from_millis(20);
+
+struct PendingClear {
+    token: String,
+    issued_at: Instant,
+}
+
+/// Holds at most one outstanding clear-confirmation token, issued by
+/// `api_config_request_clear` after a confirmed native dialog and consumed by
+/// `api_config_clear` on a successful match (see `consume_clear_token`).
+#[derive(Default)]
+pub struct ClearConfirmState(Mutex<Option<PendingClear>>);
+
+fn generate_token() -> String {
+    let mut bytes = [0u8; 32];
+    rand::thread_rng().fill_bytes(&mut bytes);
+    hex::encode(bytes)
+}
+
+/// Issues a fresh token, discarding whatever was previously pending — only
+/// the most recently confirmed dialog answer is ever honored.
+fn issue_clear_token(state: &ClearConfirmState) -> String {
+    let token = generate_token();
+    *state.0.lock().expect("clear-confirm mutex poisoned") = Some(PendingClear {
+        token: token.clone(),
+        issued_at: Instant::now(),
+    });
+    token
+}
+
+/// Consumes the pending token if `candidate` matches it and it has not
+/// expired.
+///
+/// Single-use on SUCCESS only: a mismatched guess is refused without
+/// disturbing whatever token is actually pending. If a wrong guess cleared it
+/// instead, anything invoking `api_config_clear` with garbage — an attacker
+/// probing, a retried request, a stale client — would silently invalidate a
+/// real confirmation the user is about to submit, turning a bad guess into a
+/// denial of service against the legitimate flow. An expired token IS cleared
+/// on the first access that notices, since nothing can ever consume it
+/// successfully again.
+fn consume_clear_token(state: &ClearConfirmState, candidate: &str) -> Result<(), String> {
+    let mut guard = state.0.lock().expect("clear-confirm mutex poisoned");
+    let matches = match guard.as_ref() {
+        None => return Err("refused: confirm clearing the server address first".to_string()),
+        Some(pending) if pending.issued_at.elapsed() > CLEAR_TOKEN_TTL => {
+            *guard = None;
+            return Err("refused: confirmation expired — confirm again".to_string());
+        }
+        Some(pending) => pending.token == candidate,
+    };
+    if !matches {
+        return Err("refused: confirm clearing the server address first".to_string());
+    }
+    *guard = None;
+    Ok(())
+}
 
 const CONFIG_STORE: &str = "llamenos-api-config.json";
 const CONFIG_KEY: &str = "apiBaseUrl";
@@ -222,10 +311,44 @@ pub async fn api_config_set(app: AppHandle, url: String) -> Result<String, Strin
     Ok(origin)
 }
 
-/// Forgets the backend address (and its pins), returning the app to
-/// first-run configuration.
+/// Shows a native (Rust-owned) confirmation dialog and, only if the user
+/// confirms, issues a one-time token that `api_config_clear` will accept. See
+/// the module doc comment for why this gate exists and what makes it
+/// resistant to a compromised webview.
 #[tauri::command]
-pub fn api_config_clear(app: AppHandle) -> Result<(), String> {
+pub fn api_config_request_clear(
+    app: AppHandle,
+    state: tauri::State<ClearConfirmState>,
+) -> Result<String, String> {
+    let confirmed = app
+        .dialog()
+        .message(
+            "This forgets the configured server address and returns to first-run setup. \
+             You will need to re-enter it to reconnect.",
+        )
+        .title("Forget server address?")
+        .kind(MessageDialogKind::Warning)
+        .buttons(MessageDialogButtons::OkCancelCustom(
+            "Forget server".to_string(),
+            "Cancel".to_string(),
+        ))
+        .blocking_show();
+    if !confirmed {
+        return Err("cancelled: server address was not cleared".to_string());
+    }
+    Ok(issue_clear_token(&state))
+}
+
+/// Forgets the backend address (and its pins), returning the app to
+/// first-run configuration. Requires `token` from a just-confirmed
+/// `api_config_request_clear` call — see the module doc comment.
+#[tauri::command]
+pub fn api_config_clear(
+    app: AppHandle,
+    state: tauri::State<ClearConfirmState>,
+    token: String,
+) -> Result<(), String> {
+    consume_clear_token(&state, &token)?;
     clear(&app)?;
     app.state::<crate::net::PinnedNet>().clear();
     Ok(())
@@ -310,6 +433,60 @@ mod tests {
                 "{addr} must be rejected even with the dev flag"
             );
         }
+    }
+
+    #[test]
+    fn clear_is_refused_without_ever_requesting_a_token() {
+        let state = ClearConfirmState::default();
+        let err = consume_clear_token(&state, "anything").unwrap_err();
+        assert!(err.contains("confirm"), "{err}");
+    }
+
+    #[test]
+    fn clear_is_refused_with_a_mismatched_token() {
+        let state = ClearConfirmState::default();
+        let real = issue_clear_token(&state);
+        let err = consume_clear_token(&state, &format!("{real}-wrong")).unwrap_err();
+        assert!(err.contains("confirm"), "{err}");
+    }
+
+    #[test]
+    fn a_mismatched_guess_does_not_invalidate_the_real_pending_token() {
+        // A wrong guess must not be able to DoS a confirmation the user is
+        // about to submit — see consume_clear_token's doc comment.
+        let state = ClearConfirmState::default();
+        let real = issue_clear_token(&state);
+        assert!(consume_clear_token(&state, "not-it").is_err());
+        assert!(consume_clear_token(&state, &real).is_ok());
+    }
+
+    #[test]
+    fn a_valid_token_is_single_use() {
+        let state = ClearConfirmState::default();
+        let token = issue_clear_token(&state);
+        assert!(consume_clear_token(&state, &token).is_ok());
+        let err = consume_clear_token(&state, &token).unwrap_err();
+        assert!(err.contains("confirm"), "{err}");
+    }
+
+    #[test]
+    fn issuing_a_new_token_invalidates_the_previous_one() {
+        let state = ClearConfirmState::default();
+        let first = issue_clear_token(&state);
+        let second = issue_clear_token(&state);
+        assert_ne!(first, second);
+        let err = consume_clear_token(&state, &first).unwrap_err();
+        assert!(err.contains("confirm"), "{err}");
+        assert!(consume_clear_token(&state, &second).is_ok());
+    }
+
+    #[test]
+    fn a_token_expires() {
+        let state = ClearConfirmState::default();
+        let token = issue_clear_token(&state);
+        std::thread::sleep(CLEAR_TOKEN_TTL + Duration::from_millis(20));
+        let err = consume_clear_token(&state, &token).unwrap_err();
+        assert!(err.contains("expired"), "{err}");
     }
 
     #[test]

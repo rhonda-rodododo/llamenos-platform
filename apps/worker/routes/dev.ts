@@ -160,6 +160,81 @@ dev.post('/test-a2p-approve-brand', async (c) => {
   return c.json({ ok: true })
 })
 
+// ─── WebAuthn Credential Seeding (BDD test helper, #676) ───────────────────
+// Inserts a WebAuthn credential row directly, bypassing the real attestation
+// ceremony (which needs a real hardware authenticator/private key). Used by
+// BDD scenarios that need an admin WITH a registered passkey — e.g. the
+// requireForAdmins=true success branch of PATCH /settings/webauthn — without
+// simulating WebAuthn crypto end to end.
+
+dev.post('/test-add-webauthn-credential', async (c) => {
+  if (c.env.ENVIRONMENT !== 'development') {
+    return c.json({ error: 'Not Found' }, 404)
+  }
+  if (!checkResetSecret(c)) {
+    return c.json({ error: 'Not Found' }, 404)
+  }
+  const body = await c.req.json().catch(() => ({})) as { pubkey?: string }
+  if (!body.pubkey) {
+    return c.json({ error: 'pubkey is required' }, 400)
+  }
+  let pubkey: string
+  try {
+    pubkey = decodePubkey(body.pubkey)
+  } catch (e) {
+    return c.json({ error: `Invalid pubkey: ${e instanceof Error ? e.message : String(e)}` }, 400)
+  }
+  const services = c.get('services')
+  const credentialId = crypto.randomUUID()
+  await services.identity.addWebAuthnCredential(pubkey, {
+    id: credentialId,
+    publicKey: 'test-fake-public-key',
+    counter: 0,
+    transports: ['internal'],
+    backedUp: false,
+    label: 'Test Passkey (BDD)',
+    createdAt: new Date().toISOString(),
+    lastUsedAt: new Date().toISOString(),
+  })
+  return c.json({ ok: true, credentialId })
+})
+
+// ─── Recovery Session Seeding (BDD test helper — EP09) ──────────────────────
+// Directly creates a recovery_sessions row in an arbitrary status, bypassing
+// the Signal verification ceremony (Phase 1). There is no way to intercept
+// the out-of-band verification code from a black-box BDD test, and no
+// signal-notifier sidecar runs in the test environment — this lets tests
+// start from `verified` and exercise real contribution/completion routes.
+
+dev.post('/test-recovery-seed-session', async (c) => {
+  if (c.env.ENVIRONMENT !== 'development') {
+    return c.json({ error: 'Not Found' }, 404)
+  }
+  if (!checkResetSecret(c)) {
+    return c.json({ error: 'Not Found' }, 404)
+  }
+  const body = await c.req.json().catch(() => ({})) as {
+    hubId?: string
+    userPubkey?: string
+    newDevicePubkey?: string
+    status?: 'pending' | 'verified' | 'active' | 'completed' | 'expired' | 'cancelled'
+    expiresInMs?: number
+  }
+  if (!body.hubId || !body.userPubkey || !body.newDevicePubkey) {
+    return c.json({ error: 'hubId, userPubkey, and newDevicePubkey are required' }, 400)
+  }
+  const services = c.get('services')
+  const result = await services.recoveryGroup.seedSessionForTesting({
+    hubId: body.hubId,
+    userPubkey: body.userPubkey,
+    newDevicePubkey: body.newDevicePubkey,
+    status: body.status ?? 'verified',
+    // Default: already-elapsed delay, so tests don't need to wait out a real timer.
+    expiresInMs: body.expiresInMs ?? -1000,
+  })
+  return c.json(result)
+})
+
 // ─── Rate Limit Reset (BDD test helper) ─────────────────────────────────────
 // Clears rate limit counters — prevents cross-scenario bleed in BDD tests.
 // Accepts optional ?prefix= query param to clear only matching keys (safer for parallel tests).

@@ -16,7 +16,7 @@
 # Bun runs TypeScript natively — no esbuild transpilation step needed.
 
 # Stage 1: Install runtime deps
-FROM oven/bun:1.4.0@sha256:5ff609364c049b54eb0ff560ec96319729a972078ef2c755d758f0c6ef89c2d6 AS deps
+FROM oven/bun:1.4.2@sha256:9114c058aeae42162ee16dd5084b95fe9473970bb6bcb5b232ab1630f0546895 AS deps
 # This runtime base is pinned independently of .mise.toml's `bun = "1.3.5"`.
 # .mise.toml pins the *developer/CI tool* version (kept in sync with
 # .github/workflows/ci.yml's bun-version input); this image is the
@@ -41,7 +41,7 @@ COPY site/package.json site/package.json
 RUN bun install --frozen-lockfile --production --ignore-scripts
 
 # Stage 2: Build Rust crypto FFI (.so)
-FROM rust:1-slim@sha256:cc0448b41c3b7b7fea44f5dc50eacba729a56db365b65b7bd5e8a82d5b3db078 AS rust-builder
+FROM rust:1-slim@sha256:f47a8de237dcbb0b0ce1099901e60a89728e3d51f24e664b40e947171538ade7 AS rust-builder
 RUN apt-get update && apt-get install -y --no-install-recommends pkg-config && rm -rf /var/lib/apt/lists/*
 WORKDIR /build
 COPY packages/crypto/ packages/crypto/
@@ -50,7 +50,7 @@ RUN cargo build --release --manifest-path packages/crypto/Cargo.toml --features 
     && cp packages/crypto/target/release/libllamenos_core.so packages/crypto/dist/server/
 
 # Stage 3: Production
-FROM oven/bun:1.4.0-slim@sha256:e0ee68d16ccb9927bf02aa7dd8fd4bf3369ee6d46da04faa72b05ce8bfd135f6 AS app
+FROM oven/bun:1.4.2-slim@sha256:cb3bbbb08e13a4a2ff400f24c7a2a1d5efa83f6ef8544d52d95a519631e2fc61 AS app
 # Pinned independently of .mise.toml's dev/CI `bun = "1.3.5"` — see the
 # `deps` stage comment above for why the two are allowed to diverge. Update
 # via Dependabot.
@@ -120,7 +120,7 @@ CMD []
 
 # Stage 4: Install full JS deps (incl. devDependencies) for the SPA build.
 # Separate from the `deps` stage above, which installs --production only.
-FROM oven/bun:1.4.0@sha256:5ff609364c049b54eb0ff560ec96319729a972078ef2c755d758f0c6ef89c2d6 AS frontend-deps
+FROM oven/bun:1.4.2@sha256:9114c058aeae42162ee16dd5084b95fe9473970bb6bcb5b232ab1630f0546895 AS frontend-deps
 WORKDIR /app
 COPY package.json bun.lockb ./
 COPY packages/crypto/package.json packages/crypto/package.json

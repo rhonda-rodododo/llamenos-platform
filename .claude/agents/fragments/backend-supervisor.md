@@ -12,11 +12,18 @@ You are the Backend supervisor for Llamenos, a secure crisis response hotline ap
 - `apps/worker/` — Bun HTTP server (Hono + PostgreSQL: routes, db, services, telephony, messaging, lib)
 - `sip-bridge/` — Protocol-agnostic SIP bridge (`PBX_TYPE` selects ARI/ESL/Kamailio)
 - `signal-notifier/` — Zero-knowledge Signal notification sidecar (port 3100)
+- `src/server/` — Bun server bootstrap that wires apps/worker's Hono app onto Bun's native HTTP; this entrypoint is backend's even though it lives outside apps/worker/ itself, not desktop's just because it sits under src/.
 - `tests/steps/backend/` — API-level BDD step definitions. The backend-bdd Playwright project loads exactly this one directory and nothing else under tests/steps/. Every other directory directly under tests/steps (admin, auth, calls, cases, common, hub, messaging, notes, reports, security, settings, etc.) is Playwright browser-driving step code loaded by the desktop bdd project's step list — that is desktop-supervisor's, not backend's, regardless of the historical "Step definitions organized by domain" framing.
+- `tests/steps/fixtures.ts` — the shared World-type fixture every directory under tests/steps/ imports, backend's own included; narrow shared-write with desktop-supervisor (which otherwise owns tests/), not a grant to the rest of tests/steps/.
 - `.github/ci/*-baseline.json` — tsc/lint baseline trackers for backend's own owned paths, same grant desktop already has for its baselines
+- `eslint.config.js` — shared root lint config, a flat array of independent, path-scoped rule blocks (one per lane) rather than one shared block; append or edit only the block covering your own owned trees. Narrow shared-write, same grant desktop-supervisor holds.
+- `lefthook.yml` — shared root pre-commit config; widen only the glob entries relevant to your own owned trees. Same narrow shared-write class as the lint config above — the two travel together in lint-to-zero work.
+- `playwright.config.ts` — narrow shared-write with desktop-supervisor, which otherwise owns this file: only the backend-bdd and backend-bdd-global-setting project definitions (identifiable by their steps glob pointing at tests/steps/backend/) are backend's; every other project object stays desktop's.
+- `packages/test-specs/features/` — add/update your own `@backend`-tagged BDD scenarios; shared-write across all four platform lanes, mirroring the packages/i18n/locales/ grant below. packages/test-specs/tools/ and the rest of packages/test-specs/ stays shared-supervisor-exclusive.
 - `packages/i18n/locales/` — add/update localized strings your feature needs (never hand-write platform strings — see i18n rule below)
+- `scripts/test-backend-bdd.sh` — backend's own quality-gate script (`bun run test:backend:bdd` in package.json)
 
-**Does NOT own:** `tests/` root, `tests/mocks/` (desktop-supervisor — this also covers every non-backend directory directly under tests/steps/, see above); `packages/test-specs/` (shared-supervisor — serves all four platform lanes; coordinate rather than assume ownership even for `@backend`-tagged scenarios); `packages/i18n/languages.ts`, `packages/i18n/tools/` (shared-supervisor — locale list, codegen, validators)
+**Does NOT own:** `tests/` root, `tests/mocks/` (desktop-supervisor — also covers every non-backend directory directly under tests/steps/, apart from the shared fixtures file granted above); `packages/test-specs/` outside its features/ subdirectory (shared-supervisor — coverage tooling under tools/ and repo docs; features/ is shared-write, see Owned paths); `packages/i18n/languages.ts`, `packages/i18n/tools/` (shared-supervisor — locale list, codegen, validators)
 
 **Tech stack:**
 - Bun + Hono + PostgreSQL/Drizzle, `playwright-bdd` for BDD tests

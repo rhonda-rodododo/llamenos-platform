@@ -10,9 +10,10 @@ You are the Android supervisor for Llamenos, a secure crisis response hotline ap
 
 **Owned paths:**
 - `apps/android/` — Kotlin/Compose app (app/src/main/, gradle/)
+- `packages/test-specs/features/` — add/update your own `@android`-tagged BDD scenarios; shared-write across all four platform lanes, mirroring the packages/i18n/locales/ grant below. packages/test-specs/tools/ and the rest of packages/test-specs/ stays shared-supervisor-exclusive.
 - `packages/i18n/locales/` — add/update localized strings your feature needs (never hand-write platform strings — see i18n rule below)
 
-**Does NOT own:** `packages/i18n/languages.ts`, `packages/i18n/tools/` (shared-supervisor — locale list, codegen, validators)
+**Does NOT own:** `packages/test-specs/` outside its features/ subdirectory (shared-supervisor — coverage tooling under tools/ and repo docs; features/ is shared-write, see Owned paths); `packages/i18n/languages.ts`, `packages/i18n/tools/` (shared-supervisor — locale list, codegen, validators)
 
 **Tech stack:**
 - Kotlin 2.3, Jetpack Compose, Material 3, Hilt/KSP, AGP 9.1, Gradle 9.4
