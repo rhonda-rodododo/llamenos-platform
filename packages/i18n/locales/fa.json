@@ -462,7 +462,9 @@
     "rateLimitTitle": "تغییر محدودسازی نرخ",
     "transcriptionDisable": "رونویسی تماس غیرفعال شود؟ تماس‌های کاربران دیگر به صورت خودکار رونویسی نخواهد شد.",
     "transcriptionEnable": "رونویسی تماس برای همه داوطلبان فعال شود؟ این از هوش مصنوعی برای رونویسی آنی تماس‌ها استفاده می‌کند.",
-    "transcriptionTitle": "تغییر تنظیمات رونویسی"
+    "transcriptionTitle": "تغییر تنظیمات رونویسی",
+    "biometricDisable": "باز کردن قفل بیومتریک غیرفعال شود؟ همچنان می‌توانید با پین قفل را باز کنید.",
+    "biometricDisableTitle": "غیرفعال کردن باز کردن قفل بیومتریک"
   },
   "contacts": {
     "noContacts": "هنوز مخاطبی نیست",
@@ -1244,7 +1246,11 @@
     "encryptionPubkey": "Encryption Public Key",
     "logoutDescription": "Are you sure you want to log out? Your encrypted keys will be removed from this device.",
     "logoutTitle": "Log Out",
-    "signingPubkey": "Signing Public Key"
+    "signingPubkey": "Signing Public Key",
+    "biometricDesc": "به‌جای تایپ پین، با اثر انگشت یا چهره خود قفل را باز کنید. پین شما همچنان کار می‌کند و هرگز غیرفعال نمی‌شود.",
+    "biometricEnrolled": "باز کردن قفل بیومتریک در این دستگاه فعال است.",
+    "biometricInvalidated": "اطلاعات بیومتریک دستگاه شما تغییر کرده، بنابراین باز کردن قفل بیومتریک غیرفعال شد. آن را در پایین دوباره فعال کنید یا از پین خود استفاده کنید.",
+    "biometricPinPrompt": "برای فعال کردن باز کردن قفل بیومتریک، پین خود را وارد کنید"
   },
   "serverAddress": {
     "checking": "Checking...",
@@ -1864,6 +1870,7 @@
   },
   "webauthn": {
     "browserNotSupported": "مرورگر شما از کلیدهای عبور پشتیبانی نمی‌کند.",
+    "credentialRequiredError": "پیش از الزامی کردن کلید عبور برای مدیران، یک کلید عبور ثبت کنید.",
     "deleteKey": "حذف",
     "description": "از بیومتریک دستگاه یا PIN برای ورود بدون کلید محرمانه استفاده کنید.",
     "label": "نام کلید عبور (مثلا «تلفن من»)",

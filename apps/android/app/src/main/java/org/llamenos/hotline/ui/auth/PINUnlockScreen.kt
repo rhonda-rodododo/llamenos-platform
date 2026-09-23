@@ -68,7 +68,10 @@ fun PINUnlockScreen(
     val uiState by viewModel.uiState.collectAsState()
     var localPin by remember { mutableStateOf("") }
     val context = LocalContext.current
-    val hasBiometricPIN = remember { viewModel.hasBiometricPIN() }
+    // Mutable (not a one-shot `remember`): a tap that discovers the biometric
+    // key was invalidated (device biometrics changed) must hide this button
+    // immediately and fall back to the PIN pad below, which is unaffected.
+    var biometricAvailable by remember { mutableStateOf(viewModel.hasBiometricPIN()) }
 
     // Countdown ticker: fires every second while locked out
     var lockoutSecondsRemaining by remember { mutableStateOf(0L) }
@@ -257,14 +260,20 @@ fun PINUnlockScreen(
                         modifier = Modifier.fillMaxWidth(),
                     ) {
                         // Use biometric button (when biometric-protected PIN is configured)
-                        if (hasBiometricPIN && !uiState.isLockedOut) {
+                        if (biometricAvailable && !uiState.isLockedOut) {
                             val biometricTitle = stringResource(R.string.biometric_unlock_title)
                             val biometricSubtitle = stringResource(R.string.biometric_unlock_subtitle)
                             val usePinText = stringResource(R.string.use_pin_instead)
                             OutlinedButton(
                                 onClick = {
                                     val decryptCipher = viewModel.getBiometricDecryptCipher()
-                                        ?: return@OutlinedButton
+                                    if (decryptCipher == null) {
+                                        // Nothing enrolled, or the key was just invalidated by a
+                                        // biometric change (already wiped by the view model) —
+                                        // hide the button so the PIN pad is the only path forward.
+                                        biometricAvailable = false
+                                        return@OutlinedButton
+                                    }
                                     val executor = ContextCompat.getMainExecutor(context)
                                     val biometricPrompt = BiometricPrompt(
                                         context as FragmentActivity,

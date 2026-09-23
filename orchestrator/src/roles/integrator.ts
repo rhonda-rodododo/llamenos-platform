@@ -186,7 +186,10 @@ export async function revertMerge(input: { worktree: string; mergeCommitSha: str
     '--base', 'main',
   ])).trim()
 
-  halt(`post-merge CI went red at ${mergeCommitSha} (still HEAD of main at detection) — opened ${prUrl} and halted the fleet`)
+  // Issue #838: awaited so the BLOCKED ping halt() sends is actually
+  // in flight before this one-shot process can exit — see circuit.ts's
+  // checkBreakers for the same reasoning.
+  await halt(`post-merge CI went red at ${mergeCommitSha} (still HEAD of main at detection) — opened ${prUrl} and halted the fleet`)
 
   return { reverted: true, revertPr: prUrl, reason: 'CI red on the most recent commit on main — opened a revert PR and halted' }
 }

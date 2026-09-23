@@ -41,6 +41,9 @@ import org.llamenos.hotline.ui.dashboard.DashboardScreen
 import org.llamenos.hotline.ui.dashboard.DashboardViewModel
 import org.llamenos.hotline.ui.notes.NotesScreen
 import org.llamenos.hotline.ui.notes.NotesViewModel
+import org.llamenos.hotline.ui.settings.BiometricSectionEvent
+import org.llamenos.hotline.ui.settings.BiometricSectionState
+import org.llamenos.hotline.ui.settings.BiometricSettingsViewModel
 import org.llamenos.hotline.ui.settings.SettingsScreen
 import org.llamenos.hotline.ui.shifts.ShiftsScreen
 import org.llamenos.hotline.ui.shifts.ShiftsViewModel
@@ -126,6 +129,8 @@ fun MainScreen(
     val shiftsViewModel: ShiftsViewModel = hiltViewModel()
     val demoBannerViewModel: DemoBannerViewModel = hiltViewModel()
     val demoBannerUiState by demoBannerViewModel.uiState.collectAsState()
+    val biometricSettingsViewModel: BiometricSettingsViewModel = hiltViewModel()
+    val biometricSettingsUiState by biometricSettingsViewModel.uiState.collectAsState()
 
     // Unread count for conversations badge
     val conversationsUiState by conversationsViewModel.uiState.collectAsState()
@@ -274,6 +279,27 @@ fun MainScreen(
                         onNavigateToAdmin = onNavigateToAdmin,
                         onNavigateToDeviceLink = onNavigateToDeviceLink,
                         onNavigateToErasure = onNavigateToErasure,
+                        biometricState = BiometricSectionState(
+                            enrolled = biometricSettingsUiState.isEnrolled,
+                            verifyingPin = biometricSettingsUiState.isVerifyingPin,
+                            pinError = biometricSettingsUiState.pinError,
+                            statusMessage = biometricSettingsUiState.statusMessage,
+                            enrollCipher = biometricSettingsUiState.enrollCipher,
+                        ),
+                        onBiometricEvent = { event ->
+                            when (event) {
+                                is BiometricSectionEvent.SubmitPin ->
+                                    biometricSettingsViewModel.beginEnrollment(event.pin)
+                                is BiometricSectionEvent.DismissPinDialog ->
+                                    biometricSettingsViewModel.cancelEnrollment()
+                                is BiometricSectionEvent.EnrollSucceeded ->
+                                    biometricSettingsViewModel.completeEnrollment(event.cipher)
+                                is BiometricSectionEvent.EnrollCancelled ->
+                                    biometricSettingsViewModel.cancelEnrollment()
+                                is BiometricSectionEvent.Disable ->
+                                    biometricSettingsViewModel.unenroll()
+                            }
+                        },
                     )
                 }
             }

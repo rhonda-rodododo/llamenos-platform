@@ -1457,7 +1457,9 @@
     "rateLimitTitle": "속도 제한 변경",
     "transcriptionDisable": "통화 전사를 비활성화하시겠습니까? 자원봉사자의 통화가 더 이상 자동으로 전사되지 않습니다.",
     "transcriptionEnable": "모든 자원봉사자에 대해 통화 전사를 활성화하시겠습니까? 이 기능은 AI를 사용하여 실시간으로 통화를 전사합니다.",
-    "transcriptionTitle": "전사 설정 변경"
+    "transcriptionTitle": "전사 설정 변경",
+    "biometricDisable": "생체 인식 잠금 해제를 끄시겠습니까? PIN으로는 계속 잠금을 해제할 수 있습니다.",
+    "biometricDisableTitle": "생체 인식 잠금 해제 끄기"
   },
   "connectWithOauth": "Connect with OAuth",
   "connectionFailed": "Connection failed",
@@ -3734,7 +3736,11 @@
     "transcriptionSettings": "전사",
     "version": "Version",
     "voicemail": "Voicemail",
-    "webrtcNotConfigured": "브라우저 통화를 사용할 수 없습니다. 관리자가 전화 서비스 제공업체 설정에서 WebRTC를 활성화해야 합니다."
+    "webrtcNotConfigured": "브라우저 통화를 사용할 수 없습니다. 관리자가 전화 서비스 제공업체 설정에서 WebRTC를 활성화해야 합니다.",
+    "biometricDesc": "PIN을 입력하는 대신 지문이나 얼굴로 잠금을 해제하세요. PIN은 계속 작동하며 절대 비활성화되지 않습니다.",
+    "biometricEnrolled": "이 기기에서 생체 인식 잠금 해제가 켜져 있습니다.",
+    "biometricInvalidated": "기기의 생체 인식 정보가 변경되어 생체 인식 잠금 해제가 꺼졌습니다. 아래에서 다시 활성화하거나 PIN을 계속 사용하세요.",
+    "biometricPinPrompt": "생체 인식 잠금 해제를 활성화하려면 PIN을 입력하세요"
   },
   "serverAddress": {
     "checking": "Checking...",
@@ -4557,6 +4563,7 @@
   "voiceStatusWebhook": "Voice Status Webhook",
   "webauthn": {
     "browserNotSupported": "브라우저가 패스키를 지원하지 않습니다.",
+    "credentialRequiredError": "관리자에게 패스키를 요구하기 전에 먼저 패스키를 등록하세요.",
     "deleteKey": "삭제",
     "description": "비밀 키 없이 기기 생체 인식 또는 PIN으로 로그인하세요.",
     "label": "패스키 이름 (예: \"내 휴대폰\")",

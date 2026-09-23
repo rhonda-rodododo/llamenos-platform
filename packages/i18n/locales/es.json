@@ -1457,7 +1457,9 @@
     "rateLimitTitle": "Cambiar Límite de Frecuencia",
     "transcriptionDisable": "¿Deshabilitar la transcripción de llamadas? Los voluntarios ya no tendrán las llamadas transcritas automáticamente.",
     "transcriptionEnable": "¿Habilitar la transcripción de llamadas para todos los voluntarios? Esto usa IA para transcribir llamadas en tiempo real.",
-    "transcriptionTitle": "Cambiar Configuración de Transcripción"
+    "transcriptionTitle": "Cambiar Configuración de Transcripción",
+    "biometricDisable": "¿Desactivar el desbloqueo biométrico? Podrás seguir desbloqueando con tu PIN.",
+    "biometricDisableTitle": "Desactivar Desbloqueo Biométrico"
   },
   "connectWithOauth": "Connect with OAuth",
   "connectionFailed": "Connection failed",
@@ -3734,7 +3736,11 @@
     "transcriptionSettings": "Transcripción",
     "version": "Version",
     "voicemail": "Voicemail",
-    "webrtcNotConfigured": "Las llamadas por navegador no están disponibles. Tu administrador necesita habilitar WebRTC en la configuración del proveedor de telefonía."
+    "webrtcNotConfigured": "Las llamadas por navegador no están disponibles. Tu administrador necesita habilitar WebRTC en la configuración del proveedor de telefonía.",
+    "biometricDesc": "Desbloquea con tu huella dactilar o rostro en lugar de escribir tu PIN. Tu PIN sigue funcionando y nunca se desactiva.",
+    "biometricEnrolled": "El desbloqueo biométrico está activado en este dispositivo.",
+    "biometricInvalidated": "La biometría de tu dispositivo cambió, por lo que el desbloqueo biométrico se desactivó. Vuelve a activarlo abajo o continúa usando tu PIN.",
+    "biometricPinPrompt": "Introduce tu PIN para activar el desbloqueo biométrico"
   },
   "serverAddress": {
     "checking": "Checking...",
@@ -4557,6 +4563,7 @@
   "voiceStatusWebhook": "Voice Status Webhook",
   "webauthn": {
     "browserNotSupported": "Tu navegador no soporta claves de acceso.",
+    "credentialRequiredError": "Registra una clave de acceso antes de exigir claves de acceso para los administradores.",
     "deleteKey": "Eliminar",
     "description": "Usa la biometría o PIN de tu dispositivo para iniciar sesión sin tu clave secreta.",
     "label": "Nombre de la clave de acceso (ej. \"Mi Teléfono\")",

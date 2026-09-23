@@ -208,6 +208,23 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * Extract the machine-readable `code` from an ApiError's JSON body, if present.
+ * Server error responses follow `errorResponseSchema` (`@protocol/schemas`):
+ * `{ error: string, code?: string, ... }`. Returns undefined for non-ApiErrors,
+ * unparseable bodies, or bodies without a `code` field — callers should always
+ * fall back to a generic error message in that case.
+ */
+export function getApiErrorCode(err: unknown): string | undefined {
+  if (!(err instanceof ApiError)) return undefined
+  try {
+    const parsed = JSON.parse(err.body) as { code?: string }
+    return parsed.code
+  } catch {
+    return undefined
+  }
+}
+
 export class NetworkError extends Error {
   constructor(message: string, public cause?: Error) {
     super(message)

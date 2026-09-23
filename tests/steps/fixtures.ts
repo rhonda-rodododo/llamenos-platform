@@ -36,6 +36,10 @@ export type CasesWorld = {
   contactCarlosId: string
   contactMariaId: string
   contactWithDataId: string
+  // Display name used to create contactWithDataId — lets steps locate it
+  // deterministically via the directory search box instead of guessing at
+  // the first rendered card in a shared, accumulating hub (issue #796).
+  contactWithDataName: string
   // Triage
   triageReportTypeId: string
   triageReportId: string
@@ -148,7 +152,7 @@ export const test = base.extend<
       createdCaseTitle: '', lastCreatedRecordId: '', volunteerPubkey: '', lastRecordId: '',
       initialFieldCount: 0,
       eventEntityTypeId: '', lastEventId: '', lastEventName: '',
-      contactCarlosId: '', contactMariaId: '', contactWithDataId: '',
+      contactCarlosId: '', contactMariaId: '', contactWithDataId: '', contactWithDataName: '',
       triageReportTypeId: '', triageReportId: '',
     })
   },

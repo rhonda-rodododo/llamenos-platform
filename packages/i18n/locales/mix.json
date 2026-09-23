@@ -462,7 +462,9 @@
     "rateLimitTitle": "Nasama Límite de Llamada",
     "transcriptionDisable": "¿Tási transcripción de llamada? Ña̱yivi ña koo transcripción automática de llamada.",
     "transcriptionEnable": "¿Xíni̱ñúꞌú transcripción de llamada ña ndiꞌi voluntario? Kuniñúꞌú AI ña transcribir llamada en tiempo real.",
-    "transcriptionTitle": "Nasama Configuración de Transcripción"
+    "transcriptionTitle": "Nasama Configuración de Transcripción",
+    "biometricDisable": "Turn off biometric unlock? You'll still be able to unlock with your PIN.",
+    "biometricDisableTitle": "Turn Off Biometric Unlock"
   },
   "contacts": {
     "noContacts": "Ta̱ꞌán contacto",
@@ -1244,7 +1246,11 @@
     "encryptionPubkey": "Encryption Public Key",
     "logoutDescription": "Are you sure you want to log out? Your encrypted keys will be removed from this device.",
     "logoutTitle": "Log Out",
-    "signingPubkey": "Signing Public Key"
+    "signingPubkey": "Signing Public Key",
+    "biometricDesc": "Unlock with your fingerprint or face instead of typing your PIN. Your PIN still works and is never disabled.",
+    "biometricEnrolled": "Biometric unlock is on for this device.",
+    "biometricInvalidated": "Your device's biometrics changed, so biometric unlock was turned off. Re-enable it below, or continue using your PIN.",
+    "biometricPinPrompt": "Enter your PIN to enable biometric unlock"
   },
   "serverAddress": {
     "checking": "Checking...",
@@ -1864,6 +1870,7 @@
   },
   "webauthn": {
     "browserNotSupported": "Navegador miíún ña xáꞌnda chiꞌña ji passkey.",
+    "credentialRequiredError": "Chikaa iin passkey nu̱ú xíni̱ñúꞌú ña admin.",
     "deleteKey": "Xíta",
     "description": "Kuniñúꞌú biométrico xi PIN de dispositivo miíún ña kivi ñá xíni̱ñúꞌú llave secreta.",
     "label": "Sivi passkey (ejemplo \"Teléfono Mií\")",

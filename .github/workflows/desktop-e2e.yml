@@ -151,24 +151,6 @@ jobs:
           name: app-build
           path: dist
 
-      # Keyed on BOTH lockfiles (not just packages/crypto's) so a change to
-      # either invalidates the cache. This cache backs both the crypto interop
-      # step below AND tests/tauri-lockfile-consistency.spec.ts's
-      # `cargo metadata --locked --manifest-path apps/desktop/Cargo.toml` call
-      # — see the "Warm cargo cache for apps/desktop" step for why that
-      # matters (#927: a cold `~/.cargo/registry`/`~/.cargo/git` made that
-      # check's resolve slow enough to look like a hang).
-      - name: Cache Rust build artifacts
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            packages/crypto/target
-          key: rust-crypto-${{ runner.os }}-${{ hashFiles('packages/crypto/Cargo.lock', 'apps/desktop/Cargo.lock') }}
-          restore-keys: |
-            rust-crypto-${{ runner.os }}-
-
       - name: Get Playwright version
         id: playwright-version
         run: echo "version=$(bunx playwright --version | awk '{print $2}')" >> "$GITHUB_OUTPUT"
@@ -202,10 +184,23 @@ jobs:
         with:
           toolchain: stable
 
+      # Keyed on BOTH lockfiles (not just packages/crypto's) so a change to
+      # either invalidates the cache. This cache backs both the crypto interop
+      # step below AND tests/tauri-lockfile-consistency.spec.ts's
+      # `cargo metadata --locked --manifest-path apps/desktop/Cargo.toml` call
+      # — see the "Warm cargo cache for apps/desktop" step for why that
+      # matters (#927: a cold `~/.cargo/registry`/`~/.cargo/git` made that
+      # check's resolve slow enough to look like a hang). rust-cache is the
+      # sole owner of `~/.cargo/registry`, `~/.cargo/git` and each listed
+      # workspace's `target` dir — a second hand-rolled `actions/cache` step
+      # targeting the same paths raced this one's save/restore lifecycle and
+      # produced a cache that matched neither key (#901).
       - name: Rust cache
         uses: swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
         with:
-          workspaces: packages/crypto
+          workspaces: |
+            packages/crypto
+            apps/desktop
 
       - name: Generate interop test vectors
         run: cargo test --manifest-path packages/crypto/Cargo.toml --test interop

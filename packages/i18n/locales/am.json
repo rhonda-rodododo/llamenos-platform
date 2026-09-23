@@ -462,7 +462,9 @@
     "rateLimitTitle": "የፍጥነት ገደብ ቀይር",
     "transcriptionDisable": "የጥሪ ግልባጭ ይሰናከል? ተጠቃሚዎች ከእንግዲህ ጥሪዎች በራስ-ሰር አይገለበጡም።",
     "transcriptionEnable": "ለሁሉም ፈቃደኞች የጥሪ ግልባጭ ይነቃ? ይህ ጥሪዎችን በቅጽበት ለመገልበጥ AI ይጠቀማል።",
-    "transcriptionTitle": "የግልባጭ ቅንብር ቀይር"
+    "transcriptionTitle": "የግልባጭ ቅንብር ቀይር",
+    "biometricDisable": "Turn off biometric unlock? You'll still be able to unlock with your PIN.",
+    "biometricDisableTitle": "Turn Off Biometric Unlock"
   },
   "contacts": {
     "noContacts": "ገና እውቂያዎች የሉም",
@@ -1244,7 +1246,11 @@
     "encryptionPubkey": "Encryption Public Key",
     "logoutDescription": "Are you sure you want to log out? Your encrypted keys will be removed from this device.",
     "logoutTitle": "Log Out",
-    "signingPubkey": "Signing Public Key"
+    "signingPubkey": "Signing Public Key",
+    "biometricDesc": "Unlock with your fingerprint or face instead of typing your PIN. Your PIN still works and is never disabled.",
+    "biometricEnrolled": "Biometric unlock is on for this device.",
+    "biometricInvalidated": "Your device's biometrics changed, so biometric unlock was turned off. Re-enable it below, or continue using your PIN.",
+    "biometricPinPrompt": "Enter your PIN to enable biometric unlock"
   },
   "serverAddress": {
     "checking": "Checking...",
@@ -1864,6 +1870,7 @@
   },
   "webauthn": {
     "browserNotSupported": "አሳሽዎ የመለያ ቁልፎችን አይደግፍም።",
+    "credentialRequiredError": "ለአስተዳዳሪዎች ከማስፈለጉ በፊት የመለያ ቁልፍ ይመዝገቡ።",
     "deleteKey": "ሰርዝ",
     "description": "ያለ ሚስጥራዊ ቁልፍ ለመግባት የመሣሪያዎን ባዮሜትሪክ ወይም PIN ይጠቀሙ።",
     "label": "የመለያ ቁልፍ ስም (ለምሳሌ \"ስልኬ\")",

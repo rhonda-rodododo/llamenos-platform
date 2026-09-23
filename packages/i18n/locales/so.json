@@ -462,7 +462,9 @@
     "rateLimitTitle": "Bedel Xadaynta Tirada",
     "transcriptionDisable": "Dami qoraal u rogidda wicitaannada? Isticmaalayaashu mar dambe uma qoraal u rogmi doonaan wicitaannooda si otomaatig ah.",
     "transcriptionEnable": "U shid qoraal u rogidda wicitaannada dhammaan mutadawwiciinta? Tani waxay isticmaashaa AI si ay u qoraal u rogto wicitaannada wakhtiga dhabta ah.",
-    "transcriptionTitle": "Bedel Dejinta Qoraal u Rogidda"
+    "transcriptionTitle": "Bedel Dejinta Qoraal u Rogidda",
+    "biometricDisable": "Turn off biometric unlock? You'll still be able to unlock with your PIN.",
+    "biometricDisableTitle": "Turn Off Biometric Unlock"
   },
   "contacts": {
     "noContacts": "Xiriiriyayaal ma jiraan wali",
@@ -1244,7 +1246,11 @@
     "encryptionPubkey": "Encryption Public Key",
     "logoutDescription": "Are you sure you want to log out? Your encrypted keys will be removed from this device.",
     "logoutTitle": "Log Out",
-    "signingPubkey": "Signing Public Key"
+    "signingPubkey": "Signing Public Key",
+    "biometricDesc": "Unlock with your fingerprint or face instead of typing your PIN. Your PIN still works and is never disabled.",
+    "biometricEnrolled": "Biometric unlock is on for this device.",
+    "biometricInvalidated": "Your device's biometrics changed, so biometric unlock was turned off. Re-enable it below, or continue using your PIN.",
+    "biometricPinPrompt": "Enter your PIN to enable biometric unlock"
   },
   "serverAddress": {
     "checking": "Checking...",
@@ -1864,6 +1870,7 @@
   },
   "webauthn": {
     "browserNotSupported": "Biraawsarkaagu kuma taageerayo furayaasha amniga.",
+    "credentialRequiredError": "Diiwaangeli furaha amniga ka hor intaadan u baahan furayaasha amniga maamulayaasha.",
     "deleteKey": "Tirtir",
     "description": "Isticmaal sawirka faraha ama PIN qalabkaaga si aad ugu gasho furuhaaga sirta ah la'aantii.",
     "label": "Magaca furaha amniga (tusaale \"Taleefankayga\")",

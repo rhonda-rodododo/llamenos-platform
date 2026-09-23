@@ -462,7 +462,9 @@
     "rateLimitTitle": "ခေါ်ဆိုမှုကန့်သတ်ချက် ပြောင်းလဲမည်",
     "transcriptionDisable": "ခေါ်ဆိုမှုစာသားပြောင်းခြင်း ပိတ်မည်လား? အသုံးပြုသူများ၏ ခေါ်ဆိုမှုများကို နောက်ထပ် အလိုအလျောက် စာသားပြောင်းမည်မဟုတ်ပါ။",
     "transcriptionEnable": "စေတနာ့ဝန်ထမ်းအားလုံးအတွက် ခေါ်ဆိုမှုစာသားပြောင်းခြင်း ဖွင့်မည်လား? ၎င်းသည် AI ဖြင့် ခေါ်ဆိုမှုများကို အချိန်နှင့်တပြေးညီ စာသားပြောင်းသည်။",
-    "transcriptionTitle": "စာသားပြောင်းခြင်း ဆက်တင်ပြောင်းလဲမည်"
+    "transcriptionTitle": "စာသားပြောင်းခြင်း ဆက်တင်ပြောင်းလဲမည်",
+    "biometricDisable": "Turn off biometric unlock? You'll still be able to unlock with your PIN.",
+    "biometricDisableTitle": "Turn Off Biometric Unlock"
   },
   "contacts": {
     "noContacts": "အဆက်အသွယ် မရှိသေးပါ",
@@ -1244,7 +1246,11 @@
     "encryptionPubkey": "Encryption Public Key",
     "logoutDescription": "Are you sure you want to log out? Your encrypted keys will be removed from this device.",
     "logoutTitle": "Log Out",
-    "signingPubkey": "Signing Public Key"
+    "signingPubkey": "Signing Public Key",
+    "biometricDesc": "Unlock with your fingerprint or face instead of typing your PIN. Your PIN still works and is never disabled.",
+    "biometricEnrolled": "Biometric unlock is on for this device.",
+    "biometricInvalidated": "Your device's biometrics changed, so biometric unlock was turned off. Re-enable it below, or continue using your PIN.",
+    "biometricPinPrompt": "Enter your PIN to enable biometric unlock"
   },
   "serverAddress": {
     "checking": "Checking...",
@@ -1864,6 +1870,7 @@
   },
   "webauthn": {
     "browserNotSupported": "သင့်ဘရောက်ဇာသည် Passkeys ကို ပံ့ပိုးမပေးပါ။",
+    "credentialRequiredError": "စီမံခန့်ခွဲသူများအတွက် Passkey လိုအပ်ခြင်းမပြုမီ Passkey တစ်ခု မှတ်ပုံတင်ပါ။",
     "deleteKey": "ဖျက်မည်",
     "description": "သင့်လျှို့ဝှက်သော့မလိုဘဲ ဝင်ရောက်ရန် သင့်စက်၏ ဇီဝအထောက်အထား သို့မဟုတ် PIN ကို အသုံးပြုပါ။",
     "label": "Passkey အမည် (ဥပမာ \"ကျွန်ုပ်ဖုန်း\")",

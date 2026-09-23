@@ -28,6 +28,14 @@ describe('gh', () => {
     // is always embedded in the endpoint, never appended as a flag.
     expect(ghArgs(['api', 'user'])).toEqual(['api', 'user'])
   })
+
+  // Issue #838: hit the identical failure building `GitHubSink.editComment`
+  // (a PATCH-with-body api call) — same invariant, a different call shape
+  // (flags after the endpoint) to make sure ghArgs is a no-op there too.
+  it('never appends -R for the api subcommand, which does not accept it', () => {
+    expect(ghArgs(['api', 'repos/o/r/issues/comments/1', '-X', 'PATCH', '-f', 'body=hi']))
+      .toEqual(['api', 'repos/o/r/issues/comments/1', '-X', 'PATCH', '-f', 'body=hi'])
+  })
 })
 
 /**

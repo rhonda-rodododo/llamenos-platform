@@ -110,6 +110,8 @@ export const TestIds = {
   CALL_SEARCH: 'call-search',
   CALL_SEARCH_BTN: 'call-search-btn',
   CALL_CLEAR_FILTERS: 'call-clear-filters',
+  CALL_DATE_FROM: 'call-date-from',
+  CALL_DATE_TO: 'call-date-to',
   RECORDING_BADGE: 'recording-badge',
   RECORDING_PLAYER: 'recording-player',
   RECORDING_PLAY_BTN: 'recording-play-btn',

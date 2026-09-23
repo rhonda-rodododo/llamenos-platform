@@ -105,6 +105,7 @@ describe('desktop IPC boundary', () => {
       'net_ws_close',
       'api_config_get',
       'api_config_set',
+      'api_config_request_clear',
       'api_config_clear',
     ]) {
       expect(allowed.has(cmd), `${cmd} missing from ALLOWED_COMMANDS`).toBe(true)

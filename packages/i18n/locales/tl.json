@@ -1457,7 +1457,9 @@
     "rateLimitTitle": "Baguhin ang Rate Limiting",
     "transcriptionDisable": "I-disable ang transkripsyon ng tawag? Hindi na awtomatikong ma-transcribe ang mga tawag ng mga boluntaryo.",
     "transcriptionEnable": "I-enable ang transkripsyon ng tawag para sa lahat ng boluntaryo? Gumagamit ito ng AI para ma-transcribe ang mga tawag sa real-time.",
-    "transcriptionTitle": "Baguhin ang Setting ng Transkripsyon"
+    "transcriptionTitle": "Baguhin ang Setting ng Transkripsyon",
+    "biometricDisable": "Turn off biometric unlock? You'll still be able to unlock with your PIN.",
+    "biometricDisableTitle": "Turn Off Biometric Unlock"
   },
   "connectWithOauth": "Connect with OAuth",
   "connectionFailed": "Connection failed",
@@ -3734,7 +3736,11 @@
     "transcriptionSettings": "Transkripsyon",
     "version": "Version",
     "voicemail": "Voicemail",
-    "webrtcNotConfigured": "Hindi available ang pagtawag sa browser. Kailangang i-enable ng iyong admin ang WebRTC sa mga setting ng telephony provider."
+    "webrtcNotConfigured": "Hindi available ang pagtawag sa browser. Kailangang i-enable ng iyong admin ang WebRTC sa mga setting ng telephony provider.",
+    "biometricDesc": "Unlock with your fingerprint or face instead of typing your PIN. Your PIN still works and is never disabled.",
+    "biometricEnrolled": "Biometric unlock is on for this device.",
+    "biometricInvalidated": "Your device's biometrics changed, so biometric unlock was turned off. Re-enable it below, or continue using your PIN.",
+    "biometricPinPrompt": "Enter your PIN to enable biometric unlock"
   },
   "serverAddress": {
     "checking": "Checking...",
@@ -4557,6 +4563,7 @@
   "voiceStatusWebhook": "Voice Status Webhook",
   "webauthn": {
     "browserNotSupported": "Hindi sinusuportahan ng iyong browser ang mga passkey.",
+    "credentialRequiredError": "Magrehistro ng passkey bago mo kailanganin ang mga passkey para sa mga admin.",
     "deleteKey": "Tanggalin",
     "description": "Gamitin ang biometrics o PIN ng iyong device para mag-sign in nang walang secret key.",
     "label": "Pangalan ng passkey (hal. \"Aking Telepono\")",
