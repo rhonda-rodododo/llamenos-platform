@@ -16,8 +16,15 @@
 # Bun runs TypeScript natively — no esbuild transpilation step needed.
 
 # Stage 1: Install runtime deps
-FROM oven/bun:1.4.0@sha256:5ff609364c049b54eb0ff560ec96319729a972078ef2c755d758f0c6ef89c2d6 AS deps
-# oven/bun:1.3.5 pinned to match .mise.toml — update via Dependabot or on new minor release
+FROM oven/bun:1.4.2@sha256:9114c058aeae42162ee16dd5084b95fe9473970bb6bcb5b232ab1630f0546895 AS deps
+# This runtime base is pinned independently of .mise.toml's `bun = "1.3.5"`.
+# .mise.toml pins the *developer/CI tool* version (kept in sync with
+# .github/workflows/ci.yml's bun-version input); this image is the
+# *production container* base and tracks its own Dependabot-driven minor
+# bumps on its own schedule. The two are allowed to diverge — Bun's runtime
+# compatibility across 1.3.x/1.4.x minors is not the same contract as "CI
+# uses the same tool version everywhere". Update via Dependabot or on a new
+# minor release.
 WORKDIR /app
 COPY package.json bun.lockb ./
 # Copy workspace package.json stubs so bun can resolve the workspace graph from the
@@ -34,7 +41,7 @@ COPY site/package.json site/package.json
 RUN bun install --frozen-lockfile --production --ignore-scripts
 
 # Stage 2: Build Rust crypto FFI (.so)
-FROM rust:1-slim@sha256:cc0448b41c3b7b7fea44f5dc50eacba729a56db365b65b7bd5e8a82d5b3db078 AS rust-builder
+FROM rust:1-slim@sha256:f47a8de237dcbb0b0ce1099901e60a89728e3d51f24e664b40e947171538ade7 AS rust-builder
 RUN apt-get update && apt-get install -y --no-install-recommends pkg-config && rm -rf /var/lib/apt/lists/*
 WORKDIR /build
 COPY packages/crypto/ packages/crypto/
@@ -43,8 +50,10 @@ RUN cargo build --release --manifest-path packages/crypto/Cargo.toml --features 
     && cp packages/crypto/target/release/libllamenos_core.so packages/crypto/dist/server/
 
 # Stage 3: Production
-FROM oven/bun:1.4.0-slim@sha256:e0ee68d16ccb9927bf02aa7dd8fd4bf3369ee6d46da04faa72b05ce8bfd135f6 AS app
-# oven/bun:1.3.5-slim pinned to match .mise.toml — update via Dependabot
+FROM oven/bun:1.4.2-slim@sha256:cb3bbbb08e13a4a2ff400f24c7a2a1d5efa83f6ef8544d52d95a519631e2fc61 AS app
+# Pinned independently of .mise.toml's dev/CI `bun = "1.3.5"` — see the
+# `deps` stage comment above for why the two are allowed to diverge. Update
+# via Dependabot.
 
 # Apply outstanding Debian security updates on top of the pinned base.
 # The base digest above is the newest published for the `1.4.0-slim` tag, so a
@@ -111,7 +120,7 @@ CMD []
 
 # Stage 4: Install full JS deps (incl. devDependencies) for the SPA build.
 # Separate from the `deps` stage above, which installs --production only.
-FROM oven/bun:1.4.0@sha256:5ff609364c049b54eb0ff560ec96319729a972078ef2c755d758f0c6ef89c2d6 AS frontend-deps
+FROM oven/bun:1.4.2@sha256:9114c058aeae42162ee16dd5084b95fe9473970bb6bcb5b232ab1630f0546895 AS frontend-deps
 WORKDIR /app
 COPY package.json bun.lockb ./
 COPY packages/crypto/package.json packages/crypto/package.json
@@ -145,13 +154,23 @@ RUN bun run build
 # requirement) is NOT part of stock Caddy; it ships only via this plugin,
 # built with xcaddy. Without this stage Caddy refuses to start with
 # "unrecognized directive: rate_limit".
-FROM caddy:2.11.4-builder-alpine@sha256:1a1689db91cfb390b2d856a1b3774e796852822cd723fa54c475b272f82bb4b7 AS caddy-builder
+# Digest bump (issue #650, 2026-09-20): refreshes the Alpine package layer
+# (curl/c-ares/libcrypto3/libssl3 CVEs) under the same 2.11.4 tag — same Caddy
+# version, no behavior change. See the `static` stage below for the matching bump.
+FROM caddy:2.11.4-builder-alpine@sha256:2b9f32cbba6045e79212bb253f595588d20be8f7d1edf61582c519e124e0d2d8 AS caddy-builder
 RUN xcaddy build --with github.com/mholt/caddy-ratelimit
 
 # Stage 7 (`static`): Caddy image serving the built SPA. Matches the
 # `caddy:2.11.4-alpine` base pinned in docker-compose.yml, with the custom
 # rate-limiting binary swapped in and the SPA baked into /srv/app.
-FROM caddy:2.11.4-alpine@sha256:5f5c8640aae01df9654968d946d8f1a56c497f1dd5c5cda4cf95ab7c14d58648 AS static
+# Digest bump (issue #650, 2026-09-20): see caddy-builder stage above — same
+# tag, refreshed Alpine layer. Trivy re-scan of this stage went from 23 fixable
+# HIGH (curl/c-ares/libcrypto3/libssl3) to 0 on the OS layer; the xcaddy-built
+# binary's own Go-module HIGH findings (golang.org/x/*, grpc) are unaffected by
+# this bump — they come from the Caddy 2.11.4 release's resolved dependency set,
+# not the Alpine base, and need a Caddy version bump to clear (follow-up, needs
+# Caddyfile.production + caddy-ratelimit plugin compat validation first).
+FROM caddy:2.11.4-alpine@sha256:de23def33b17fb5d1290b0f6c2add1d70780e52341896c00a4c8a2a2fe9d355e AS static
 COPY --from=caddy-builder /usr/bin/caddy /usr/bin/caddy
 COPY --from=frontend-builder /app/dist/client /srv/app
 # NOTE: /srv/crypto (the Tier-4 sandboxed-crypto-iframe origin referenced by

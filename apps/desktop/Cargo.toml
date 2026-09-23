@@ -51,6 +51,10 @@ futures-util = { version = "0.3", default-features = false, features = ["sink", 
 tokio = { version = "1", features = ["sync", "net"] }
 url = "2"
 base64 = "0.22"
+# Native OS confirmation dialog for api_config_request_clear (#788) — rendered
+# outside the webview's DOM/JS sandbox so a compromised renderer cannot script
+# a confirmation click.
+tauri-plugin-dialog = "2"
 # TLS certificate pinning for the network proxy (#775) — a custom rustls
 # ServerCertVerifier (src/cert_pin.rs) applied to both the reqwest client and
 # the WebSocket TLS connector. `default-features = false` + explicit `ring`

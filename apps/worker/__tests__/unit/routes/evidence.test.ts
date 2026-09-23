@@ -4,7 +4,7 @@
  * Tests: permission enforcement, evidence upload, custody chain logging,
  * integrity verification, evidence listing.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { Hono } from 'hono'
 import type { AppEnv } from '@worker/types'
 import evidenceRoutes from '@worker/routes/evidence'
@@ -13,14 +13,18 @@ import evidenceRoutes from '@worker/routes/evidence'
 // Test app factory
 // ---------------------------------------------------------------------------
 
+const defaultEnv = { HMAC_SECRET: 'test-secret' } as unknown as AppEnv['Bindings']
+
 function makeApp(opts: {
   permissions?: string[]
   pubkey?: string
+  hubId?: string
   services?: Record<string, unknown>
 } = {}) {
   const {
     permissions = ['*'],
     pubkey = 'a'.repeat(64),
+    hubId,
     services = {},
   } = opts
 
@@ -35,13 +39,19 @@ function makeApp(opts: {
     verifyEvidence: vi.fn(),
     ...((services.cases as Record<string, unknown>) ?? {}),
   }
+  const mockAudit = {
+    log: auditLog,
+    listForEvidence: vi.fn().mockResolvedValue([]),
+    ...((services.audit as Record<string, unknown>) ?? {}),
+  }
 
   const app = new Hono<AppEnv>()
   app.use('*', async (c, next) => {
     c.set('pubkey', pubkey)
     c.set('permissions', permissions)
+    if (hubId) c.set('hubId', hubId)
     c.set('services', {
-      audit: { log: auditLog },
+      audit: mockAudit,
       cases: mockCases,
       ...services,
     } as unknown as AppEnv['Variables']['services'])
@@ -50,7 +60,14 @@ function makeApp(opts: {
   })
   app.route('/', evidenceRoutes)
 
-  return { app, mockCases, auditLog }
+  // Always inject env bindings (HMAC_SECRET) so device-fingerprint audit
+  // capture doesn't throw on undefined c.env in tests — matches the real
+  // request path where env bindings are always present.
+  const originalRequest = app.request.bind(app)
+  app.request = ((input: Parameters<typeof app.request>[0], init?: RequestInit) =>
+    originalRequest(input, init, defaultEnv)) as typeof app.request
+
+  return { app, mockCases, mockAudit, auditLog }
 }
 
 // ---------------------------------------------------------------------------
@@ -137,6 +154,23 @@ describe('POST /records/:id/evidence', () => {
     expect(res.status).toBe(403)
   })
 
+  it('logs a denied-access audit entry on 403 (Issue #730)', async () => {
+    const { app, auditLog } = makeApp({ permissions: ['evidence:download'] })
+
+    await app.request('/records/case-1/evidence', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(validBody),
+    })
+
+    expect(auditLog).toHaveBeenCalledWith(
+      'evidenceAccessDenied',
+      expect.any(String),
+      expect.objectContaining({ required: ['evidence:upload'] }),
+      undefined,
+    )
+  })
+
   it('returns 400 on invalid body (missing required fields)', async () => {
     const { app } = makeApp({ permissions: ['evidence:upload'] })
 
@@ -198,6 +232,20 @@ describe('GET /records/:id/evidence', () => {
     const res = await app.request('/records/case-1/evidence')
     expect(res.status).toBe(200)
   })
+
+  it('automatically logs the list view to the audit chain (Issue #730)', async () => {
+    const { app, mockCases, auditLog } = makeApp({ permissions: ['evidence:download'] })
+    mockCases.listEvidence.mockResolvedValue({ evidence: [{ id: 'ev-1' }], total: 1 })
+
+    await app.request('/records/case-1/evidence')
+
+    expect(auditLog).toHaveBeenCalledWith(
+      'evidenceAccessed',
+      expect.any(String),
+      expect.objectContaining({ caseId: 'case-1', action: 'list_viewed' }),
+      undefined,
+    )
+  })
 })
 
 // ---------------------------------------------------------------------------
@@ -230,6 +278,47 @@ describe('GET /evidence/:evidenceId', () => {
     const res = await app.request('/evidence/ev-1')
     expect(res.status).toBe(200)
   })
+
+  it('automatically logs the metadata read to the audit chain (Issue #730)', async () => {
+    const { app, mockCases, auditLog } = makeApp({ permissions: ['evidence:download'] })
+    mockCases.getEvidence.mockResolvedValue({ id: 'ev-1' })
+
+    await app.request('/evidence/ev-1')
+
+    expect(auditLog).toHaveBeenCalledWith(
+      'evidenceAccessed',
+      expect.any(String),
+      expect.objectContaining({ evidenceId: 'ev-1', action: 'metadata_read' }),
+      undefined,
+    )
+  })
+
+  it('logs a denied-access audit entry on 403 (Issue #730)', async () => {
+    const { app, auditLog } = makeApp({ permissions: ['evidence:upload'] })
+
+    await app.request('/evidence/ev-1')
+
+    expect(auditLog).toHaveBeenCalledWith(
+      'evidenceAccessDenied',
+      expect.any(String),
+      expect.objectContaining({ required: ['evidence:download', 'evidence:manage-custody'] }),
+      undefined,
+    )
+  })
+
+  it('scopes the access-log entry to the current hub when hub-scoped (Issue #730)', async () => {
+    const { app, mockCases, auditLog } = makeApp({ permissions: ['evidence:download'], hubId: 'hub-1' })
+    mockCases.getEvidence.mockResolvedValue({ id: 'ev-1' })
+
+    await app.request('/evidence/ev-1')
+
+    expect(auditLog).toHaveBeenCalledWith(
+      'evidenceAccessed',
+      expect.any(String),
+      expect.objectContaining({ evidenceId: 'ev-1', action: 'metadata_read' }),
+      'hub-1',
+    )
+  })
 })
 
 // ---------------------------------------------------------------------------
@@ -255,6 +344,75 @@ describe('GET /evidence/:evidenceId/custody', () => {
 
     const res = await app.request('/evidence/ev-1/custody')
     expect(res.status).toBe(403)
+  })
+
+  it('automatically logs the custody view to the audit chain (Issue #730)', async () => {
+    const { app, mockCases, auditLog } = makeApp({ permissions: ['evidence:manage-custody'] })
+    mockCases.listCustodyEntries.mockResolvedValue({ entries: [] })
+
+    await app.request('/evidence/ev-1/custody')
+
+    expect(auditLog).toHaveBeenCalledWith(
+      'evidenceAccessed',
+      expect.any(String),
+      expect.objectContaining({ evidenceId: 'ev-1', action: 'custody_viewed' }),
+      undefined,
+    )
+  })
+
+  it('logs a denied-access audit entry on 403 (Issue #730)', async () => {
+    const { app, auditLog } = makeApp({ permissions: ['evidence:download'] })
+
+    await app.request('/evidence/ev-1/custody')
+
+    expect(auditLog).toHaveBeenCalledWith(
+      'evidenceAccessDenied',
+      expect.any(String),
+      expect.objectContaining({ required: ['evidence:manage-custody'] }),
+      undefined,
+    )
+  })
+})
+
+// ---------------------------------------------------------------------------
+// GET /evidence/:evidenceId/access-log — admin-only chain-of-custody audit log
+// ---------------------------------------------------------------------------
+
+describe('GET /evidence/:evidenceId/access-log', () => {
+  it('returns the hash-chained access log entries for admins', async () => {
+    const entries = [
+      { id: 'a-1', action: 'evidenceAccessed', actorPubkey: 'a'.repeat(64), details: { evidenceId: 'ev-1' }, createdAt: new Date().toISOString(), previousEntryHash: null, entryHash: 'h1' },
+    ]
+    const { app, mockAudit } = makeApp({ permissions: ['audit:read'] })
+    mockAudit.listForEvidence.mockResolvedValue(entries)
+
+    const res = await app.request('/evidence/ev-1/access-log')
+
+    expect(res.status).toBe(200)
+    const json = await res.json()
+    expect(json.total).toBe(1)
+    expect(json.entries).toEqual(entries)
+    expect(mockAudit.listForEvidence).toHaveBeenCalledWith('ev-1', undefined)
+  })
+
+  it('returns 403 for a non-admin (no audit:read permission)', async () => {
+    const { app } = makeApp({ permissions: ['evidence:download', 'evidence:manage-custody'] })
+
+    const res = await app.request('/evidence/ev-1/access-log')
+    expect(res.status).toBe(403)
+  })
+
+  it('logs a denied-access audit entry when a non-admin is refused (Issue #730)', async () => {
+    const { app, auditLog } = makeApp({ permissions: ['evidence:manage-custody'] })
+
+    await app.request('/evidence/ev-1/access-log')
+
+    expect(auditLog).toHaveBeenCalledWith(
+      'evidenceAccessDenied',
+      expect.any(String),
+      expect.objectContaining({ required: ['audit:read'] }),
+      undefined,
+    )
   })
 })
 

@@ -14,25 +14,37 @@ const HOUR = 3_600_000
 /**
  * QUOTA is excluded: a provider rate limit is not the fleet misbehaving.
  *
- * REJECTED counts toward the streak; BLOCKED deliberately does not. REJECTED
- * means a worker's output failed verification — three of those in a row is
- * exactly the fleet misbehaving, which is what this breaker exists to catch.
- * BLOCKED means a worker correctly reported it cannot proceed (e.g. a scope
- * conflict) — that is the system working as designed, and the per-item
- * attempt limit (see ledger.ts's failedAttemptsFor) already bounds it, so it
- * must not also feed a fleet-wide halt.
+ * REJECTED was originally grouped with FAILED/TIMEOUT here, on the theory
+ * that "a worker's output failed verification" is itself evidence of the
+ * fleet misbehaving. Issue #944 is the live incident that overturned that:
+ * a full queue of items with no genuinely dispatchable work produced three
+ * independent, unrelated mechanical-verify REJECTEDs (three different
+ * workers, three different lanes, one common cause — a lane-scope config gap
+ * later fixed in #938) and the fleet halted itself, then kept re-halting for
+ * over a day, needing a human `resume` more than a dozen times on 2026-09-19
+ * alone. Re-reading the BLOCKED reasoning above against REJECTED's own
+ * definition shows the distinction this file used to draw does not hold:
+ * REJECTED sits in `ledger.ts`'s `TERMINAL_FAILURES` set, the EXACT SAME
+ * per-item bound BLOCKED is excused by ("the per-item attempt limit already
+ * bounds it, so it must not also feed a fleet-wide halt") — REJECTED is
+ * bounded by `MAX_ATTEMPTS_PER_ITEM` in precisely the same way. A mechanical
+ * scope/test failure or a review `FAIL` verdict is the verification pipeline
+ * catching a bad diff and refusing to merge it — the system working as
+ * designed, exactly like BLOCKED, not a runaway fleet. Three REJECTEDs on
+ * three different items is not "the same worker spiralling three times in a
+ * row"; it is three independent, already-bounded catches that tell you
+ * nothing about whether a FOURTH dispatch would also fail. A real runaway
+ * fleet — a crashed worker, a hung session, a broken launch script — still
+ * shows up as FAILED or TIMEOUT, which is what this set is narrowed to.
  *
- * UNVERIFIED is excluded for the same reason as QUOTA, not BLOCKED: issue
- * #870 (see the `Outcome` doc comment in ledger.ts) is three workers that
- * finished with a real terminal SUCCESS and a real PR, recorded FAILED only
- * because THIS fleet's own launch/revise plumbing broke down talking to
- * them. That is a verification gap, not a worker producing bad output — the
- * exact distinction REJECTED already draws against BLOCKED above, just
- * pointed at this fleet's own machinery instead of a worker's scope
- * violation. Three verification gaps in a row must never read as "the fleet
- * is misbehaving" the way three real REJECTEDs do.
+ * UNVERIFIED is excluded for the same reason as QUOTA, not BLOCKED/REJECTED:
+ * issue #870 (see the `Outcome` doc comment in ledger.ts) is three workers
+ * that finished with a real terminal SUCCESS and a real PR, recorded FAILED
+ * only because THIS fleet's own launch/revise plumbing broke down talking to
+ * them. That is a verification gap, not a worker producing bad output. Three
+ * verification gaps in a row must never read as "the fleet is misbehaving".
  */
-const STREAK_FAILURES: ReadonlySet<Outcome> = new Set<Outcome>(['FAILED', 'TIMEOUT', 'REJECTED'])
+const STREAK_FAILURES: ReadonlySet<Outcome> = new Set<Outcome>(['FAILED', 'TIMEOUT'])
 // SHADOW is excluded from both sets, like QUOTA — a shadow lane writes a
 // SHADOW row on every pass it runs, so in the mixed ramp the spec prescribes
 // (some lanes live, some shadow), the newest row would always be a SHADOW
@@ -95,10 +107,11 @@ const QUOTA_DEFAULT_COOLDOWN_MS = 3_600_000
  * would be, and a single QUOTA row is deliberately not enough on its own —
  * a lone rejection could still be a transient blip.
  *
- * Never returns anything from `FAILED`/`TIMEOUT`/`REJECTED` rows: the
- * consecutive-failure breaker already owns those, and its own contract
- * (`failureBreaker`, above) explicitly excludes `QUOTA` from that count —
- * this function's whole reason to exist is to give quota exhaustion a
+ * Never returns anything from `FAILED`/`TIMEOUT`/`REJECTED` rows: `FAILED`
+ * and `TIMEOUT` are the consecutive-failure breaker's own set (`REJECTED` no
+ * longer feeds it either — see `STREAK_FAILURES`'s doc comment above), and
+ * `failureBreaker`'s own contract explicitly excludes `QUOTA` from that count
+ * — this function's whole reason to exist is to give quota exhaustion a
  * SEPARATE, self-describing, self-healing halt path instead of it silently
  * feeding "N consecutive failures".
  */

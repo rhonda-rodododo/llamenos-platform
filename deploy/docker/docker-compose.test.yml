@@ -24,6 +24,26 @@ services:
       - web
 
   app:
+    # Import the registry-hosted BuildKit layer cache that
+    # .github/workflows/docker-buildcache.yml refreshes nightly (and on any
+    # main-branch change to bun.lockb/packages/crypto//Dockerfile — see that
+    # workflow for why). This is the fix for #902: bootstrap-backend's
+    # `docker compose up -d --build --wait app` runs on a fresh ubuntu-latest
+    # runner with an empty local cache every time, so without this the
+    # `deps` (bun install) and `rust-builder` (cargo build --release) stages
+    # rebuilt from scratch on every CI run regardless of what actually
+    # changed. Docker still invalidates by content hash on import — a PR
+    # that changes bun.lockb or packages/crypto/** still rebuilds exactly
+    # those layers — this only lets an unrelated-file PR pull instead of
+    # rebuild. Cache import is a soft dependency: a missing/unreachable tag
+    # falls back to a normal build rather than failing the job. The ref
+    # below is the literal form of `ghcr.io/${{ github.repository }}` (the
+    # same public GHCR package release.yml's docker-stable job already
+    # publishes real images to) — update it if the repo is ever renamed or
+    # transferred.
+    build:
+      cache_from:
+        - type=registry,ref=ghcr.io/rhonda-rodododo/llamenos-platform:buildcache
     ports:
       - "${APP_PORT:-3000}:3000"
     read_only: false
@@ -57,14 +77,24 @@ services:
       start_period: 20s
 
   # ── Signal sidecar: test mode ──────────────────────────────────────
-  # signal-cli runs in json-rpc mode; AUTO_RECEIVE_SCHEDULE disabled in CI
-  # so the webhook-based tests control message flow entirely.
-  # Healthcheck: in CI no Signal number is registered so /v1/about returns 503.
-  # Override to just check the process is listening (TCP check on port 8080).
+  # signal-cli runs in json-rpc mode. AUTO_RECEIVE_SCHEDULE must NOT be set
+  # (not even to an empty string) — see deploy/docker/docker-compose.yml for
+  # why (#944: setting the key at all, regardless of value, fataled the
+  # container on every start and crash-looped it for the full CI job).
+  # Healthcheck: in CI no Signal number is registered so /v1/about may
+  # return a non-2xx. Override to just check the process is listening.
+  #
+  # restart is bounded (base compose uses `unless-stopped`, appropriate for
+  # a real self-hosted deployment with a registered account) so that if a
+  # *future* misconfiguration or image regression reintroduces a startup
+  # crash, CI fails fast and loud after 3 attempts instead of crash-looping
+  # silently for the whole ~30min job and corrupting unrelated Playwright
+  # navigations with net::ERR_NETWORK_CHANGED (the exact failure mode #944
+  # documents).
   signal-cli:
+    restart: on-failure:3
     environment:
       - MODE=json-rpc
-      - AUTO_RECEIVE_SCHEDULE=
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://localhost:8080/v1/about || true"]
       interval: 10s

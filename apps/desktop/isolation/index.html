@@ -77,6 +77,7 @@ window.__TAURI_ISOLATION_HOOK__ = (payload) => {
     // Configured backend address (#738) — persisted + validated in Rust
     'api_config_get',
     'api_config_set',
+    'api_config_request_clear',
     'api_config_clear',
     // Runtime-enforced network egress (#739) — CSP connect-src is `ipc:` only
     'net_fetch',

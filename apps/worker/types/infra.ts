@@ -96,6 +96,9 @@ export interface Env {
   APNS_KEY_P8?: string       // Apple Push Notification auth key (PEM format)
   APNS_KEY_ID?: string       // Key ID from Apple Developer Portal
   APNS_TEAM_ID?: string      // Apple Developer Team ID
+  APNS_BUNDLE_ID?: string    // APNs topic / iOS bundle identifier override (Issue #724).
+                             // Defaults to org.llamenos.hotline (see lib/apns-topic.ts) —
+                             // must match PRODUCT_BUNDLE_IDENTIFIER in apps/ios/project.yml.
 
   // Push notifications (Epic 86) — ntfy/UnifiedPush (Android)
   NTFY_URL?: string           // Self-hosted ntfy instance URL (e.g. http://ntfy:80)

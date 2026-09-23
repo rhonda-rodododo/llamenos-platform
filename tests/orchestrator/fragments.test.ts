@@ -195,10 +195,14 @@ describe('loadLaneScopes against the real fragments', () => {
         'tests/mocks/',
         'playwright.config.ts',
         '.github/ci/*-baseline.json',
+        'eslint.config.js',
+        'lefthook.yml',
+        'packages/test-specs/features/',
         'packages/i18n/locales/',
       ],
       notOwned: [
-        'tests/steps/',
+        'tests/steps/backend/',
+        'src/server/',
         'packages/test-specs/',
         'packages/i18n/languages.ts',
         'packages/i18n/tools/',
@@ -206,7 +210,21 @@ describe('loadLaneScopes against the real fragments', () => {
     })
 
     expect(scopes.backend).toEqual({
-      owned: ['apps/worker/', 'sip-bridge/', 'signal-notifier/', 'tests/steps/', 'packages/i18n/locales/'],
+      owned: [
+        'apps/worker/',
+        'sip-bridge/',
+        'signal-notifier/',
+        'src/server/',
+        'tests/steps/backend/',
+        'tests/steps/fixtures.ts',
+        '.github/ci/*-baseline.json',
+        'eslint.config.js',
+        'lefthook.yml',
+        'playwright.config.ts',
+        'packages/test-specs/features/',
+        'packages/i18n/locales/',
+        'scripts/test-backend-bdd.sh',
+      ],
       notOwned: [
         'tests/',
         'tests/mocks/',
