@@ -20,6 +20,13 @@ export const Timeouts = {
   /** Time to wait for auth-related operations (includes PBKDF2 600K iterations).
    *  CI containers have limited CPU which makes PBKDF2 significantly slower. */
   AUTH: 55000,
+  /** Time to wait for message content that depends on client-side HPKE/AES-GCM
+   *  decryption completing and a subsequent React re-render (e.g. an outbound
+   *  message's plaintext appearing in ConversationThread after a fresh fetch).
+   *  Individually fast, but the shared self-hosted CI runners are frequently
+   *  under contention from concurrent jobs, and ELEMENT's 10s has been observed
+   *  to occasionally not be enough for fetch + decrypt + render to land. */
+  DECRYPT: 20000,
 } as const
 
 // Re-export TestIds for convenience

@@ -233,7 +233,11 @@ Then('I should see the delivery status indicator', async ({ page, backendRequest
   // an icon-only affordance, so assert on the rendered bubble here).
   const thread = page.getByTestId(TestIds.CONVERSATION_THREAD)
   await expect(thread).toBeVisible({ timeout: Timeouts.ELEMENT })
-  await expect(thread.getByText(outbound.body)).toBeVisible({ timeout: Timeouts.ELEMENT })
+  // The just-sent message's plaintext only appears after the client refetches
+  // and HPKE/AES-GCM-decrypts it (ConversationThread's decrypt effect) — give
+  // that its own budget instead of the generic ELEMENT timeout, which has been
+  // observed to be too tight under contended CI runners.
+  await expect(thread.getByText(outbound.body)).toBeVisible({ timeout: Timeouts.DECRYPT })
 
   // Behavior: the delivery status actually transitioned — verify through the
   // real API instead of asserting on an SVG glyph.

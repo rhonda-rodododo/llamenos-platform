@@ -4563,6 +4563,7 @@
   "voiceStatusWebhook": "Voice Status Webhook",
   "webauthn": {
     "browserNotSupported": "您的浏览器不支持通行密钥。",
+    "credentialRequiredError": "在要求管理员使用通行密钥之前，请先注册一个通行密钥。",
     "deleteKey": "删除",
     "description": "使用设备生物识别或PIN码登录，无需密钥。",
     "label": "通行密钥名称（例如\"我的手机\"）",
