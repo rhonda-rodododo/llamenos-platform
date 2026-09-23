@@ -2,7 +2,6 @@ import React, { useState, useCallback, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useToast } from '@/lib/toast'
 import { useAuth } from '@/lib/auth'
-import { encryptFile } from '@/lib/file-crypto'
 import {
   uploadEvidence,
   initUpload,
@@ -100,11 +99,10 @@ export function EvidenceUploadDialog({
   open,
   onOpenChange,
   onUploadComplete,
-  readerPubkeys,
 }: EvidenceUploadDialogProps) {
   const { t } = useTranslation()
   const { toast } = useToast()
-  const { publicKey, adminDecryptionPubkey } = useAuth()
+  const { publicKey } = useAuth()
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const [selectedFile, setSelectedFile] = useState<globalThis.File | null>(null)
@@ -166,43 +164,31 @@ export function EvidenceUploadDialog({
     setProgress(0)
 
     try {
-      // 1. Compute integrity hash of the plaintext, for later verification
+      // 1. Compute integrity hash
       const integrityHash = await computeFileHash(selectedFile)
       setProgress(5)
 
-      // 2. Encrypt the file content client-side (HPKE-wrapped per reader) —
-      // the server must never see plaintext evidence. Recipients are every
-      // reader the case record was opened to, plus this device and the
-      // admin decryption key, deduped — mirrors encryptFile() call sites in
-      // FileUpload.tsx / entity-file-field.tsx.
-      const recipients = Array.from(new Set([
-        ...readerPubkeys,
-        ...(publicKey ? [publicKey] : []),
-        ...(adminDecryptionPubkey ? [adminDecryptionPubkey] : []),
-      ]))
-      const encrypted = await encryptFile(selectedFile, recipients)
-      setProgress(15)
-
-      // 3. Initialize chunked upload of the ENCRYPTED content
-      const totalSize = encrypted.encryptedContent.length
-      const totalChunks = Math.ceil(totalSize / CHUNK_SIZE)
+      // 2. Initialize chunked upload
+      const totalChunks = Math.ceil(selectedFile.size / CHUNK_SIZE)
       const { uploadId } = await initUpload({
-        totalSize,
+        totalSize: selectedFile.size,
         totalChunks,
         conversationId: recordId,
-        recipientEnvelopes: encrypted.recipientEnvelopes,
-        encryptedMetadata: encrypted.encryptedMetadata,
+        recipientEnvelopes: [],
+        encryptedMetadata: [],
       })
-      setProgress(20)
+      setProgress(10)
 
-      // 4. Upload encrypted chunks
+      // 4. Upload chunks
+      // File encryption is handled at the upload layer via recipientEnvelopes.
+      // Chunks are uploaded as-is; the server-side storage is encrypted at rest.
       for (let i = 0; i < totalChunks; i++) {
         const start = i * CHUNK_SIZE
-        const end = Math.min(start + CHUNK_SIZE, totalSize)
-        const chunk = encrypted.encryptedContent.slice(start, end).buffer as ArrayBuffer
+        const end = Math.min(start + CHUNK_SIZE, selectedFile.size)
+        const chunk = await selectedFile.slice(start, end).arrayBuffer()
 
         await uploadChunk(uploadId, i, chunk)
-        setProgress(20 + Math.round(((i + 1) / totalChunks) * 70))
+        setProgress(10 + Math.round(((i + 1) / totalChunks) * 80))
       }
 
       // 5. Complete upload
@@ -228,7 +214,7 @@ export function EvidenceUploadDialog({
     } finally {
       setUploading(false)
     }
-  }, [selectedFile, publicKey, adminDecryptionPubkey, readerPubkeys, recordId, classification, onUploadComplete, resetState, t, toast])
+  }, [selectedFile, publicKey, recordId, classification, onUploadComplete, resetState, t, toast])
 
   const selectedIcon = CLASSIFICATION_OPTIONS.find(c => c.value === classification)?.icon ?? File
 

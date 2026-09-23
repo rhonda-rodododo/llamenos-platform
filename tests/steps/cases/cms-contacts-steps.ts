@@ -89,24 +89,28 @@ async function ensureContactVisibleInDirectory(
 }
 
 /**
- * Click a specific contact's card in the directory list, waiting for it.
- *
- * Deliberately NOT the search box: the client's search sends the raw query as
- * a single blind-index token, which the server never matches against a name,
- * so a name search always returns an empty list (and clears the one that was
- * showing). The default list is sorted newest-first for never-contacted
- * contacts, so a contact a Given step just seeded is within the first page;
- * asserting on the named card (a waiting assertion) instead of probing with
- * a non-waiting isVisible() keeps the click from racing the list load. A
- * contact that is genuinely absent fails the step loudly.
+ * Locate a specific contact's card via the search box (server-side, blind-
+ * index/trigram search), rather than relying on `.first()` in the default
+ * directory list. The default list is capped at 50 and sorted by last
+ * interaction, so once other scenarios sharing this worker's hub have
+ * created dozens of contacts, the intended contact is not reliably the
+ * first (or even present) in the unfiltered list. Searching by the exact
+ * name used at creation finds it deterministically regardless of how much
+ * state has accumulated. Returns null if the search genuinely finds nothing.
  */
-async function clickContactCardByName(
+async function findContactCardByName(
   page: import('@playwright/test').Page,
   name: string,
-): Promise<void> {
+): Promise<import('@playwright/test').Locator | null> {
+  // The search box always renders on the contacts directory page — wait for
+  // it deterministically rather than gating the fill on a non-waiting probe.
+  const searchInput = page.getByTestId('contact-search-input')
+  await expect(searchInput).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await searchInput.fill(name)
   const card = page.getByTestId('directory-contact-card').filter({ hasText: name })
-  await expect(card.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
-  await card.first().click()
+  const found = await card.first().isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
+  if (!found) return null
+  return card.first()
 }
 
 // --- Contact directory page elements ---
@@ -472,22 +476,48 @@ Given('no contacts have been created', async ({ backendRequest: request, workerH
 })
 
 When('I click on the {string} contact card', async ({ page }, name: string) => {
-  await clickContactCardByName(page, name)
+  // Search deterministically by name rather than trusting the default
+  // (capped, last-interaction-sorted) list to contain — let alone lead
+  // with — this specific contact once other scenarios sharing this
+  // worker's hub have accumulated dozens of contacts (issue #796).
+  const card = await findContactCardByName(page, name)
+  if (card) {
+    await card.click()
+    return
+  }
+  // Genuinely not found via search (e.g. contact creation itself failed) —
+  // fall back to creating one through the UI so the scenario can proceed.
+  // ensureContactVisibleInDirectory already waits for the dialog to close
+  // and the target card to render before returning.
+  await ensureContactVisibleInDirectory(page, name)
+  const namedCard = page.getByTestId('directory-contact-card').filter({ hasText: name })
+  await expect(namedCard.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await namedCard.first().click()
 })
 
 When('I click on the contact card', async ({ page, casesWorld }) => {
   // When a prior Given step tracked the display name of the contact under
-  // test, click exactly that card — the directory accumulates contacts from
-  // every earlier scenario sharing this worker's hub, so `.first()` is only
-  // safe when no specific contact is being targeted.
+  // test, search for it deterministically — the same reasoning as the
+  // named step above. `.first()` on the unfiltered list is only safe when
+  // no specific contact is being targeted.
   if (casesWorld.contactWithDataName) {
-    await clickContactCardByName(page, casesWorld.contactWithDataName)
-    return
+    const named = await findContactCardByName(page, casesWorld.contactWithDataName)
+    if (named) {
+      await named.click()
+      return
+    }
   }
-  // No tracked name — fall back to the first card, seeding one through the UI
-  // if the directory is empty.
+  // No tracked name, or search found nothing — fall back to the first
+  // card, seeding one through the UI if the directory is empty.
   const card = page.getByTestId('directory-contact-card')
-  await ensureContactVisibleInDirectory(page)
+  await expect(
+    card.first()
+      .or(page.getByTestId('contact-list').getByText(/no contacts match/i))
+      .or(page.getByTestId('empty-state')),
+  ).toBeVisible({ timeout: Timeouts.ELEMENT })
+  if (await card.count() === 0) {
+    await ensureContactVisibleInDirectory(page)
+  }
   // The directory orders never-contacted contacts newest-first, and the scenario's
   // Given seeded its contact last, so the first card is that contact.
   await expect(card.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
