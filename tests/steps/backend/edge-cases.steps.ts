@@ -203,27 +203,30 @@ Then('the second role creation should return {int}', async ({}, _status: number)
 When('an admin creates a volunteer with a {int}-character name', async ({ request, world }, length: number) => {
   const kp = generateTestKeypair()
   const name = 'A'.repeat(length)
-  getSharedState(world).lastResponse = await apiPost(request, '/users', {
+  const response = await apiPost(request, '/users', {
     pubkey: kp.pubkey,
     name,
     phone: uniquePhone(),
   })
-  getEdgeState(world).createdSuccessfully = getSharedState(world).lastResponse.status < 300
+  getSharedState(world).lastResponse = response
+  getEdgeState(world).createdSuccessfully = response.status < 300
 })
 
 Then('the volunteer should be created successfully', async ({ world }) => {
-  expect(getEdgeState(world).createdSuccessfully || (getSharedState(world).lastResponse && getSharedState(world).lastResponse.status < 300)).toBeTruthy()
+  const lastResponse = getSharedState(world).lastResponse
+  expect(getEdgeState(world).createdSuccessfully || (lastResponse && lastResponse.status < 300)).toBeTruthy()
 })
 
 // 'an admin creates a volunteer named {string}' is defined in crud.steps.ts
 // 'the volunteer list should contain {string}' is defined in crud.steps.ts
 
 When('an admin creates a ban with reason {string}', async ({ request, world }, reason: string) => {
-  getSharedState(world).lastResponse = await apiPost(request, '/bans', {
+  const response = await apiPost(request, '/bans', {
     phone: uniquePhone(),
     reason,
   })
-  getEdgeState(world).createdSuccessfully = getSharedState(world).lastResponse.status < 300
+  getSharedState(world).lastResponse = response
+  getEdgeState(world).createdSuccessfully = response.status < 300
 })
 
 Then('the ban should be created successfully', async ({ world }) => {
@@ -232,12 +235,13 @@ Then('the ban should be created successfully', async ({ world }) => {
 
 When('an admin creates a volunteer with no optional fields', async ({ request, world }) => {
   const kp = generateTestKeypair()
-  getSharedState(world).lastResponse = await apiPost(request, '/users', {
+  const response = await apiPost(request, '/users', {
     pubkey: kp.pubkey,
     name: uniqueName('Edge NoOpt'),
     phone: uniquePhone(),
   })
-  getEdgeState(world).createdSuccessfully = getSharedState(world).lastResponse.status < 300
+  getSharedState(world).lastResponse = response
+  getEdgeState(world).createdSuccessfully = response.status < 300
 })
 
 // ─── Error Response Consistency ─────────────────────────────────────
@@ -271,7 +275,7 @@ When('a CORS preflight request is sent to {string}', async ({ request, world }, 
   for (const [key, value] of Object.entries(rawHeaders)) {
     headers[key.toLowerCase()] = value
   }
-  getSharedState(world).lastResponse.data = headers
+  getSharedState(world).lastResponse!.data = headers
 })
 
 Then('the response should include CORS headers', async ({ world }) => {

@@ -10,6 +10,7 @@ import { expect } from '@playwright/test'
 import { Given, When, Then, Before, getState, setState } from './fixtures'
 import { setLastResponse } from './shared-state'
 import { getScenarioState } from './common.steps'
+import type { TemplateSummary } from '../../api-helpers'
 import {
   createEntityTypeViaApi,
   listEntityTypesViaApi,
@@ -48,7 +49,7 @@ import {
 
 interface CmsState {
   // Templates
-  templateCatalog: Array<Record<string, unknown>>
+  templateCatalog: TemplateSummary[]
   templateDetails?: Record<string, unknown>
   applyResult?: Record<string, unknown>
   // Contacts
@@ -369,8 +370,9 @@ When('the volunteer tries to create a contact', async ({ request, world }) => {
 When('the admin creates a record of type {string} with status hash {string}', async ({ request, world }, typeName: string, statusHash: string) => {
   const entityTypeId = await resolveEntityTypeId(world, request, typeName)
   const hubId = getScenarioState(world).hubId
-  getCmsState(world).lastRecord = await createRecordViaApi(request, entityTypeId, { statusHash, hubId })
-  getCmsState(world).records.push(getCmsState(world).lastRecord)
+  const record = await createRecordViaApi(request, entityTypeId, { statusHash, hubId })
+  getCmsState(world).lastRecord = record
+  getCmsState(world).records.push(record)
 })
 
 Then('the record should have a generated UUID id', async ({ world }) => {
@@ -391,15 +393,17 @@ Then('the record should have status hash {string}', async ({ world }, statusHash
 Given('a record of type {string} exists', async ({ request, world }, typeName: string) => {
   const entityTypeId = await resolveEntityTypeId(world, request, typeName)
   const hubId = getScenarioState(world).hubId
-  getCmsState(world).lastRecord = await createRecordViaApi(request, entityTypeId, { hubId })
-  getCmsState(world).records.push(getCmsState(world).lastRecord)
+  const record = await createRecordViaApi(request, entityTypeId, { hubId })
+  getCmsState(world).lastRecord = record
+  getCmsState(world).records.push(record)
 })
 
 Given('a record of type {string} exists with status hash {string}', async ({ request, world }, typeName: string, statusHash: string) => {
   const entityTypeId = await resolveEntityTypeId(world, request, typeName)
   const hubId = getScenarioState(world).hubId
-  getCmsState(world).lastRecord = await createRecordViaApi(request, entityTypeId, { statusHash, hubId })
-  getCmsState(world).records.push(getCmsState(world).lastRecord)
+  const record = await createRecordViaApi(request, entityTypeId, { statusHash, hubId })
+  getCmsState(world).lastRecord = record
+  getCmsState(world).records.push(record)
 })
 
 When('the admin lists records filtered by entity type {string}', async ({ request, world }, typeName: string) => {
@@ -467,8 +471,9 @@ Given('an entity type with number prefix {string} exists', async ({ request, wor
 
 When('the admin creates a record of the numbered type', async ({ request, world }) => {
   const hubId = getScenarioState(world).hubId
-  getCmsState(world).lastRecord = await createRecordViaApi(request, getCmsState(world).numberedEntityTypeId!, { hubId })
-  getCmsState(world).records.push(getCmsState(world).lastRecord)
+  const record = await createRecordViaApi(request, getCmsState(world).numberedEntityTypeId!, { hubId })
+  getCmsState(world).lastRecord = record
+  getCmsState(world).records.push(record)
 })
 
 Then('the record should have a case number matching {string}', async ({ world }, pattern: string) => {
@@ -479,8 +484,9 @@ Then('the record should have a case number matching {string}', async ({ world },
 
 When('the admin creates another record of the numbered type', async ({ request, world }) => {
   const hubId = getScenarioState(world).hubId
-  getCmsState(world).lastRecord = await createRecordViaApi(request, getCmsState(world).numberedEntityTypeId!, { hubId })
-  getCmsState(world).records.push(getCmsState(world).lastRecord)
+  const record = await createRecordViaApi(request, getCmsState(world).numberedEntityTypeId!, { hubId })
+  getCmsState(world).lastRecord = record
+  getCmsState(world).records.push(record)
 })
 
 Then('the second record should have a case number matching {string}', async ({ world }, pattern: string) => {
