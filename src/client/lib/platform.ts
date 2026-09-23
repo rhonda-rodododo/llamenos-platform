@@ -84,6 +84,7 @@ export type TauriIpcCommand =
   | 'provision_decrypt_and_import'
   | 'api_config_get'
   | 'api_config_set'
+  | 'api_config_request_clear'
   | 'api_config_clear'
   | 'net_fetch'
   | 'net_probe_health'
