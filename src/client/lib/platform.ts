@@ -1395,10 +1395,28 @@ export async function persistApiBase(origin: string): Promise<string> {
   throw new Error('persistApiBase: not in Tauri context')
 }
 
-/** Forget the backend address — the app returns to first-run configuration. */
+/**
+ * Forget the backend address — the app returns to first-run configuration.
+ *
+ * Rust-owned confirmation gate (#788): `api_config_clear` refuses to run
+ * without a one-time token, and the only way to obtain one is
+ * `api_config_request_clear`, which blocks in Rust on a native OS dialog
+ * rendered outside the webview's DOM/JS sandbox. A compromised renderer (or a
+ * stray click handler wired to the wrong callback) that calls this function —
+ * or calls `api_config_clear` directly, skipping this function entirely —
+ * still cannot clear the configured address without a real person clicking a
+ * real system dialog. The token is single-use and short-lived (see
+ * `apps/desktop/src/api_config.rs::CLEAR_TOKEN_TTL`), so it can't be
+ * intercepted here and replayed later.
+ *
+ * This function is the ONLY place that chains the two IPC calls — callers
+ * (e.g. `api-config.ts::resetApiBase`) see one awaitable operation and never
+ * get a chance to call `api_config_clear` without going through the dialog.
+ */
 export async function clearConfiguredApiBase(): Promise<void> {
   if (useTauri) {
-    await tauriInvoke<void>('api_config_clear')
+    const token = await tauriInvoke<string>('api_config_request_clear')
+    await tauriInvoke<void>('api_config_clear', { token })
     return
   }
   throw new Error('clearConfiguredApiBase: not in Tauri context')

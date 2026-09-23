@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll } from 'vitest'
 import { checkScope } from '../../orchestrator/src/scope.js'
-import { loadLaneScopes, type LaneScope } from '../../orchestrator/src/fragments.js'
+import { loadLaneScopes, matchesPath, type LaneScope } from '../../orchestrator/src/fragments.js'
 
 const IOS: LaneScope = { owned: ['apps/ios/', '.github/workflows/ios*.yml'], notOwned: [] }
 const NEVER = ['.env', 'deploy/', '.github/workflows/']
@@ -72,9 +72,16 @@ describe('checkScope', () => {
         'apps/worker/',
         'sip-bridge/',
         'signal-notifier/',
+        'src/server/',
         'tests/steps/backend/',
+        'tests/steps/fixtures.ts',
         '.github/ci/*-baseline.json',
+        'eslint.config.js',
+        'lefthook.yml',
+        'playwright.config.ts',
+        'packages/test-specs/features/',
         'packages/i18n/locales/',
+        'scripts/test-backend-bdd.sh',
       ])
       expect(backend.notOwned).toEqual([
         'tests/',
@@ -90,10 +97,14 @@ describe('checkScope', () => {
         'tests/mocks/',
         'playwright.config.ts',
         '.github/ci/*-baseline.json',
+        'eslint.config.js',
+        'lefthook.yml',
+        'packages/test-specs/features/',
         'packages/i18n/locales/',
       ])
       expect(desktop.notOwned).toEqual([
         'tests/steps/backend/',
+        'src/server/',
         'packages/test-specs/',
         'packages/i18n/languages.ts',
         'packages/i18n/tools/',
@@ -203,16 +214,22 @@ describe('checkScope', () => {
     })
 
     // (d) adjacent grants this fix must NOT touch stay exactly as they were.
-    it('backend still does not own tests/mocks/ or packages/test-specs/', () => {
+    // packages/test-specs/features/ itself became a shared-write grant for
+    // backend and desktop in the lane-boundary fix below (#847/#908/#938-style
+    // narrow carve-out) — that grant is exercised in the
+    // "packages/test-specs/features/ lane-scope fix" describe block further
+    // down. What must NOT have moved is packages/test-specs/tools/ (coverage
+    // tooling) and tests/mocks/, neither of which this or that fix touches.
+    it('backend still does not own tests/mocks/ or packages/test-specs/tools/', () => {
       expect(checkScope(['tests/mocks/tauri.ts'], backend, []).strayed).toEqual(['tests/mocks/tauri.ts'])
-      expect(checkScope(['packages/test-specs/features/x.feature'], backend, []).strayed).toEqual([
-        'packages/test-specs/features/x.feature',
+      expect(checkScope(['packages/test-specs/tools/validate-coverage.ts'], backend, []).strayed).toEqual([
+        'packages/test-specs/tools/validate-coverage.ts',
       ])
     })
 
-    it('desktop still does not own packages/test-specs/ or the shared i18n files', () => {
-      expect(checkScope(['packages/test-specs/features/x.feature'], desktop, []).strayed).toEqual([
-        'packages/test-specs/features/x.feature',
+    it('desktop still does not own packages/test-specs/tools/ or the shared i18n files', () => {
+      expect(checkScope(['packages/test-specs/tools/validate-coverage.ts'], desktop, []).strayed).toEqual([
+        'packages/test-specs/tools/validate-coverage.ts',
       ])
       expect(checkScope(['packages/i18n/languages.ts'], desktop, []).strayed).toEqual([
         'packages/i18n/languages.ts',
@@ -327,6 +344,375 @@ describe('checkScope', () => {
       expect(checkScope(['packages/i18n/locales/en.json'], shared, []).strayed).toEqual([])
       expect(checkScope(['packages/i18n/languages.ts'], shared, []).strayed).toEqual([])
       expect(checkScope(['packages/i18n/tools/i18n-codegen.ts'], shared, []).strayed).toEqual([])
+    })
+  })
+
+  // --- Lane boundary fix, 2026-09-22: four PRs blocked on the same
+  // fleet/verify scope question across three lanes (#890 desktop, #887/#847/
+  // #908 backend). Read from the repo's own configuration and structure
+  // (root.package.json's `lint` script, each PR's actual diff, CLAUDE.md's
+  // "129 .feature files tagged @backend/@desktop/@ios/@android"), not
+  // invented — mirrors #938 (packages/i18n/locales/) and #943
+  // (tests/steps/backend/) in shape: narrow, evidence-led grants, never a
+  // blanket "everyone owns everything" widening.
+  //
+  // Four distinct fixes, each independently evidenced:
+  //
+  // 1. eslint.config.js / lefthook.yml — root tooling config, structurally a
+  //    flat array of independent, path-scoped rule blocks (confirmed by
+  //    reading #890's actual diff: its new block is `files: ['src/client/**/
+  //    ...', 'tests/**/*.ts'], ignores: ['tests/steps/**/*.ts']` — scoped to
+  //    exactly desktop's own trees). package.json's root `lint` script is
+  //    `eslint src/ apps/worker/ orchestrator/ tests/orchestrator/` — of the
+  //    four platform lanes, only desktop (src/, tests/) and backend
+  //    (apps/worker/) are covered by it; android and iOS have no ESLint-
+  //    relevant owned paths at all (Kotlin/Swift), and shared's #836 (the
+  //    "shared third" of the same #647 split) landed clean without touching
+  //    either file, confirming shared does not need this grant. Backend's own
+  //    tracking issue #702 explicitly lists "apps/worker, sip-bridge,
+  //    signal-notifier and tests/steps are added to the lefthook pre-commit
+  //    ESLint glob" as an acceptance criterion — backend WILL need this grant
+  //    even though #887/#847/#908 (the backend PRs on hand) happen not to
+  //    exercise it yet.
+  //
+  // 2. src/server/ — NOT desktop's. It is the Bun server bootstrap that
+  //    imports directly from apps/worker/{db,services,lib} and wires up the
+  //    Hono app onto Bun's native HTTP — backend's domain by every import in
+  //    the file. #890 touched it only incidentally (a mechanical lint fix,
+  //    3 lines) while it was nobody's declared path at all. Moved to
+  //    backend's owned list; deliberately NOT added to desktop's — #890
+  //    keeps exactly one file strayed, and that is the correct outcome (see
+  //    the PR-by-PR table in this fix's PR body).
+  //
+  // 3. tests/steps/fixtures.ts — genuinely shared: every directory under
+  //    tests/steps/ imports it (grep confirms all 19, both backend's
+  //    tests/steps/backend/ and every desktop-owned domain directory).
+  //    #887's diff narrows RolesWorld.cachedRoles from `Array<Record<string,
+  //    unknown>>` to a real `RoleDefinition[]` — a type backend needed
+  //    tightened, that both lanes' consumers must then satisfy. Desktop
+  //    already owns this file via its blanket `tests/` grant; only backend
+  //    needed the explicit narrow add.
+  //
+  // 4. packages/test-specs/features/ — CLAUDE.md already states test-specs
+  //    is "129 .feature files tagged @backend/@desktop/@ios/@android"; grep
+  //    confirms real tag counts across all four (90/50/32/31 files
+  //    respectively). #847 and #908 both add clean, single-tag `@backend`
+  //    scenarios to files that already exist under packages/test-specs/
+  //    features/security/ — no cross-tag edits, no touch to
+  //    packages/test-specs/tools/ (the coverage checker, #836 confirms that
+  //    stays shared-exclusive). Narrow carve-out granted to all four platform
+  //    lanes, mirroring packages/i18n/locales/ exactly; packages/test-specs/
+  //    tools/ and the repo docs at its root (README.md, STEP_VOCABULARY.md,
+  //    package.json) stay shared-supervisor-exclusive.
+  //
+  // 5. playwright.config.ts — desktop already owns the whole file. #908 adds
+  //    a `backend-bdd-global-setting` Playwright project object (additive,
+  //    scoped to `steps: "tests/steps/backend/**/*.ts"`) alongside the
+  //    existing `backend-bdd` project — both are backend's own test-project
+  //    definitions inside a file desktop otherwise owns, the same shape
+  //    #943 already established for this exact file. Narrow shared-write
+  //    added for backend.
+  //
+  // 6. scripts/test-backend-bdd.sh — package.json's `test:backend:bdd` script
+  //    target, already named as backend's own quality gate in this fragment's
+  //    "Quality Gates" section before this fix. `scripts/` as a whole is a
+  //    mixed bag (android-parallel-e2e.sh, ios-build.sh, release/, etc.) with
+  //    no single owner and is NOT granted wholesale here — only the one file
+  //    #908 actually touches.
+  //
+  // What was deliberately NOT done: tests/steps/admin/, tests/steps/auth/,
+  // and tests/steps/cases/ (also touched by #887) are NOT granted to backend.
+  // Those edits are genuine, unaccommodated strays — see this fix's PR body
+  // for the verdict on #887 and #890.
+
+  describe('root tooling config (eslint.config.js, lefthook.yml): backend and desktop shared-write, nobody else', () => {
+    let backend: LaneScope
+    let desktop: LaneScope
+    let ios: LaneScope
+    let android: LaneScope
+    let shared: LaneScope
+    let infra: LaneScope
+
+    beforeAll(async () => {
+      const scopes = await loadLaneScopes(process.cwd())
+      const b = scopes['backend']
+      const d = scopes['desktop']
+      const i = scopes['ios']
+      const a = scopes['android']
+      const s = scopes['shared']
+      const inf = scopes['infra']
+      if (!b || !d || !i || !a || !s || !inf) throw new Error('expected all six lane fragments to exist')
+      backend = b
+      desktop = d
+      ios = i
+      android = a
+      shared = s
+      infra = inf
+    })
+
+    it.each(['eslint.config.js', 'lefthook.yml'])('backend may write %s', (file) => {
+      expect(checkScope([file], backend, []).strayed).toEqual([])
+    })
+
+    it.each(['eslint.config.js', 'lefthook.yml'])('desktop may write %s', (file) => {
+      expect(checkScope([file], desktop, []).strayed).toEqual([])
+    })
+
+    it.each(['eslint.config.js', 'lefthook.yml'])('ios may NOT write %s — no ESLint-relevant owned paths', (file) => {
+      expect(checkScope([file], ios, []).strayed).toEqual([file])
+    })
+
+    it.each(['eslint.config.js', 'lefthook.yml'])('android may NOT write %s — no ESLint-relevant owned paths', (file) => {
+      expect(checkScope([file], android, []).strayed).toEqual([file])
+    })
+
+    it.each(['eslint.config.js', 'lefthook.yml'])('shared may NOT write %s — #836 landed without needing it', (file) => {
+      expect(checkScope([file], shared, []).strayed).toEqual([file])
+    })
+
+    it.each(['eslint.config.js', 'lefthook.yml'])('infra may NOT write %s — not infra tooling', (file) => {
+      expect(checkScope([file], infra, []).strayed).toEqual([file])
+    })
+
+    // The exact file #890 tripped on: confirms the grant resolves the red.
+    it('desktop may write the actual lint-block diff shape from #890', () => {
+      expect(
+        checkScope(['eslint.config.js', 'lefthook.yml', 'src/client/main.tsx', 'tests/helpers.ts'], desktop, [])
+          .strayed,
+      ).toEqual([])
+    })
+  })
+
+  describe('src/server/ ownership fix: backend, not desktop (#890)', () => {
+    let backend: LaneScope
+    let desktop: LaneScope
+
+    beforeAll(async () => {
+      const scopes = await loadLaneScopes(process.cwd())
+      const b = scopes['backend']
+      const d = scopes['desktop']
+      if (!b || !d) throw new Error('expected backend and desktop lane fragments to exist')
+      backend = b
+      desktop = d
+    })
+
+    it('backend may write src/server/index.ts — it wires apps/worker onto Bun HTTP', () => {
+      expect(checkScope(['src/server/index.ts'], backend, []).strayed).toEqual([])
+    })
+
+    it('desktop may NOT write src/server/index.ts — genuine stray, not accommodated (#890 verdict)', () => {
+      expect(checkScope(['src/server/index.ts'], desktop, []).strayed).toEqual(['src/server/index.ts'])
+    })
+
+    it('desktop keeps its unrelated src/client/ grant — the fix does not widen or narrow that', () => {
+      expect(checkScope(['src/client/main.tsx'], desktop, []).strayed).toEqual([])
+    })
+  })
+
+  describe('tests/steps/fixtures.ts lane-scope fix: backend shared-write added, desktop already had it (#887)', () => {
+    let backend: LaneScope
+    let desktop: LaneScope
+
+    beforeAll(async () => {
+      const scopes = await loadLaneScopes(process.cwd())
+      const b = scopes['backend']
+      const d = scopes['desktop']
+      if (!b || !d) throw new Error('expected backend and desktop lane fragments to exist')
+      backend = b
+      desktop = d
+    })
+
+    it('backend may write tests/steps/fixtures.ts', () => {
+      expect(checkScope(['tests/steps/fixtures.ts'], backend, []).strayed).toEqual([])
+    })
+
+    it('desktop may write tests/steps/fixtures.ts — via its unchanged blanket tests/ grant', () => {
+      expect(checkScope(['tests/steps/fixtures.ts'], desktop, []).strayed).toEqual([])
+    })
+
+    it('the grant is scoped to the one file — backend still may not write other desktop-owned tests/steps/ directories', () => {
+      const r = checkScope(
+        ['tests/steps/admin/admin-flow-steps.ts', 'tests/steps/auth/pin-lockout-steps.ts', 'tests/steps/cases/cms-events-steps.ts'],
+        backend,
+        [],
+      )
+      expect(r.strayed).toEqual([
+        'tests/steps/admin/admin-flow-steps.ts',
+        'tests/steps/auth/pin-lockout-steps.ts',
+        'tests/steps/cases/cms-events-steps.ts',
+      ])
+    })
+  })
+
+  describe('packages/test-specs/features/ lane-scope fix: all four platform lanes shared-write, tools/ stays shared-exclusive (#847, #908)', () => {
+    let backend: LaneScope
+    let desktop: LaneScope
+    let ios: LaneScope
+    let android: LaneScope
+    let shared: LaneScope
+
+    beforeAll(async () => {
+      const scopes = await loadLaneScopes(process.cwd())
+      const b = scopes['backend']
+      const d = scopes['desktop']
+      const i = scopes['ios']
+      const a = scopes['android']
+      const s = scopes['shared']
+      if (!b || !d || !i || !a || !s) throw new Error('expected backend/desktop/ios/android/shared lane fragments to exist')
+      backend = b
+      desktop = d
+      ios = i
+      android = a
+      shared = s
+    })
+
+    // (a) the actual files from #847 and #908 are now in scope for backend.
+    it.each([
+      'packages/test-specs/features/security/recovery-group.feature', // #847
+      'packages/test-specs/features/security/webauthn-flow.feature', // #908
+    ])('backend may write %s', (file) => {
+      expect(checkScope([file], backend, []).strayed).toEqual([])
+    })
+
+    // (b) every platform lane gets the same carve-out, not just backend.
+    it.each(['desktop', 'backend', 'ios', 'android'] as const)(
+      '%s may add/update a scenario under packages/test-specs/features/',
+      (lane) => {
+        const scope = { desktop, backend, ios, android }[lane]
+        expect(checkScope(['packages/test-specs/features/security/new-scenario.feature'], scope, []).strayed).toEqual([])
+      },
+    )
+
+    // (c) the grant does not widen into packages/test-specs/tools/ or the
+    // directory's root docs — those stay shared-supervisor-exclusive.
+    it.each(['desktop', 'backend', 'ios', 'android'] as const)(
+      '%s may NOT touch packages/test-specs/tools/ (shared-supervisor exclusive)',
+      (lane) => {
+        const scope = { desktop, backend, ios, android }[lane]
+        expect(checkScope(['packages/test-specs/tools/validate-coverage.ts'], scope, []).strayed).toEqual([
+          'packages/test-specs/tools/validate-coverage.ts',
+        ])
+      },
+    )
+
+    it.each(['desktop', 'backend', 'ios', 'android'] as const)(
+      '%s may NOT touch packages/test-specs/ root docs (shared-supervisor exclusive)',
+      (lane) => {
+        const scope = { desktop, backend, ios, android }[lane]
+        expect(checkScope(['packages/test-specs/README.md'], scope, []).strayed).toEqual([
+          'packages/test-specs/README.md',
+        ])
+      },
+    )
+
+    // (d) shared lane is unaffected — it still owns everything under
+    // packages/test-specs/, features/ included, via its unchanged blanket
+    // `packages/test-specs/` owned entry.
+    it('shared lane still owns packages/test-specs/features/, packages/test-specs/tools/, and the root docs', () => {
+      expect(checkScope(['packages/test-specs/features/security/x.feature'], shared, []).strayed).toEqual([])
+      expect(checkScope(['packages/test-specs/tools/validate-coverage.ts'], shared, []).strayed).toEqual([])
+      expect(checkScope(['packages/test-specs/README.md'], shared, []).strayed).toEqual([])
+    })
+  })
+
+  describe('playwright.config.ts lane-scope fix: backend narrow shared-write added, desktop keeps full ownership (#908)', () => {
+    let backend: LaneScope
+    let desktop: LaneScope
+
+    beforeAll(async () => {
+      const scopes = await loadLaneScopes(process.cwd())
+      const b = scopes['backend']
+      const d = scopes['desktop']
+      if (!b || !d) throw new Error('expected backend and desktop lane fragments to exist')
+      backend = b
+      desktop = d
+    })
+
+    it('backend may write playwright.config.ts', () => {
+      expect(checkScope(['playwright.config.ts'], backend, []).strayed).toEqual([])
+    })
+
+    it('desktop still owns playwright.config.ts — the grant to backend does not remove it', () => {
+      expect(checkScope(['playwright.config.ts'], desktop, []).strayed).toEqual([])
+    })
+  })
+
+  describe('scripts/test-backend-bdd.sh lane-scope fix: backend only, not a scripts/ blanket grant (#908)', () => {
+    let backend: LaneScope
+    let desktop: LaneScope
+
+    beforeAll(async () => {
+      const scopes = await loadLaneScopes(process.cwd())
+      const b = scopes['backend']
+      const d = scopes['desktop']
+      if (!b || !d) throw new Error('expected backend and desktop lane fragments to exist')
+      backend = b
+      desktop = d
+    })
+
+    it('backend may write scripts/test-backend-bdd.sh', () => {
+      expect(checkScope(['scripts/test-backend-bdd.sh'], backend, []).strayed).toEqual([])
+    })
+
+    it('the grant is scoped to the one file — backend still may not write an unrelated scripts/ file', () => {
+      expect(checkScope(['scripts/android-parallel-e2e.sh'], backend, []).strayed).toEqual([
+        'scripts/android-parallel-e2e.sh',
+      ])
+    })
+
+    it('desktop may not write scripts/test-backend-bdd.sh — it is not desktop\'s file', () => {
+      expect(checkScope(['scripts/test-backend-bdd.sh'], desktop, []).strayed).toEqual([
+        'scripts/test-backend-bdd.sh',
+      ])
+    })
+  })
+
+  describe('neverWrite stays untouched by the lane-boundary fix — every new grant is checked against the real secret patterns', () => {
+    let backend: LaneScope
+
+    beforeAll(async () => {
+      const scopes = await loadLaneScopes(process.cwd())
+      const b = scopes['backend']
+      if (!b) throw new Error('expected backend lane fragment to exist')
+      backend = b
+    })
+
+    // Real SECRET_PATH_PATTERNS from config.ts — pinned here rather than
+    // imported so this test still catches a regression if config.ts's
+    // NEVER_WRITE_PATHS export is ever accidentally narrowed.
+    const NEVER = ['.env', '.dev.vars', 'keystore.properties', '*.pem', 'id_rsa', 'id_ed25519', '*.jks', '*.keystore', '*.p8', '*.p12', '*.pfx', '*.key', '*.mobileprovision', '.npmrc', '.pgpass', 'authorized_keys']
+
+    it('none of the six new grants (eslint.config.js, lefthook.yml, src/server/, tests/steps/fixtures.ts, packages/test-specs/features/, playwright.config.ts, scripts/test-backend-bdd.sh) collide with a secret pattern', () => {
+      const newlyGranted = [
+        'eslint.config.js',
+        'lefthook.yml',
+        'src/server/index.ts',
+        'tests/steps/fixtures.ts',
+        'packages/test-specs/features/security/x.feature',
+        'playwright.config.ts',
+        'scripts/test-backend-bdd.sh',
+      ]
+      for (const f of newlyGranted) {
+        expect(NEVER.some((p) => matchesPath(f, p)), `${f} unexpectedly matches a neverWrite pattern`).toBe(false)
+      }
+    })
+
+    it('an unrestricted lane still cannot write a secret through one of the new shared files\' own directories', () => {
+      // Sanity: neverWrite still wins even where a lane now has a broad new
+      // owned entry (e.g. backend's packages/test-specs/features/) — a
+      // hypothetical secret dropped into that tree is still forbidden, not
+      // merely strayed.
+      const r = checkScope(['packages/test-specs/features/.env'], backend, ['.env'])
+      expect(r.forbidden).toEqual(['packages/test-specs/features/.env'])
+      expect(r.strayed).toEqual([])
+    })
+
+    it('sanity: the never-write list itself is unchanged by this fix — deploy/ and .github/workflows/ remain the merge-gate\'s job, not the write gate\'s', () => {
+      // This mirrors config.ts's own documented reasoning (see
+      // assertLiveLanesHaveScope's doc comment) — restated here as a
+      // regression guard specific to this fix, not a re-test of config.ts.
+      expect(NEVER).not.toContain('deploy/')
+      expect(NEVER).not.toContain('.github/workflows/')
     })
   })
 

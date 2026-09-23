@@ -40,7 +40,11 @@ pub fn run() {
         }))
         .plugin(tauri_plugin_window_state::Builder::default().build())
         .plugin(tauri_plugin_log::Builder::new().build())
-        .plugin(tauri_plugin_process::init());
+        .plugin(tauri_plugin_process::init())
+        // Native confirmation dialogs (#788) — used only from Rust
+        // (`api_config::api_config_request_clear`), never exposed to the
+        // webview as its own IPC command.
+        .plugin(tauri_plugin_dialog::init());
 
     // Updater disabled for Flatpak builds (Flatpak has its own update mechanism)
     #[cfg(feature = "updater")]
@@ -56,6 +60,8 @@ pub fn run() {
         // Pinned HTTP client + WebSocket TLS connector for the configured
         // backend (#775) — populated below, once a backend is configured.
         .manage(PinnedNet::default())
+        // One-time confirmation token for api_config_clear (#788)
+        .manage(api_config::ClearConfirmState::default())
         .setup(|app| {
             // Rehydrate the pinned TLS client/connector from whatever backend
             // was already configured on a previous run (#775). Must happen
@@ -224,6 +230,7 @@ pub fn run() {
             // the webview holds no store-plugin permission for it.
             api_config::api_config_get,
             api_config::api_config_set,
+            api_config::api_config_request_clear,
             api_config::api_config_clear,
             // Runtime-enforced network egress (#739) — the webview's CSP connect-src
             // allows only `ipc:`; all HTTP/WS traffic to the configured backend goes
