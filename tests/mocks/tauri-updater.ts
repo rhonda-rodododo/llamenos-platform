@@ -96,7 +96,7 @@ export async function check(): Promise<Update | null> {
       onProgress?.({ event: 'Finished' })
     },
 
-    async download(onProgress) {
+    async download(this: Update, onProgress) {
       await this.downloadAndInstall(onProgress)
     },
 
