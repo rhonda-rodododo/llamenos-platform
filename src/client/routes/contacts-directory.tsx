@@ -413,7 +413,7 @@ function ContactDirectoryPage() {
             ) : filteredContacts.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-12 text-center px-4">
                 <Search className="h-6 w-6 mb-2 text-muted-foreground/40" />
-                <p className="text-sm text-muted-foreground">
+                <p data-testid="contact-list-no-results" className="text-sm text-muted-foreground">
                   {searchQuery
                     ? t('contactDirectory.noSearchResults', { defaultValue: 'No contacts match your search.' })
                     : t('contactDirectory.noFilterResults', { defaultValue: 'No contacts match the selected filter.' })}

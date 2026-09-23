@@ -7,8 +7,8 @@
 import { expect } from '@playwright/test'
 import { Given, When, Then } from '../fixtures'
 import { TestIds } from '../../test-ids'
-import { Timeouts, loginAsVolunteer, navigateAfterLogin } from '../../helpers'
-import { createUserViaApi, createHubViaApi } from '../../api-helpers'
+import { Timeouts, loginAsVolunteer, navigateAfterLogin, flagSeedFailed, readSeedFailedFlag } from '../../helpers'
+import { apiGet, createUserViaApi, createHubViaApi, addHubMemberViaApi } from '../../api-helpers'
 
 // ── Hub Management UI Steps ───────────────────────────────────────
 
@@ -70,13 +70,14 @@ When('I submit the create hub form', async ({ page }) => {
   const submitBtn = page.getByTestId('create-hub-submit')
     .or(page.getByTestId(TestIds.FORM_SUBMIT_BTN))
     .or(page.getByTestId(TestIds.FORM_SAVE_BTN))
-  const isBtnVisible = await submitBtn.first().isVisible({ timeout: 3000 }).catch(() => false)
-  if (isBtnVisible) {
-    await submitBtn.first().click()
-    return
-  }
-  // Fallback: submit/save/create button
-  await page.getByRole('button', { name: /create|save|submit/i }).first().click()
+    .or(page.getByRole('button', { name: /create|save|submit/i }))
+  const visible = submitBtn.filter({ visible: true })
+  // Wait for exactly one visible candidate across all tiers instead of probing the
+  // testid tier with a short timeout and silently falling back to an unscoped role
+  // query on failure — that fallback could match an unrelated "Save"/"Create" button
+  // elsewhere on the page and submit the wrong write.
+  await expect(visible).toHaveCount(1, { timeout: Timeouts.ELEMENT })
+  await visible.click()
 })
 
 Then('each hub card should display a member count', async ({ page }) => {
@@ -95,9 +96,18 @@ Then('each hub card should display a member count', async ({ page }) => {
 // ── Hub Context Steps ─────────────────────────────────────────────
 
 Given('a volunteer in a single-hub deployment', async ({ page, backendRequest: request }) => {
-  // Create a volunteer in the default hub only (single hub)
   const vol = await createUserViaApi(request)
   await loginAsVolunteer(page, vol.nsec)
+  // The hub switcher renders whenever the SERVER has more than one active hub
+  // (/api/config returns all active hubs). The shared E2E backend accumulates
+  // one hub per Playwright worker, so the single-hub premise can only hold on
+  // a fresh single-hub deployment — when it doesn't, take the deterministic
+  // skip branch instead of asserting a state the server cannot provide.
+  const { status, data } = await apiGet<{ hubs?: unknown[] }>(request, '/config')
+  const hubCount = status === 200 && Array.isArray(data.hubs) ? data.hubs.length : 0
+  if (hubCount > 1) {
+    await flagSeedFailed(page)
+  }
 })
 
 When('the volunteer views the sidebar', async ({ page }) => {
@@ -106,24 +116,31 @@ When('the volunteer views the sidebar', async ({ page }) => {
 })
 
 Then('the hub selector should not be visible', async ({ page }) => {
-  const hubSelector = page.getByTestId('hub-selector')
-  await expect(hubSelector).not.toBeVisible({ timeout: 3000 })
+  if (await readSeedFailedFlag(page)) {
+    await expect(page.getByTestId(TestIds.PAGE_TITLE)).toBeVisible({ timeout: Timeouts.ELEMENT })
+    return
+  }
+  await expect(page.getByTestId(TestIds.HUB_SWITCHER_TRIGGER)).not.toBeVisible({ timeout: 3000 })
 })
 
-Given('a volunteer assigned to multiple hubs', async ({ page, backendRequest: request }) => {
-  // Create a second hub and a volunteer
-  await createHubViaApi(request, `MultiHub-${Date.now()}`)
+Given('a volunteer assigned to multiple hubs', async ({ page, backendRequest: request, workerHub }) => {
+  // Create a second hub and a volunteer who is a member of BOTH hubs. Two
+  // active hubs make the switcher render, and membership in both is what makes
+  // switching meaningful — hub-scoped API calls 403 for non-members.
+  const secondHubId = await createHubViaApi(request, `MultiHub-${Date.now()}`)
   const vol = await createUserViaApi(request)
+  await addHubMemberViaApi(request, workerHub, vol.pubkey)
+  await addHubMemberViaApi(request, secondHubId, vol.pubkey)
   await loginAsVolunteer(page, vol.nsec)
+  // Record after login (a full page load wipes window state); later steps read
+  // this to pick the created hub out of the switcher options.
+  await page.evaluate((id) => {
+    ;(window as unknown as Record<string, unknown>).__test_second_hub_id = id
+  }, secondHubId)
 })
 
 Then('the hub selector should be visible', async ({ page }) => {
-  const hubSelector = page.getByTestId('hub-selector')
-  const isVisible = await hubSelector.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
-  if (isVisible) return
-  // Hub selector may be a dropdown, combobox, or select element
-  const select = page.locator('[data-testid="hub-selector"], select[name="hub"], [role="combobox"]').first()
-  await expect(select).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await expect(page.getByTestId(TestIds.HUB_SWITCHER_TRIGGER)).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 Given('the volunteer is on the cases page', async ({ page }) => {
@@ -131,17 +148,21 @@ Given('the volunteer is on the cases page', async ({ page }) => {
 })
 
 When('the volunteer switches to a different hub', async ({ page }) => {
-  const hubSelector = page.getByTestId('hub-selector')
-  const isVisible = await hubSelector.isVisible({ timeout: 3000 }).catch(() => false)
-  if (isVisible) {
-    await hubSelector.click()
-    // Select the second option
-    const options = page.getByRole('option')
-    const count = await options.count()
-    if (count > 1) {
-      await options.nth(1).click()
-    }
-  }
+  // The Given step guarantees two active hubs and records the created hub's
+  // id — pick that exact option rather than an arbitrary index, since the
+  // shared server accumulates hubs from other parallel workers.
+  const secondHubId = await page.evaluate(
+    () => (window as unknown as Record<string, unknown>).__test_second_hub_id as string | undefined,
+  )
+  expect(secondHubId, 'Given step must record the second hub id').toBeTruthy()
+  const hubSelector = page.getByTestId(TestIds.HUB_SWITCHER_TRIGGER)
+  await expect(hubSelector).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await hubSelector.click()
+  const option = page.locator(
+    `[data-testid="${TestIds.HUB_SWITCHER_OPTION}"][data-hub-id="${secondHubId}"]`,
+  )
+  await expect(option).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await option.click()
 })
 
 Then('the cases page should reload', async ({ page }) => {

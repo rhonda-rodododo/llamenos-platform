@@ -246,12 +246,12 @@ function IdentifiersTab({ contact }: { contact: DirectoryContact }) {
       {identifiers.map(ident => {
         const Icon = typeIcons[ident.type] ?? Phone
         return (
-          <Card key={ident.id}>
+          <Card key={ident.id} data-testid="contact-identifier-item">
             <CardContent className="flex items-center gap-3 py-3">
               <Icon className="h-4 w-4 text-muted-foreground shrink-0" />
               <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium">{ident.value}</p>
-                <p className="text-xs text-muted-foreground capitalize">{ident.type}</p>
+                <p data-testid="contact-identifier-value" className="text-sm font-medium">{ident.value}</p>
+                <p data-testid="contact-identifier-type" className="text-xs text-muted-foreground capitalize">{ident.type}</p>
               </div>
               {ident.isPrimary && (
                 <Badge data-testid="identifier-primary-badge" variant="default" className="text-[10px]">
@@ -302,12 +302,12 @@ function CasesTab({ contactId }: { contactId: string }) {
   return (
     <div data-testid="contact-cases-list" className="space-y-2">
       {cases.map(caseLink => (
-        <Card key={caseLink.recordId}>
+        <Card key={caseLink.recordId} data-testid="contact-case-item">
           <CardContent className="flex items-center gap-3 py-3">
             <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
-                <p className="text-sm font-medium">
+                <p data-testid="contact-case-number" className="text-sm font-medium">
                   {caseLink.caseNumber ?? caseLink.recordId.slice(0, 8)}
                 </p>
                 <Badge variant="outline" className="text-[10px]">{caseLink.entityTypeLabel}</Badge>
@@ -316,7 +316,7 @@ function CasesTab({ contactId }: { contactId: string }) {
                 {t('contactDirectory.caseStatus', { defaultValue: 'Status' })}: {caseLink.status}
               </p>
             </div>
-            <Badge variant="secondary" className="text-[10px]">{caseLink.role}</Badge>
+            <Badge data-testid="contact-case-role" variant="secondary" className="text-[10px]">{caseLink.role}</Badge>
           </CardContent>
         </Card>
       ))}
@@ -448,7 +448,7 @@ function GroupsTab({ contactId }: { contactId: string }) {
   return (
     <div data-testid="contact-groups-list" className="space-y-2">
       {groups.map(group => (
-        <Card key={group.id}>
+        <Card key={group.id} data-testid="contact-group-item">
           <CardContent className="flex items-center gap-3 py-3">
             <Users className="h-4 w-4 text-muted-foreground shrink-0" />
             <div className="min-w-0 flex-1">
@@ -461,7 +461,7 @@ function GroupsTab({ contactId }: { contactId: string }) {
               {group.role && (
                 <Badge variant="secondary" className="text-[10px]">{group.role}</Badge>
               )}
-              <span className="text-xs text-muted-foreground">
+              <span data-testid="contact-group-member-count" className="text-xs text-muted-foreground">
                 {t('contactDirectory.memberCount', { count: group.memberCount, defaultValue: '{{count}} members' })}
               </span>
             </div>

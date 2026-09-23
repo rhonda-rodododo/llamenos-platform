@@ -1031,7 +1031,7 @@ export async function createEntityTypeViaApi(
     category?: string
     color?: string
     hubId?: string
-    statuses?: Array<{ value: string; label: string; order: number }>
+    statuses?: Array<{ value: string; label: string; order: number; isClosed?: boolean }>
     fields?: Array<{ name: string; label: string; type: string; required?: boolean; order: number }>
     numberPrefix?: string
   },
@@ -1243,7 +1243,7 @@ export async function createCmsReportTypeViaApi(
     description?: string
     hubId?: string
     fields?: Array<Record<string, unknown>>
-    statuses?: Array<{ value: string; label: string; order: number }>
+    statuses?: Array<{ value: string; label: string; order: number; isClosed?: boolean }>
     allowCaseConversion?: boolean
     mobileOptimized?: boolean
     allowFileAttachments?: boolean
@@ -1506,7 +1506,7 @@ export async function createRecordViaApi(
 
 export async function listRecordsViaApi(
   request: APIRequestContext,
-  params?: { entityTypeId?: string; statusHash?: string; assignedTo?: string; page?: number; limit?: number; hubId?: string },
+  params?: { entityTypeId?: string; statusHash?: string; assignedTo?: string; parentRecordId?: string; page?: number; limit?: number; hubId?: string },
   seedHex = ADMIN_SEED,
 ): Promise<{ records: Record<string, unknown>[]; total: number; hasMore: boolean }> {
   const qs = new URLSearchParams()
@@ -1515,6 +1515,7 @@ export async function listRecordsViaApi(
   if (params?.entityTypeId) qs.set('entityTypeId', params.entityTypeId)
   if (params?.statusHash) qs.set('statusHash', params.statusHash)
   if (params?.assignedTo) qs.set('assignedTo', params.assignedTo)
+  if (params?.parentRecordId) qs.set('parentRecordId', params.parentRecordId)
   const qsStr = qs.toString()
   const path = `${hubPath('/records', params?.hubId)}${qsStr ? `?${qsStr}` : ''}`
   const { status, data } = await apiGet<{ records: Record<string, unknown>[]; total: number; hasMore: boolean }>(request, path, seedHex)

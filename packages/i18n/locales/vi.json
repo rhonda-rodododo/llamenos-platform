@@ -1457,7 +1457,9 @@
     "rateLimitTitle": "Thay đổi giới hạn tần suất",
     "transcriptionDisable": "Tắt phiên âm cuộc gọi? Tình nguyện viên sẽ không còn được phiên âm cuộc gọi tự động.",
     "transcriptionEnable": "Bật phiên âm cuộc gọi cho tất cả tình nguyện viên? Tính năng này sử dụng AI để phiên âm cuộc gọi theo thời gian thực.",
-    "transcriptionTitle": "Thay đổi cài đặt phiên âm"
+    "transcriptionTitle": "Thay đổi cài đặt phiên âm",
+    "biometricDisable": "Tắt mở khóa sinh trắc học? Bạn vẫn có thể mở khóa bằng mã PIN.",
+    "biometricDisableTitle": "Tắt Mở Khóa Sinh Trắc Học"
   },
   "connectWithOauth": "Connect with OAuth",
   "connectionFailed": "Connection failed",
@@ -3734,7 +3736,11 @@
     "transcriptionSettings": "Phiên âm",
     "version": "Version",
     "voicemail": "Voicemail",
-    "webrtcNotConfigured": "Gọi qua trình duyệt không khả dụng. Quản trị viên cần bật WebRTC trong cài đặt nhà cung cấp điện thoại."
+    "webrtcNotConfigured": "Gọi qua trình duyệt không khả dụng. Quản trị viên cần bật WebRTC trong cài đặt nhà cung cấp điện thoại.",
+    "biometricDesc": "Mở khóa bằng vân tay hoặc khuôn mặt thay vì nhập mã PIN. Mã PIN của bạn vẫn hoạt động và không bao giờ bị vô hiệu hóa.",
+    "biometricEnrolled": "Mở khóa sinh trắc học đang bật trên thiết bị này.",
+    "biometricInvalidated": "Dữ liệu sinh trắc học trên thiết bị của bạn đã thay đổi, vì vậy mở khóa sinh trắc học đã bị tắt. Bật lại bên dưới, hoặc tiếp tục dùng mã PIN.",
+    "biometricPinPrompt": "Nhập mã PIN để bật mở khóa sinh trắc học"
   },
   "serverAddress": {
     "checking": "Checking...",

@@ -6,6 +6,7 @@ import { hashPhone } from '../lib/crypto'
 import { publishEvent } from '../lib/ws-events'
 import { KIND_CALL_RING, KIND_CALL_UPDATE, KIND_CALL_VOICEMAIL, KIND_MESSAGE_NEW, KIND_PRESENCE_UPDATE } from '@shared/event-kinds'
 import { getTestPushLog, clearTestPushLog } from '../lib/push-dispatch'
+import { getApnsBundleId, getApnsVoipTopic } from '../lib/apns-topic'
 
 /**
  * Decode a pubkey (hex only — npub1 bech32 encoding is no longer supported).
@@ -1041,6 +1042,21 @@ dev.delete('/test-push-log', (c) => {
 
   clearTestPushLog()
   return c.json({ ok: true })
+})
+
+// Returns the APNs topic (bundle id) and VoIP topic that a real push dispatch
+// would set as the outgoing `apns-topic` header, derived the same way
+// push-dispatch.ts and voip-push.ts derive it (see lib/apns-topic.ts).
+// Lets BDD tests assert the header value without real APNs credentials
+// configured in the test environment (Issue #724).
+dev.get('/test-apns-topic', (c) => {
+  const denied = simulationGuard(c)
+  if (denied) return denied
+
+  return c.json({
+    topic: getApnsBundleId(c.env),
+    voipTopic: getApnsVoipTopic(c.env),
+  })
 })
 
 // 7. Simulate push dispatch — directly invokes createPushDispatcherFromService with

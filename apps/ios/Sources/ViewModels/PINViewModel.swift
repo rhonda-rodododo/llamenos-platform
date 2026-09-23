@@ -76,11 +76,23 @@ final class PINViewModel {
     /// Whether an async operation is in progress (PIN verification).
     var isLoading: Bool = false
 
-    /// Number of failed unlock attempts. Persisted in Keychain (H7).
-    private(set) var failedAttempts: Int = 0
+    /// Number of failed unlock attempts. The Keychain is the sole source of truth
+    /// (H7) — this reads live on every access rather than caching a snapshot from
+    /// `init`, so a write from another code path (e.g. `AuthService.logout()`
+    /// clearing lockout state while this view model is still on screen) is
+    /// observed immediately instead of through a stale in-memory copy. A stale
+    /// lockout read is a security defect here, not a display glitch: it is the
+    /// control that protects a seized device.
+    var failedAttempts: Int {
+        guard mode == .unlock else { return 0 }
+        return keychainService.getLockoutAttempts()
+    }
 
-    /// Lockout expiry time. Persisted in Keychain (H7).
-    private(set) var lockoutUntil: Date = .distantPast
+    /// Lockout expiry time. Same live-read rationale as `failedAttempts`.
+    var lockoutUntil: Date {
+        guard mode == .unlock else { return .distantPast }
+        return keychainService.getLockoutUntil()
+    }
 
     /// Whether biometric unlock is available and enabled.
     var isBiometricAvailable: Bool {
@@ -147,31 +159,14 @@ final class PINViewModel {
         self.keychainService = keychainService ?? authService.keychainService
         self.maxLength = maxLength
         self.onSuccess = onSuccess
-
-        // Restore lockout state from Keychain (H7)
-        if mode == .unlock {
-            loadLockoutState()
-        }
     }
 
     // MARK: - Lockout State Persistence (H7)
 
-    /// Load lockout state from Keychain on init.
-    private func loadLockoutState() {
-        failedAttempts = keychainService.getLockoutAttempts()
-        lockoutUntil = keychainService.getLockoutUntil()
-    }
-
-    /// Persist lockout state to Keychain after a failed attempt.
-    private func persistLockoutState() {
-        keychainService.setLockoutAttempts(failedAttempts)
-        keychainService.setLockoutUntil(lockoutUntil)
-    }
-
-    /// Clear lockout state on successful unlock.
+    /// Clear lockout state on successful unlock. `failedAttempts`/`lockoutUntil`
+    /// read straight from the Keychain, so clearing it there is the whole fix —
+    /// there is no in-memory copy left to reset separately.
     private func clearLockoutState() {
-        failedAttempts = 0
-        lockoutUntil = .distantPast
         keychainService.clearLockoutState()
     }
 
@@ -262,7 +257,7 @@ final class PINViewModel {
             onSuccess()
         } catch {
             isLoading = false
-            failedAttempts += 1
+            keychainService.setLockoutAttempts(failedAttempts + 1)
             pin = ""
 
             // Apply escalating lockout (H7)
@@ -284,7 +279,7 @@ final class PINViewModel {
         }
 
         if let duration = PINLockout.lockoutDuration(forAttempts: failedAttempts) {
-            lockoutUntil = Date().addingTimeInterval(duration)
+            keychainService.setLockoutUntil(Date().addingTimeInterval(duration))
             errorMessage = String(
                 format: NSLocalizedString(
                     "error_pin_lockout_duration",
@@ -295,8 +290,6 @@ final class PINViewModel {
         } else {
             errorMessage = NSLocalizedString("error_pin_incorrect", comment: "Incorrect PIN. Please try again.")
         }
-
-        persistLockoutState()
     }
 
     // MARK: - Biometric Unlock (C5)
@@ -384,14 +377,15 @@ final class PINViewModel {
         phase = .enter
     }
 
-    /// Full reset of the view model.
+    /// Full reset of the view model. `failedAttempts`/`lockoutUntil` are Keychain-backed
+    /// reads, so resetting them means clearing the Keychain record, not an in-memory
+    /// field — otherwise this method would silently stop doing what its name promises.
     func reset() {
         pin = ""
         firstEntry = nil
         phase = .enter
         errorMessage = nil
         isLoading = false
-        failedAttempts = 0
-        lockoutUntil = .distantPast
+        clearLockoutState()
     }
 }

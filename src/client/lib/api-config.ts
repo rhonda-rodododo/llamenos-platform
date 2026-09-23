@@ -114,11 +114,37 @@ export async function setApiBase(url: string): Promise<void> {
   }
 }
 
+/**
+ * Forget the configured backend address so `needsServerAddress()` shows the
+ * first-run screen again.
+ *
+ * `cachedApiBase` is intentionally only mutated AFTER `clearConfiguredApiBase()`
+ * resolves, not before it. `needsServerAddress()` reads `cachedApiBase` live on
+ * every render (no memoization) — mutating it first, then awaiting the actual
+ * clear, opens a window where the rest of the app already believes no server
+ * is configured while the persisted config (and any in-flight confirmation,
+ * e.g. the native dialog gating `api_config_clear` — #788) hasn't actually
+ * cleared yet. Any state change during that window (this function's only
+ * caller also calls `keyManager.lock()` and `setActiveHub(null)` immediately
+ * before this) reactively remounts `ServerAddressScreen`, which consumes the
+ * staged pending address and auto-submits it — straight into a health probe
+ * that the Rust/mock IPC refuses with "a server is already configured",
+ * because it still is. That one-shot probe failure permanently strands the
+ * user on an empty first-run screen with no address left to retry, since the
+ * pending address was already consumed by the premature mount. Reordering so
+ * `cachedApiBase` only flips once the clear has genuinely completed collapses
+ * this window to nothing — the very next statement in the caller is
+ * `window.location.reload()`, so a real reload follows immediately instead of
+ * a reactive swap racing an in-flight clear. It also means a rejected/canceled
+ * confirmation (the whole point of #788's gate) leaves `cachedApiBase`
+ * untouched, rather than wrongly showing "unconfigured" for a clear that
+ * never happened.
+ */
 export async function resetApiBase(): Promise<void> {
-  cachedApiBase = DEFAULT_API_BASE
   if (useTauri) {
     await clearConfiguredApiBase()
   }
+  cachedApiBase = DEFAULT_API_BASE
 }
 
 /** Full request URL — origin (if configured) + the fixed `/api` prefix + `path`. */

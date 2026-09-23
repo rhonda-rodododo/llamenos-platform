@@ -51,6 +51,24 @@ export const HALT_FILE = join(fleetHome(), '.llamenos-fleet-disabled')
 export const FLEET_ENV_FILE = join(FLEET_DIR, 'env')
 
 /**
+ * Issue #838: the fleet's deterministic, always-visible reporting channel is
+ * a single dedicated, pinned GitHub issue titled "Fleet digest" — created
+ * once and remembered here so every later `digest`/`halt`/`resume` invocation
+ * (each a separate process) resolves the SAME issue instead of searching or,
+ * worse, creating a new one every pass. See `digest-issue.ts`.
+ */
+export const DIGEST_ISSUE_FILE = join(FLEET_DIR, 'digest-issue')
+
+/**
+ * Issue #838: "fleet PRs opened since the last digest" needs a persisted
+ * high-water mark — the digest's own `hours` lookback window (default 12h)
+ * is a display convenience for the existing sections, not a promise about
+ * exactly when the last digest ran. Read before rendering, written after
+ * (see `digest-issue.ts`'s `readLastDigestAt`/`writeLastDigestAt`).
+ */
+export const LAST_DIGEST_AT_FILE = join(FLEET_DIR, 'last-digest-at')
+
+/**
  * `dispatch-one.sh` is NOT vendored into this repo. It lives at
  * `~/.claude/skills/supervising-dispatched-sessions/`, which is a symlink into
  * the `claude-skills` git repository — a real, separately-committed repo, not

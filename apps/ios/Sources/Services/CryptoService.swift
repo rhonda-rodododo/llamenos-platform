@@ -175,7 +175,7 @@ private func ffiMobileDecryptEventWithAttribution(ciphertextHex: String) throws 
 
 // MARK: - CryptoService
 
-enum CryptoServiceError: LocalizedError {
+enum CryptoServiceError: LocalizedError, Equatable {
     case noKeyLoaded
     case invalidPin
     case encryptionFailed(String)

@@ -1,243 +1,320 @@
 /**
  * Full conversation management step definitions.
- * Matches steps from: packages/test-specs/features/messaging/conversations-full.feature
+ * Matches steps from: packages/test-specs/features/core/messaging-flow.feature
  *
- * Behavioral depth: Hard assertions on conversation elements. Steps seed
- * conversations via simulateIncomingMessage when needed.
+ * Behavioral depth: Hard assertions on conversation elements. Given steps seed
+ * conversations through the real API — an inbound message simulated into the
+ * worker's isolated hub, then claim/close via the hub-scoped conversations API —
+ * so the conversation is in the exact status the scenario needs (waiting,
+ * active, closed) before any UI assertion runs. The UI renders status-gated
+ * controls: conv-assign-btn only for a selected `waiting` conversation,
+ * conv-close-btn and the message composer only for `active`, conv-reopen-btn
+ * only for `closed` (src/client/routes/conversations.tsx).
+ *
+ * When seeding fails (e.g. messaging backend unavailable), the Given step sets
+ * `window.__test_seed_failed` via flagSeedFailed() so downstream When/Then steps
+ * take a single deterministic branch instead of re-probing visibility with
+ * isVisible().catch(() => false). Once a conversation is known to exist, every
+ * subsequent locator is asserted hard — a missing element is a real app bug,
+ * not a "maybe" to swallow.
  */
 import { expect } from '@playwright/test'
 import { Given, When, Then } from '../fixtures'
 import { TestIds } from '../../test-ids'
-import { Timeouts } from '../../helpers'
+import { Timeouts, flagSeedFailed as flagNoConversation, readSeedFailedFlag as readNoConversationFlag } from '../../helpers'
 import { Navigation } from '../../pages/index'
-import { enableMessagingViaApi } from '../../api-helpers'
+import { apiPatch, apiPost, enableMessagingViaApi } from '../../api-helpers'
 import { simulateIncomingMessage, uniqueCallerNumber } from '../../simulation-helpers'
 
-/**
- * Ensure messaging is enabled and at least one conversation exists.
- * Returns whether a conversation was successfully seeded.
- */
-async function ensureConversationExists(
-  page: import('@playwright/test').Page,
-  backendRequest: import('@playwright/test').APIRequestContext,
-): Promise<boolean> {
-  // Enable SMS channel so the page renders conversations
-  await enableMessagingViaApi(backendRequest, ['sms']).catch(() => {})
+type Page = import('@playwright/test').Page
+type APIRequestContext = import('@playwright/test').APIRequestContext
 
-  // Simulate an incoming message to create a conversation
-  await simulateIncomingMessage(backendRequest, {
-    senderNumber: uniqueCallerNumber(),
+interface SeededConversation {
+  conversationId: string
+  /** Last 4 digits of the unique sender number — the card renders `...XXXX`. */
+  last4: string
+}
+
+/**
+ * Seed a conversation into the worker's isolated hub via the real API and put
+ * it in the requested status:
+ *   - waiting: fresh inbound message, unassigned (default)
+ *   - active:  claimed by the admin via POST /conversations/:id/claim
+ *   - closed:  claimed, then closed via PATCH /conversations/:id
+ * Returns null when the messaging backend is unavailable.
+ */
+async function seedConversationViaApi(
+  backendRequest: APIRequestContext,
+  workerHub: string,
+  status: 'waiting' | 'active' | 'closed' = 'waiting',
+): Promise<SeededConversation | null> {
+  await enableMessagingViaApi(backendRequest, ['sms']).catch(() => {})
+  const senderNumber = uniqueCallerNumber()
+  const result = await simulateIncomingMessage(backendRequest, {
+    senderNumber,
     body: `Test conversation ${Date.now()}`,
     channel: 'sms',
-  }).catch(() => {})
+    // Scope to the worker's hub: the UI lists conversations hub-scoped, so a
+    // conversation seeded without a hubId would never render in the test app.
+    hubId: workerHub,
+  }).catch(() => null)
+  if (!result?.conversationId) return null
 
-  // Navigate to conversations (forces config reload)
+  const base = `/hubs/${workerHub}/conversations/${result.conversationId}`
+  if (status !== 'waiting') {
+    const claim = await apiPost(backendRequest, `${base}/claim`, {})
+    if (claim.status !== 200) return null
+  }
+  if (status === 'closed') {
+    const closed = await apiPatch(backendRequest, base, { status: 'closed' })
+    if (closed.status !== 200) return null
+  }
+  return { conversationId: result.conversationId, last4: senderNumber.slice(-4) }
+}
+
+/**
+ * Navigate to the conversations page and select the seeded conversation.
+ * Selection is scoped by the sender's unique last-4 digits so parallel workers
+ * never select each other's conversations. Returns false when the seeded
+ * conversation does not render (seed failure).
+ */
+async function navigateAndSelect(page: Page, seeded: SeededConversation): Promise<boolean> {
   await Navigation.goToConversations(page)
-
-  // Wait for conversation item to appear
-  const item = page.getByTestId(TestIds.CONVERSATION_ITEM).first()
-  return item.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
+  const item = page.getByTestId(TestIds.CONVERSATION_ITEM).filter({ hasText: seeded.last4 })
+  const visible = await item.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
+  if (!visible) return false
+  await item.click()
+  // Remember the last-4 for steps that must re-select the same conversation
+  // after the app clears the detail selection (closing sets selectedId null).
+  await page.evaluate((l4) => {
+    ;(window as unknown as Record<string, unknown>).__test_conv_last4 = l4
+  }, seeded.last4)
+  return true
 }
 
 // --- Conversation setup ---
 
-Given('a conversation exists', async ({ page, backendRequest }) => {
-  const hasConvo = await ensureConversationExists(page, backendRequest)
-  // If no conversation could be created (e.g., messaging not supported),
-  // verify at least the page loaded
-  if (!hasConvo) {
+Given('a conversation exists', async ({ page, backendRequest, workerHub }) => {
+  const seeded = await seedConversationViaApi(backendRequest, workerHub)
+  // Select the conversation: downstream steps (assign, thread view) act on the
+  // detail pane, which only renders once a conversation is selected.
+  const selected = seeded !== null && (await navigateAndSelect(page, seeded))
+  if (!selected) {
+    // Messaging not supported in this environment — verify at least the page loaded
+    // and flag so downstream steps take the deterministic "no conversation" branch.
+    await Navigation.goToConversations(page).catch(() => {})
     await expect(page.getByTestId(TestIds.PAGE_TITLE)).toBeVisible({ timeout: Timeouts.ELEMENT })
+    await flagNoConversation(page)
   }
 })
 
-Given('I have an open conversation', async ({ page, backendRequest }) => {
-  const hasConvo = await ensureConversationExists(page, backendRequest)
-  if (hasConvo) {
-    await page.getByTestId(TestIds.CONVERSATION_ITEM).first().click()
-    // Claim the conversation so it becomes "active" and the composer is visible
+Given('I have an open conversation', async ({ page, backendRequest, workerHub }) => {
+  const seeded = await seedConversationViaApi(backendRequest, workerHub)
+  const selected = seeded !== null && (await navigateAndSelect(page, seeded))
+  if (selected) {
+    // Claim the conversation through the UI so it becomes "active" and the
+    // composer is visible. The conversation was just seeded via
+    // simulateIncomingMessage, so it is guaranteed to be unassigned — the
+    // claim button must be present.
     const claimBtn = page.getByTestId(TestIds.CONV_ASSIGN_BTN)
-    const hasClaim = await claimBtn.isVisible({ timeout: 3000 }).catch(() => false)
-    if (hasClaim) {
-      await claimBtn.click()
-    }
-    // Always wait for the composer — without it the Send button won't be visible.
-    // If the conversation was already claimed the composer should appear immediately.
-    const composerVisible = await page.getByTestId(TestIds.MESSAGE_COMPOSER)
-      .waitFor({ state: 'visible', timeout: Timeouts.ELEMENT })
-      .then(() => true)
-      .catch(() => false)
-    if (!composerVisible) {
-      // Composer not available (e.g., conversation is waiting/unassigned and claim failed)
-      // Flag so downstream steps skip gracefully
-      await page.evaluate(() => {
-        (window as unknown as Record<string, unknown>).__test_no_conversation = true
-      })
-    }
+    await expect(claimBtn).toBeVisible({ timeout: Timeouts.ELEMENT })
+    await claimBtn.click()
+    await expect(page.getByTestId(TestIds.MESSAGE_COMPOSER)).toBeVisible({ timeout: Timeouts.ELEMENT })
   } else {
     // Backend not available — flag so downstream steps skip gracefully
-    await page.evaluate(() => {
-      (window as unknown as Record<string, unknown>).__test_no_conversation = true
-    })
+    await Navigation.goToConversations(page).catch(() => {})
+    await expect(page.getByTestId(TestIds.PAGE_TITLE)).toBeVisible({ timeout: Timeouts.ELEMENT })
+    await flagNoConversation(page)
   }
 })
 
-Given('conversations from different channels exist', async ({ page, backendRequest }) => {
+Given('conversations from different channels exist', async ({ page, backendRequest, workerHub }) => {
   await enableMessagingViaApi(backendRequest, ['sms', 'whatsapp']).catch(() => {})
   // Create SMS conversation
   await simulateIncomingMessage(backendRequest, {
     senderNumber: uniqueCallerNumber(),
     body: 'SMS conversation',
     channel: 'sms',
+    hubId: workerHub,
   }).catch(() => {})
   // Create WhatsApp conversation
   await simulateIncomingMessage(backendRequest, {
     senderNumber: uniqueCallerNumber(),
     body: 'WhatsApp conversation',
     channel: 'whatsapp',
+    hubId: workerHub,
   }).catch(() => {})
   await Navigation.goToConversations(page)
   const item = page.getByTestId(TestIds.CONVERSATION_ITEM).first()
   const hasConvo = await item.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
   if (!hasConvo) {
     await expect(page.getByTestId(TestIds.PAGE_TITLE)).toBeVisible({ timeout: Timeouts.ELEMENT })
+    await flagNoConversation(page)
   }
 })
 
-Given('an open conversation exists', async ({ page, backendRequest }) => {
-  const hasConvo = await ensureConversationExists(page, backendRequest)
-  if (hasConvo) {
-    await page.getByTestId(TestIds.CONVERSATION_ITEM).first().click()
+Given('an open conversation exists', async ({ page, backendRequest, workerHub }) => {
+  // "Open" means active: the close button only renders once the conversation
+  // is claimed, so claim it through the real API before navigating.
+  const seeded = await seedConversationViaApi(backendRequest, workerHub, 'active')
+  const selected = seeded !== null && (await navigateAndSelect(page, seeded))
+  if (!selected) {
+    await Navigation.goToConversations(page).catch(() => {})
+    await expect(page.getByTestId(TestIds.PAGE_TITLE)).toBeVisible({ timeout: Timeouts.ELEMENT })
+    await flagNoConversation(page)
   }
 })
 
-Given('a closed conversation exists', async ({ page, backendRequest }) => {
-  // Create a conversation first, then we'd need to close it — for now seed one
-  const hasConvo = await ensureConversationExists(page, backendRequest)
-  if (hasConvo) {
-    await page.getByTestId(TestIds.CONVERSATION_ITEM).first().click()
+Given('a closed conversation exists', async ({ page, backendRequest, workerHub }) => {
+  // Seed a conversation and close it through the real API (claim → close) so
+  // the reopen button — rendered only for selected `closed` conversations —
+  // is actually available.
+  const seeded = await seedConversationViaApi(backendRequest, workerHub, 'closed')
+  const selected = seeded !== null && (await navigateAndSelect(page, seeded))
+  if (!selected) {
+    await Navigation.goToConversations(page).catch(() => {})
+    await expect(page.getByTestId(TestIds.PAGE_TITLE)).toBeVisible({ timeout: Timeouts.ELEMENT })
+    await flagNoConversation(page)
   }
 })
 
-Given('conversations exist', async ({ page, backendRequest }) => {
-  await ensureConversationExists(page, backendRequest)
+Given('conversations exist', async ({ page, backendRequest, workerHub }) => {
+  const seeded = await seedConversationViaApi(backendRequest, workerHub)
+  const selected = seeded !== null && (await navigateAndSelect(page, seeded))
+  if (!selected) {
+    await Navigation.goToConversations(page).catch(() => {})
+    await flagNoConversation(page)
+  }
 })
 
 // --- Conversation interactions ---
 
 When('I click on a conversation', async ({ page }) => {
-  const noConvo = await page.evaluate(() => (window as unknown as Record<string, unknown>).__test_no_conversation).catch(() => false)
-  if (noConvo) return
+  if (await readNoConversationFlag(page)) return
   const item = page.getByTestId(TestIds.CONVERSATION_ITEM).first()
-  const hasConvo = await item.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
-  if (hasConvo) {
-    await item.click()
-  }
+  await expect(item).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await item.click()
 })
 
 When('I type a message in the reply field', async ({ page }) => {
-  const noConvo = await page.evaluate(() => (window as unknown as Record<string, unknown>).__test_no_conversation).catch(() => false)
-  if (noConvo) return
+  if (await readNoConversationFlag(page)) return
   const composer = page.getByTestId(TestIds.MESSAGE_COMPOSER)
-  const hasComposer = await composer.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
-  if (hasComposer) {
-    const textarea = composer.locator('textarea, input[type="text"]').first()
-    await textarea.fill(`Test message ${Date.now()}`)
-  }
+  await expect(composer).toBeVisible({ timeout: Timeouts.ELEMENT })
+  const textarea = composer.locator('textarea, input[type="text"]').first()
+  await textarea.fill(`Test message ${Date.now()}`)
 })
 
 When('I assign the conversation to a volunteer', async ({ page }) => {
+  if (await readNoConversationFlag(page)) return
+  // For a waiting conversation the app's assign action is the Claim button:
+  // conv-assign-btn → handleClaim self-assigns immediately (src/client/routes/
+  // conversations.tsx). There is no volunteer-picker dialog on this path —
+  // the Reassign dialog (conv-reassign-btn) is a separate admin-only action.
+  // The Given step seeded and selected a waiting conversation, so the claim
+  // button must be rendered — a missing button is a real app bug.
   const assignBtn = page.getByTestId(TestIds.CONV_ASSIGN_BTN)
-  const hasBtn = await assignBtn.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
-  if (hasBtn) {
-    await assignBtn.click()
-    const volunteerOption = page.locator('[role="option"], [role="menuitem"]').first()
-    const hasOption = await volunteerOption.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
-    if (hasOption) await volunteerOption.click()
-  }
+  await expect(assignBtn).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await assignBtn.click()
+  // Claim completes with a "Conversation claimed" toast — wait for it so the
+  // Then step runs against the post-claim state, not mid-request.
+  await expect(page.getByText(/claimed/i).first()).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 When('I close the conversation', async ({ page }) => {
+  if (await readNoConversationFlag(page)) return
   const closeBtn = page.getByTestId(TestIds.CONV_CLOSE_BTN)
-  const hasBtn = await closeBtn.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
-  if (hasBtn) {
-    await closeBtn.click()
-    // Confirm if dialog appears
-    const dialog = page.getByTestId(TestIds.CONFIRM_DIALOG_OK)
-    const hasDialog = await dialog.isVisible({ timeout: 2000 }).catch(() => false)
-    if (hasDialog) await dialog.click()
-  }
+  await expect(closeBtn).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await closeBtn.click()
+  // handleClose closes immediately — the app shows no confirm dialog for
+  // closing a conversation — and surfaces a "Conversation closed" toast.
 })
 
 When('I reopen the conversation', async ({ page }) => {
+  if (await readNoConversationFlag(page)) return
+  // The reopen button only renders for a selected closed conversation, and
+  // closing a conversation clears the detail selection (handleClose sets
+  // selectedId to null). Re-navigate to force a fresh list fetch (the relay
+  // may have removed the closed card from live state), then re-select the
+  // scenario's conversation by its unique sender digits. Re-selecting an
+  // already-selected card is idempotent, so this is safe in both the
+  // reopen-only and close-and-reopen scenarios.
+  const last4 = await page.evaluate(
+    () => (window as unknown as Record<string, unknown>).__test_conv_last4 as string | undefined,
+  )
+  expect(last4, 'seeded conversation last-4 must be recorded by the Given step').toBeTruthy()
+  await Navigation.goToDashboard(page)
+  await Navigation.goToConversations(page)
+  const item = page.getByTestId(TestIds.CONVERSATION_ITEM).filter({ hasText: last4 as string })
+  await expect(item).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await item.click()
   const reopenBtn = page.getByTestId(TestIds.CONV_REOPEN_BTN)
-  const hasBtn = await reopenBtn.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
-  if (hasBtn) await reopenBtn.click()
+  await expect(reopenBtn).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await reopenBtn.click()
 })
 
 When('I search for a phone number', async ({ page }) => {
+  if (await readNoConversationFlag(page)) return
   const searchInput = page.getByTestId(TestIds.CONV_SEARCH)
-  const hasSearch = await searchInput.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
-  if (hasSearch) {
-    await searchInput.fill('+1212')
-  }
+  await expect(searchInput).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await searchInput.fill('+1212')
 })
 
 // --- Conversation assertions ---
 
 Then('I should see the conversation thread', async ({ page }) => {
-  const thread = page.getByTestId(TestIds.CONVERSATION_THREAD)
-  const hasThread = await thread.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
-  if (hasThread) return
-  // Fall back to page loaded (no conversation selected or no conversations available)
-  await expect(page.getByTestId(TestIds.PAGE_TITLE)).toBeVisible({ timeout: Timeouts.ELEMENT })
+  if (await readNoConversationFlag(page)) {
+    await expect(page.getByTestId(TestIds.PAGE_TITLE)).toBeVisible({ timeout: Timeouts.ELEMENT })
+    return
+  }
+  await expect(page.getByTestId(TestIds.CONVERSATION_THREAD)).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 Then('I should see message timestamps', async ({ page }) => {
+  if (await readNoConversationFlag(page)) return
   // Timestamps appear in the conversation thread
   const thread = page.getByTestId(TestIds.CONVERSATION_THREAD)
-  const hasThread = await thread.isVisible({ timeout: 3000 }).catch(() => false)
-  if (!hasThread) return // No thread visible — conversations may not be seeded
+  await expect(thread).toBeVisible({ timeout: Timeouts.ELEMENT })
   const timestamp = thread.locator('text=/\\d{1,2}:\\d{2}|ago|just now/i').first()
   await expect(timestamp).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 Then('the message should appear in the thread', async ({ page }) => {
-  const noConvo = await page.evaluate(() => (window as unknown as Record<string, unknown>).__test_no_conversation).catch(() => false)
-  if (noConvo) {
+  if (await readNoConversationFlag(page)) {
     await expect(page.getByTestId(TestIds.PAGE_TITLE)).toBeVisible({ timeout: Timeouts.ELEMENT })
     return
   }
   const thread = page.getByTestId(TestIds.CONVERSATION_THREAD)
-  const hasThread = await thread.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
-  if (!hasThread) return
+  await expect(thread).toBeVisible({ timeout: Timeouts.ELEMENT })
   await expect(thread.locator('text=/Test message|test/i').first()).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 Then('each conversation should show its channel badge', async ({ page }) => {
+  if (await readNoConversationFlag(page)) return
   const item = page.getByTestId(TestIds.CONVERSATION_ITEM).first()
-  const hasItem = await item.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
-  if (!hasItem) return
+  await expect(item).toBeVisible({ timeout: Timeouts.ELEMENT })
   // Channel badge is rendered by ChannelBadge component inside conversation-item
   const badge = item.locator('text=/SMS|WhatsApp|Signal|RCS/i')
   await expect(badge.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 Then('the conversation should show the assigned volunteer', async ({ page }) => {
+  if (await readNoConversationFlag(page)) {
+    await expect(page.getByTestId(TestIds.PAGE_TITLE)).toBeVisible({ timeout: Timeouts.ELEMENT })
+    return
+  }
   // After claiming, the conversation detail header shows the assigned user
   const assigned = page.locator('text=/assigned|claimed|volunteer/i')
-  const hasAssigned = await assigned.first().isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
-  if (hasAssigned) return
-  // Assignment may have completed — check the page is still loaded
-  await expect(page.getByTestId(TestIds.PAGE_TITLE)).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await expect(assigned.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 Then('the conversation status should change to {string}', async ({ page }, status: string) => {
+  if (await readNoConversationFlag(page)) {
+    await expect(page.getByTestId(TestIds.PAGE_TITLE)).toBeVisible({ timeout: Timeouts.ELEMENT })
+    return
+  }
   // After close/reopen, look for the status text or a toast notification
   const statusText = page.locator(`text=/${status}/i`).first()
-  const hasStatus = await statusText.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
-  if (hasStatus) return
-  // Status change may have triggered navigation — verify page is loaded
-  await expect(page.getByTestId(TestIds.PAGE_TITLE)).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await expect(statusText).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 Then('matching conversations should be displayed', async ({ page }) => {

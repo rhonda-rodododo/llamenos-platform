@@ -957,12 +957,24 @@ function checkDuplicateFeatureNames(featureFiles: string[]) {
  * that `tests/steps/` was non-empty and reported every scenario as
  * covered regardless of content, which is why desktop/backend were
  * fabricated at 100% before this fix.
+ *
+ * iOS is gated by the auth/PIN-unlock tranche in
+ * Tests/Unit/AuthLoginBDDTests.swift (added after ios was first ratcheted to 2%).
+ * Why iOS reads far below Android despite having ~480 Swift test methods: the two
+ * platforms are measured differently. Android matches Cucumber *step phrases*, so
+ * one step definition counts toward every scenario that uses it. iOS matches whole
+ * scenario titles 1:1 against Swift method names — `test` + PascalCase(title) — so
+ * a test only counts if it is named for the scenario it implements. Most iOS tests
+ * predate that convention and test real behaviour under their own names, which is
+ * why coverage reads low relative to the test code that exists. Raising iOS
+ * coverage is largely a matter of naming tests for their scenarios as areas are
+ * worked, not of writing hundreds of new tests.
  */
 const COVERAGE_THRESHOLDS: Record<Platform, number> = {
   desktop: 95,
   backend: 77,
   android: 76,
-  ios: 2,
+  ios: 5,
 };
 
 // ---- Main ----

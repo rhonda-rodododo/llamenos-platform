@@ -20,13 +20,13 @@ import {
   ClipboardList,
 } from 'lucide-react'
 import type {
-  CaseRecord, EntityTypeDefinition, EventRecordLink, EventReportLink,
+  CaseRecord, EntityTypeDefinition, EventReportLink,
 } from '@/lib/api'
 import {
-  listEventLinkedRecords,
   listEventLinkedReports,
-  linkRecordToEvent,
   linkReportToEvent,
+  listChildRecords,
+  updateRecord,
   listRecords,
 } from '@/lib/api'
 import { useToast } from '@/lib/toast'
@@ -172,15 +172,17 @@ export function CaseDetail({ record, entityType, onStatusChange, onBack }: CaseD
 function EventLinkedCasesTab({ eventId }: { eventId: string }) {
   const { t } = useTranslation()
   const { toast } = useToast()
-  const [links, setLinks] = useState<EventRecordLink[]>([])
+  const [linkedCases, setLinkedCases] = useState<CaseRecord[]>([])
   const [loading, setLoading] = useState(true)
   const [showLinkDialog, setShowLinkDialog] = useState(false)
 
+  // Record-based events link cases via record parent/child — the /events API
+  // operates on the separate events table, which record-based events never enter.
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const res = await listEventLinkedRecords(eventId)
-      setLinks(res.links)
+      const res = await listChildRecords(eventId)
+      setLinkedCases(res.records)
     } catch {
       toast(t('common.error'), 'error')
     } finally {
@@ -212,23 +214,23 @@ function EventLinkedCasesTab({ eventId }: { eventId: string }) {
         <div className="flex items-center justify-center py-12">
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
         </div>
-      ) : links.length === 0 ? (
+      ) : linkedCases.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-12 text-center text-muted-foreground">
           <ClipboardList className="h-8 w-8 mb-2 opacity-40" />
           <p className="text-sm">{t('events.noLinkedCases', { defaultValue: 'No cases linked to this event.' })}</p>
         </div>
       ) : (
         <div data-testid="event-linked-cases-list" className="space-y-2">
-          {links.map(link => (
-            <Card key={link.recordId}>
+          {linkedCases.map(rec => (
+            <Card key={rec.id} data-testid="event-linked-case-card">
               <CardContent className="flex items-center gap-3 py-3">
                 <ClipboardList className="h-4 w-4 text-muted-foreground shrink-0" />
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium font-mono">{link.recordId.slice(0, 8)}</p>
+                  <p className="text-sm font-medium font-mono">{rec.caseNumber || rec.id.slice(0, 8)}</p>
                   <p className="text-xs text-muted-foreground">
                     {t('cases.createdAt', {
                       defaultValue: 'Created {{time}}',
-                      time: new Date(link.linkedAt).toLocaleDateString(),
+                      time: new Date(rec.createdAt).toLocaleDateString(),
                     })}
                   </p>
                 </div>
@@ -303,7 +305,7 @@ function EventLinkedReportsTab({ eventId }: { eventId: string }) {
       ) : (
         <div data-testid="event-linked-reports-list" className="space-y-2">
           {links.map(link => (
-            <Card key={link.reportId}>
+            <Card key={link.reportId} data-testid="event-linked-report-item">
               <CardContent className="flex items-center gap-3 py-3">
                 <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
                 <div className="min-w-0 flex-1">
@@ -367,7 +369,7 @@ function LinkCaseDialog({ eventId, open, onOpenChange, onLinked }: {
   async function handleSelect(recordId: string) {
     setLinking(true)
     try {
-      await linkRecordToEvent(eventId, recordId)
+      await updateRecord(recordId, { parentRecordId: eventId })
       toast(t('common.saved', { defaultValue: 'Saved' }), 'success')
       onLinked()
     } catch {
@@ -387,6 +389,7 @@ function LinkCaseDialog({ eventId, open, onOpenChange, onLinked }: {
           </DialogDescription>
         </DialogHeader>
         <Input
+          data-testid="event-link-case-search"
           placeholder={t('events.searchCases', { defaultValue: 'Search cases...' })}
           value={search}
           onChange={e => setSearch(e.target.value)}
@@ -406,6 +409,7 @@ function LinkCaseDialog({ eventId, open, onOpenChange, onLinked }: {
               <button
                 key={rec.id}
                 type="button"
+                data-testid="event-link-case-result"
                 disabled={linking}
                 onClick={() => handleSelect(rec.id)}
                 className="w-full flex items-center gap-2 rounded-md px-3 py-2 text-left text-sm hover:bg-accent transition-colors"
@@ -479,6 +483,7 @@ function LinkReportDialog({ eventId, open, onOpenChange, onLinked }: {
           </DialogDescription>
         </DialogHeader>
         <Input
+          data-testid="event-link-report-search"
           placeholder={t('events.searchReports', { defaultValue: 'Search reports...' })}
           value={search}
           onChange={e => setSearch(e.target.value)}
@@ -498,6 +503,7 @@ function LinkReportDialog({ eventId, open, onOpenChange, onLinked }: {
               <button
                 key={report.id}
                 type="button"
+                data-testid="event-link-report-result"
                 disabled={linking}
                 onClick={() => handleSelect(report.id)}
                 className="w-full flex items-center gap-2 rounded-md px-3 py-2 text-left text-sm hover:bg-accent transition-colors"

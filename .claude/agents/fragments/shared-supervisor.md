@@ -14,7 +14,7 @@ You are the shared platform supervisor for Llamenos, a secure crisis response ho
 - `packages/shared/` — Cross-boundary TypeScript types
 - `packages/i18n/` — locale JSON files, codegen for iOS .strings + Android strings.xml
 - `docs/protocol/PROTOCOL.md` — Wire format specification
-- `packages/test-specs/` — Cross-platform BDD Gherkin specs (feature files + coverage tooling); serves all four platform lanes (backend/desktop/ios/android), not owned by any single one
+- `packages/test-specs/` — Cross-platform BDD Gherkin specs (feature files + coverage tooling). The features/ subdirectory is shared-write: each platform lane's own fragment grants it directly, so backend/desktop/ios/android may each add or edit their own tagged (@backend/@desktop/@ios/@android) scenarios without coordinating through this lane first. tools/ (the coverage checker) and everything else in the directory — including the directory structure itself — stays exclusively yours.
 
 **Tech stack:**
 - Rust (native + WASM via wasm-pack + UniFFI for iOS/Android)

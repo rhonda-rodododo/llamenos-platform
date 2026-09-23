@@ -1,0 +1,111 @@
+# Nightly CI base image (issue #903).
+#
+# Pre-installs FIXED toolchains and pre-warms package DOWNLOAD caches so the
+# non-compose CI jobs (desktop-e2e.yml's `build` job, ci.yml's `build` and
+# `crypto-tests` jobs) skip network-bound setup and hit a warm cache
+# instead. Rebuilt nightly by .github/workflows/ci-base-image-nightly.yml so
+# Debian security updates land automatically; consumers pin the resulting
+# digest, never a mutable tag — see that workflow for why.
+#
+# ── CACHES ONLY, NEVER RESOLVED TREES ──────────────────────────────────────
+# This image never contains node_modules/, packages/crypto/target/, or
+# packages/protocol/generated/ — those stay fully job-computed from
+# `bun install --frozen-lockfile` / `cargo build` / codegen against the PR's
+# ACTUAL lockfile and source, every run, exactly as today. Only Bun's and
+# Cargo's content-addressed DOWNLOAD caches are warmed here, keyed by
+# package hash, not by resolved dependency tree. That is what makes
+# rebuilding this image nightly safe: nothing baked in is ever
+# authoritative, so a stale or even a completely empty cache can only make
+# a job's install slower (falls back to the registry) — never wrong, and
+# `bun.lockb` / `Cargo.lock` changes in a PR are a non-issue by construction.
+#
+# ── SCOPE FOR THIS ROLLOUT ──────────────────────────────────────────────────
+# Bakes Bun + Rust only. Playwright browsers and the `install-deps` system
+# packages are deliberately NOT included yet — the job that needs them
+# (desktop-e2e.yml's `test` job) drives `docker compose` and reaches the
+# backend at `localhost`, which breaks under `container:` (sibling
+# containers publish ports on the host, not the job container) without the
+# docker-socket/network work #903 explicitly defers. Baking Playwright's
+# browser weight into an image pulled by jobs that never touch a browser
+# would only add pull cost with nothing to show for it. Revisit when the
+# E2E job itself is migrated to `container:`.
+
+FROM rust:1-slim@sha256:f47a8de237dcbb0b0ce1099901e60a89728e3d51f24e664b40e947171538ade7
+# rust:1-slim tracks the same "stable" channel as packages/crypto/rust-toolchain.toml.
+# Digest pinned like every other base image in this repo (see deploy/docker/Dockerfile);
+# bumped by Dependabot's existing docker-base-images group (dependabot.yml).
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        ca-certificates \
+        curl \
+        git \
+        pkg-config \
+        unzip \
+    && rm -rf /var/lib/apt/lists/* \
+    && rustup component add clippy rustfmt
+
+# Bun binary, pinned to match .mise.toml / workflows' BUN_VERSION (env.BUN_VERSION
+# in ci.yml and desktop-e2e.yml). Bump this ARG in lockstep with those — the nightly
+# workflow does not cross-check it, a mismatch just means a colder-than-expected
+# bun install cache until both are bumped together.
+ARG BUN_VERSION=1.3.5
+RUN curl -fsSL https://bun.sh/install | BUN_INSTALL=/usr/local bash -s "bun-v${BUN_VERSION}" \
+    && bun --version
+
+# Bun's and Cargo's caches are set to fixed, non-$HOME paths. GitHub Actions
+# `container:` jobs run as a fixed user whose $HOME is not guaranteed to match
+# what this image assumed at build time — pointing both caches at explicit
+# ENV-set directories means the job sees exactly what this layer warmed,
+# regardless of the container's runtime $HOME.
+ENV BUN_INSTALL_CACHE_DIR=/opt/cache/bun \
+    CARGO_HOME=/opt/cache/cargo
+
+# Non-root user (Trivy AVD-DS-0002 / same pattern as deploy/docker/Dockerfile's
+# `app` stage), created and given ownership of the (still-empty) cache and
+# work directories BEFORE they're warmed below — not a `chown -R` afterward.
+# Ownership-changing a file that only exists in a lower, already-committed
+# overlay layer forces a copy-up of that file into the writable layer; across
+# the ~2GB / tens of thousands of small files a warmed Bun+Cargo cache
+# produces, a retroactive `chown -R` measured in minutes instead of seconds.
+# Pre-owning empty directories and writing into them as `ci` from the start
+# avoids that entirely — every file lands with correct ownership on its only
+# copy-up.
+RUN groupadd -r ci && useradd -r -g ci -d /home/ci -m -s /bin/bash ci \
+    && mkdir -p "$BUN_INSTALL_CACHE_DIR" "$CARGO_HOME" /warm \
+    && chown -R ci:ci /opt/cache /warm /home/ci
+ENV HOME=/home/ci
+USER ci
+WORKDIR /warm
+
+# Same workspace package.json stub pattern as deploy/docker/Dockerfile's `deps`
+# stage: bun needs these to resolve the workspace graph from the lockfile.
+# `--chown` on every COPY: Docker's COPY always writes as root by default
+# regardless of the active USER, so an explicit --chown is still required
+# even though everything below this point otherwise runs as `ci`.
+COPY --chown=ci:ci package.json bun.lockb ./
+COPY --chown=ci:ci packages/crypto/package.json packages/crypto/package.json
+COPY --chown=ci:ci packages/i18n/package.json packages/i18n/package.json
+COPY --chown=ci:ci packages/protocol/package.json packages/protocol/package.json
+COPY --chown=ci:ci packages/test-specs/package.json packages/test-specs/package.json
+COPY --chown=ci:ci apps/worker/package.json apps/worker/package.json
+COPY --chown=ci:ci site/package.json site/package.json
+
+# Warm the Bun download cache against this repo's CURRENT lockfile, then
+# discard the resolved node_modules tree — only the content-addressed cache
+# under $BUN_INSTALL_CACHE_DIR survives into the image.
+RUN bun install --frozen-lockfile --ignore-scripts \
+    && rm -rf /warm/node_modules
+
+# Warm the Cargo registry (crate download) cache the same way. `cargo fetch`
+# needs the real source tree to resolve path deps/features, not just the
+# manifest — copied here and discarded with the rest of /warm afterward, so
+# only $CARGO_HOME/registry (downloaded .crate files + index) survives.
+COPY --chown=ci:ci packages/crypto/ packages/crypto/
+RUN cargo fetch --manifest-path packages/crypto/Cargo.toml --locked
+
+# Clear /warm's contents rather than removing the directory itself — as the
+# non-root `ci` user, unlinking /warm would need write permission on its
+# root-owned parent (/), which it deliberately does not have.
+WORKDIR /
+RUN rm -rf /warm/*

@@ -11,6 +11,8 @@ import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import org.llamenos.hotline.crypto.BiometricKeyInvalidatedException
+import org.llamenos.hotline.crypto.BiometricKeyStore
 import org.llamenos.hotline.crypto.CryptoService
 import org.llamenos.hotline.crypto.DeviceKeyState
 import org.llamenos.hotline.crypto.EncryptedDeviceKeys
@@ -79,6 +81,7 @@ data class AuthUiState(
 class AuthViewModel @Inject constructor(
     private val cryptoService: CryptoService,
     private val keystoreService: KeyValueStore,
+    private val biometricKeyStore: BiometricKeyStore,
 ) : ViewModel() {
 
     private val json = Json { ignoreUnknownKeys = true }
@@ -358,19 +361,23 @@ class AuthViewModel @Inject constructor(
 
     /**
      * Whether a biometric-protected PIN is stored and ready for decryption.
-     * Returns false if KeystoreService is not the real implementation (test environment).
      */
-    fun hasBiometricPIN(): Boolean {
-        return (keystoreService as? KeystoreService)?.hasBiometricPIN() ?: false
-    }
+    fun hasBiometricPIN(): Boolean = biometricKeyStore.hasBiometricPIN()
 
     /**
      * Get a Cipher initialized for decryption using the stored biometric key IV.
      * Pass this as the BiometricPrompt.CryptoObject to authenticate.
-     * Returns null if biometric PIN is not configured or KeystoreService unavailable.
+     * Returns null if biometric PIN is not configured, or if the biometric
+     * key was invalidated by a change to the device's enrolled biometrics
+     * (new fingerprint/face added, or all biometrics removed) — in both
+     * cases the caller falls back to PIN entry, which is unaffected.
      */
     fun getBiometricDecryptCipher(): javax.crypto.Cipher? {
-        return (keystoreService as? KeystoreService)?.getBiometricDecryptCipher()
+        return try {
+            biometricKeyStore.getBiometricDecryptCipher()
+        } catch (_: BiometricKeyInvalidatedException) {
+            null
+        }
     }
 
     /**
@@ -378,8 +385,7 @@ class AuthViewModel @Inject constructor(
      * Decrypts the stored PIN and uses it to unlock device keys.
      */
     fun onBiometricSuccess(cipher: javax.crypto.Cipher) {
-        val ks = keystoreService as? KeystoreService ?: return
-        val pin = ks.decryptPINWithBiometric(cipher) ?: return
+        val pin = biometricKeyStore.decryptPINWithBiometric(cipher) ?: return
         unlockWithPin(pin)
     }
 }

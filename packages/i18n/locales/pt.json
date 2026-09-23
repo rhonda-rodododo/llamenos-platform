@@ -1457,7 +1457,9 @@
     "rateLimitTitle": "Alterar Limitação de Frequência",
     "transcriptionDisable": "Desativar transcrição de chamadas? As chamadas dos voluntários não serão mais transcritas automaticamente.",
     "transcriptionEnable": "Ativar transcrição de chamadas para todos os voluntários? Isso usa IA para transcrever chamadas em tempo real.",
-    "transcriptionTitle": "Alterar Configuração de Transcrição"
+    "transcriptionTitle": "Alterar Configuração de Transcrição",
+    "biometricDisable": "Desativar o desbloqueio biométrico? Você ainda poderá desbloquear com o seu PIN.",
+    "biometricDisableTitle": "Desativar Desbloqueio Biométrico"
   },
   "connectWithOauth": "Connect with OAuth",
   "connectionFailed": "Connection failed",
@@ -3734,7 +3736,11 @@
     "transcriptionSettings": "Transcrição",
     "version": "Version",
     "voicemail": "Voicemail",
-    "webrtcNotConfigured": "Chamadas pelo navegador não estão disponíveis. Seu administrador precisa ativar WebRTC nas configurações do provedor de telefonia."
+    "webrtcNotConfigured": "Chamadas pelo navegador não estão disponíveis. Seu administrador precisa ativar WebRTC nas configurações do provedor de telefonia.",
+    "biometricDesc": "Desbloqueie com sua impressão digital ou rosto em vez de digitar seu PIN. Seu PIN continua funcionando e nunca é desativado.",
+    "biometricEnrolled": "O desbloqueio biométrico está ativado neste dispositivo.",
+    "biometricInvalidated": "A biometria do seu dispositivo mudou, então o desbloqueio biométrico foi desativado. Reative-o abaixo ou continue usando seu PIN.",
+    "biometricPinPrompt": "Digite seu PIN para ativar o desbloqueio biométrico"
   },
   "serverAddress": {
     "checking": "Checking...",

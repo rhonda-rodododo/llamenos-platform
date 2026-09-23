@@ -116,7 +116,9 @@ services:
       start_period: 10s
 
   caddy:
-    image: caddy:2.11.4-alpine@sha256:5f5c8640aae01df9654968d946d8f1a56c497f1dd5c5cda4cf95ab7c14d58648
+    # Digest bump (issue #650, 2026-09-20): refreshes the Alpine package layer
+    # (curl/c-ares/libcrypto3/libssl3 CVEs) under the same 2.11.4 tag.
+    image: caddy:2.11.4-alpine@sha256:de23def33b17fb5d1290b0f6c2add1d70780e52341896c00a4c8a2a2fe9d355e
     restart: unless-stopped
     ports:
       - "${HTTP_PORT:-80}:80"
@@ -378,9 +380,19 @@ services:
     image: bbernhard/signal-cli-rest-api:0.92@sha256:702db336aa1a87611595e66755c9ccf65b24c25589857301eabef1d46056b3c5
     profiles: ["signal"]
     restart: unless-stopped
+    # AUTO_RECEIVE_SCHEDULE is NOT set — it is incompatible with MODE=json-rpc.
+    # signal-cli-rest-api 0.92 fatals at startup ("Env variable
+    # AUTO_RECEIVE_SCHEDULE can't be used with mode json-rpc") the instant the
+    # var is *present* in the container's environment, even set to an empty
+    # string — the binary checks for the key's presence, not its value.
+    # Combined with `restart: unless-stopped` this crash-looped the container
+    # indefinitely (#944): every restart tears down and recreates the
+    # container's network attachment, which surfaced as bursts of Chromium
+    # net::ERR_NETWORK_CHANGED errors in unrelated Playwright E2E tests,
+    # misread as a login/PIN flake. In json-rpc mode the daemon receives
+    # messages continuously on its own — no receive schedule needed.
     environment:
       - MODE=json-rpc
-      - AUTO_RECEIVE_SCHEDULE=0 * * * *
     volumes:
       - signal-data:/home/.local/share/signal-cli
     networks:
