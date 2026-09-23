@@ -2,6 +2,7 @@ import React, { useState, useCallback, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useToast } from '@/lib/toast'
 import { useAuth } from '@/lib/auth'
+import { prepareEvidenceUpload } from '@/lib/evidence-upload'
 import {
   uploadEvidence,
   initUpload,
@@ -73,14 +74,6 @@ function formatFileSize(bytes: number): string {
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
   if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
   return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`
-}
-
-/** Compute SHA-256 hex hash of a file */
-async function computeFileHash(file: globalThis.File): Promise<string> {
-  const buffer = await file.arrayBuffer()
-  const hashBuffer = await crypto.subtle.digest('SHA-256', buffer)
-  const hashArray = Array.from(new Uint8Array(hashBuffer))
-  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('')
 }
 
 // --- Chunk size for upload ---
@@ -165,43 +158,54 @@ export function EvidenceUploadDialog({
     setProgress(0)
 
     try {
-      // 1. Compute integrity hash
-      const integrityHash = await computeFileHash(selectedFile)
-      setProgress(5)
+      // 1. Encrypt the file content client-side (HPKE-wrapped per reader) —
+      // the server must never see plaintext evidence. Recipients are every
+      // reader the case record was opened to, plus this device and the
+      // admin decryption key, deduped — mirrors encryptFile() call sites in
+      // FileUpload.tsx / entity-file-field.tsx.
+      const recipients = Array.from(new Set([
+        ...readerPubkeys,
+        ...(publicKey ? [publicKey] : []),
+        ...(adminDecryptionPubkey ? [adminDecryptionPubkey] : []),
+      ]))
+      // sizeBytes and integrityHash are derived from the CIPHERTEXT: a hash or
+      // length of the plaintext stored next to the ciphertext would let the
+      // server (or anyone with its DB) confirm a guessed file without decrypting.
+      const { encrypted, sizeBytes, integrityHash } = await prepareEvidenceUpload(selectedFile, recipients)
+      setProgress(15)
 
-      // 2. Initialize chunked upload
-      const totalChunks = Math.ceil(selectedFile.size / CHUNK_SIZE)
+      // 2. Initialize chunked upload of the ENCRYPTED content
+      const totalSize = sizeBytes
+      const totalChunks = Math.ceil(totalSize / CHUNK_SIZE)
       const { uploadId } = await initUpload({
-        totalSize: selectedFile.size,
+        totalSize,
         totalChunks,
         conversationId: recordId,
-        recipientEnvelopes: [],
-        encryptedMetadata: [],
+        recipientEnvelopes: encrypted.recipientEnvelopes,
+        encryptedMetadata: encrypted.encryptedMetadata,
       })
-      setProgress(10)
+      setProgress(20)
 
-      // 4. Upload chunks
-      // File encryption is handled at the upload layer via recipientEnvelopes.
-      // Chunks are uploaded as-is; the server-side storage is encrypted at rest.
+      // 3. Upload encrypted chunks
       for (let i = 0; i < totalChunks; i++) {
         const start = i * CHUNK_SIZE
-        const end = Math.min(start + CHUNK_SIZE, selectedFile.size)
-        const chunk = await selectedFile.slice(start, end).arrayBuffer()
+        const end = Math.min(start + CHUNK_SIZE, totalSize)
+        const chunk = encrypted.encryptedContent.slice(start, end).buffer as ArrayBuffer
 
         await uploadChunk(uploadId, i, chunk)
-        setProgress(10 + Math.round(((i + 1) / totalChunks) * 80))
+        setProgress(20 + Math.round(((i + 1) / totalChunks) * 70))
       }
 
-      // 5. Complete upload
+      // 4. Complete upload
       const { fileId } = await completeUpload(uploadId)
       setProgress(95)
 
-      // 6. Register as evidence
+      // 5. Register as evidence
       const evidenceResult = await uploadEvidence(recordId, {
         fileId,
         filename: selectedFile.name,
         mimeType: selectedFile.type || 'application/octet-stream',
-        sizeBytes: selectedFile.size,
+        sizeBytes,
         classification,
         integrityHash,
         source: 'volunteer_upload',
@@ -215,7 +219,7 @@ export function EvidenceUploadDialog({
     } finally {
       setUploading(false)
     }
-  }, [selectedFile, publicKey, recordId, classification, onUploadComplete, resetState, t, toast])
+  }, [selectedFile, publicKey, adminDecryptionPubkey, readerPubkeys, recordId, classification, onUploadComplete, resetState, t, toast])
 
   const selectedIcon = CLASSIFICATION_OPTIONS.find(c => c.value === classification)?.icon ?? File
 
