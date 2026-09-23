@@ -34,8 +34,6 @@ declare global {
     __TEST_ROUTER?: TestRouter
     __TEST_GET_ACTIVE_HUB?: () => string | null
     __TEST_PLATFORM?: typeof import('../src/client/lib/platform')
-    /** Set by tests/updater.spec.ts to stub the Tauri updater IPC mock's check() response. */
-    __MOCK_UPDATE?: unknown
     __TAURI_INTERNALS__?: TauriInternals
   }
 }

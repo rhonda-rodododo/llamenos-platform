@@ -1,11 +1,12 @@
 import { test, expect } from '@playwright/test'
 import { loginAsAdmin, reenterPinAfterReload, Timeouts } from './helpers'
+import type { MockUpdateConfig } from './mocks/tauri-updater'
 
 /**
  * Helper to reload, set mock update, and re-enter PIN to get back to authenticated state.
  * The __MOCK_UPDATE must be set BEFORE the UpdateChecker's 5s startup delay fires.
  */
-async function reloadWithMockUpdate(page: import('@playwright/test').Page, mockUpdate: Record<string, unknown>) {
+async function reloadWithMockUpdate(page: import('@playwright/test').Page, mockUpdate: MockUpdateConfig) {
   // Set mock before reload so it's ready when JS evaluates (won't survive reload though)
   await page.reload()
   await page.waitForLoadState('domcontentloaded')

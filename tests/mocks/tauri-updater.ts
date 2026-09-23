@@ -27,7 +27,7 @@ if (!import.meta.env.PLAYWRIGHT_TEST) {
 //
 // Set to null/undefined for "no update available".
 
-interface MockUpdateConfig {
+export interface MockUpdateConfig {
   version: string
   body?: string
   date?: string
