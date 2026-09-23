@@ -4563,6 +4563,7 @@
   "voiceStatusWebhook": "Voice Status Webhook",
   "webauthn": {
     "browserNotSupported": "आपका ब्राउज़र पासकी का समर्थन नहीं करता।",
+    "credentialRequiredError": "व्यवस्थापकों के लिए पासकी अनिवार्य करने से पहले एक पासकी पंजीकृत करें।",
     "deleteKey": "हटाएं",
     "description": "अपनी गुप्त कुंजी के बिना साइन इन करने के लिए अपने डिवाइस की बायोमेट्रिक्स या PIN का उपयोग करें।",
     "label": "पासकी का नाम (जैसे \"मेरा फ़ोन\")",

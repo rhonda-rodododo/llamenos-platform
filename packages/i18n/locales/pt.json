@@ -4563,6 +4563,7 @@
   "voiceStatusWebhook": "Voice Status Webhook",
   "webauthn": {
     "browserNotSupported": "Seu navegador não suporta chaves de acesso.",
+    "credentialRequiredError": "Registre uma chave de acesso antes de exigir chaves de acesso para os administradores.",
     "deleteKey": "Excluir",
     "description": "Use a biometria ou PIN do seu dispositivo para entrar sem sua chave secreta.",
     "label": "Nome da chave de acesso (ex. \"Meu Celular\")",

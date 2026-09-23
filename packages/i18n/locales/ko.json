@@ -4563,6 +4563,7 @@
   "voiceStatusWebhook": "Voice Status Webhook",
   "webauthn": {
     "browserNotSupported": "브라우저가 패스키를 지원하지 않습니다.",
+    "credentialRequiredError": "관리자에게 패스키를 요구하기 전에 먼저 패스키를 등록하세요.",
     "deleteKey": "삭제",
     "description": "비밀 키 없이 기기 생체 인식 또는 PIN으로 로그인하세요.",
     "label": "패스키 이름 (예: \"내 휴대폰\")",
