@@ -159,6 +159,17 @@ authenticatedRoutes.post('/enroll',
   async (c) => {
     const body = c.req.valid('json')
     const services = c.get('services')
+    const user = c.get('user')
+
+    // Enforce hub-scoping: recovery:manage is a GLOBAL permission grant and
+    // says nothing about which hub(s) the caller actually belongs to
+    // (multi-hub axiom). Without this, a manager scoped to one hub could
+    // create/replace ANY hub's recovery group by supplying an arbitrary
+    // hubId — mirrors the check on GET /sessions and POST /rotate.
+    const hubRoles = user.hubRoles ?? []
+    if (hubRoles.length > 0 && !hubRoles.some((hr) => hr.hubId === body.hubId)) {
+      return c.json({ error: 'Forbidden' }, 403)
+    }
 
     try {
       await services.recoveryGroup.enrollHub({
@@ -208,6 +219,18 @@ authenticatedRoutes.post('/rotate',
     const body = c.req.valid('json')
     const services = c.get('services')
     const callerPubkey = c.get('pubkey')
+    const user = c.get('user')
+
+    // Enforce hub-scoping: recovery:manage is a GLOBAL permission grant and
+    // says nothing about which hub(s) the caller actually belongs to
+    // (multi-hub axiom). Without this, a manager scoped to one hub could
+    // rotate — i.e. destroy/corrupt — ANY hub's recovery group and every
+    // member's recovery envelope by supplying an arbitrary hubId. Mirrors
+    // the identical check on GET /sessions and POST /enroll.
+    const hubRoles = user.hubRoles ?? []
+    if (hubRoles.length > 0 && !hubRoles.some((hr) => hr.hubId === body.hubId)) {
+      return c.json({ error: 'Forbidden' }, 403)
+    }
 
     try {
       await services.recoveryGroup.rotateGroup({
@@ -299,6 +322,15 @@ authenticatedRoutes.get('/:hubId',
   async (c) => {
     const hubId = c.req.param('hubId')
     const services = c.get('services')
+    const user = c.get('user')
+
+    // Enforce hub-scoping: recovery:view is a GLOBAL permission grant and
+    // says nothing about which hub(s) the caller actually belongs to.
+    // Mirrors the identical check on GET /sessions and GET /session/:id.
+    const hubRoles = user.hubRoles ?? []
+    if (hubRoles.length > 0 && !hubRoles.some((hr) => hr.hubId === hubId)) {
+      return c.json({ error: 'Forbidden' }, 403)
+    }
 
     try {
       const group = await services.recoveryGroup.getGroup(hubId)
@@ -427,6 +459,7 @@ authenticatedRoutes.post('/session/:id/emergency',
     const body = c.req.valid('json')
     const services = c.get('services')
     const callerPubkey = c.get('pubkey')
+    const user = c.get('user')
 
     // HIGH-W6: Enforce approverPubkey matches the authenticated caller — prevent impersonation
     if (body.approverPubkey !== callerPubkey) {
@@ -434,6 +467,17 @@ authenticatedRoutes.post('/session/:id/emergency',
     }
 
     try {
+      // Enforce hub-scoping: recovery:approve is a GLOBAL permission grant
+      // and says nothing about which hub(s) the approver actually belongs
+      // to. Fetch the session first so we know its hub before acting — an
+      // approver scoped to one hub must not be able to bypass another
+      // hub's delay timer. Mirrors the identical check on GET /session/:id.
+      const session = await services.recoveryGroup.getSession(sessionId)
+      const hubRoles = user.hubRoles ?? []
+      if (hubRoles.length > 0 && !hubRoles.some((hr) => hr.hubId === session.hubId)) {
+        return c.json({ error: 'Session not found' }, 404)
+      }
+
       await services.recoveryGroup.applyEmergencyOverride({
         sessionId,
         approverPubkey: callerPubkey,
@@ -474,15 +518,37 @@ authenticatedRoutes.post('/session/:id/cancel',
     const callerPubkey = c.get('pubkey')
     const permissions = c.get('permissions')
     const services = c.get('services')
+    const user = c.get('user')
 
     const hasManagePermission = checkPermission(permissions, 'recovery:manage')
 
     try {
+      // Enforce hub-scoping on the manager-bypass path: recovery:manage is
+      // a GLOBAL permission grant and says nothing about which hub(s) the
+      // caller belongs to. Without this, a manager scoped to one hub could
+      // cancel ANY hub's in-progress recovery session — a denial-of-recovery
+      // attack against volunteers locked out on another hub. The recovering
+      // user's own path is unaffected: it is already self-scoped to their
+      // own session regardless of hub membership. Fetch the session first
+      // (same shape as GET /session/:id and POST /.../emergency) so a
+      // hub-mismatched manager with no recovering-user claim gets the same
+      // "Session not found" anti-enumeration response as those routes,
+      // rather than a 403 that would confirm the session exists.
+      const session = await services.recoveryGroup.getSession(sessionId)
+      const isRecoveringUser = callerPubkey === session.userPubkey
+      const hubRoles = user.hubRoles ?? []
+      const scopedManagePermission = hasManagePermission &&
+        (hubRoles.length === 0 || hubRoles.some((hr) => hr.hubId === session.hubId))
+
+      if (!isRecoveringUser && hasManagePermission && !scopedManagePermission) {
+        return c.json({ error: 'Session not found' }, 404)
+      }
+
       await services.recoveryGroup.cancelSession({
         sessionId,
         cancelledBy: callerPubkey,
         callerPubkey,
-        hasManagePermission,
+        hasManagePermission: scopedManagePermission,
       })
       return c.json({ ok: true })
     } catch (err) {

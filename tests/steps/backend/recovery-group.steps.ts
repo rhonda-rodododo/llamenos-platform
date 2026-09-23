@@ -677,6 +677,210 @@ Then('the listed sessions include the seeded session for the second hub', async 
 })
 
 // ══════════════════════════════════════════════════════════════════
+// Cross-hub scoping, round 2 (issue #847 review round 2) — POST /rotate,
+// POST /enroll, GET /:hubId, POST /session/:id/emergency, and
+// POST /session/:id/cancel all omitted the hub-membership check present on
+// the (already fixed) GET /sessions, letting a holder of the GLOBAL
+// recovery:manage / recovery:view / recovery:approve permission, scoped to
+// only one hub, act on another hub's recovery group entirely — for
+// /rotate and /enroll, destructively.
+// ══════════════════════════════════════════════════════════════════
+
+Given('a second hub with a recovery group enrolled', async ({ request, world }) => {
+  const s = getS(world)
+
+  if (!s.secondHubId) {
+    s.secondHubId = await createHubViaApi(request, `recovery-second-hub-${Date.now()}`)
+  }
+
+  const { status } = await enrollRecoveryGroup(request, s.secondHubId!, s.adminSeed)
+  expect(status).toBe(200)
+})
+
+When('the cross-hub viewer rotates the second hub\'s recovery group', async ({ request, world }) => {
+  const s = getS(world)
+  expect(s.secondHubId).toBeDefined()
+  expect(s.crossHubViewerSeed).toBeDefined()
+
+  const newHolderPubkeys = [`${'1'.repeat(63)}1`, `${'1'.repeat(63)}2`, `${'1'.repeat(63)}3`]
+  const { status, data } = await apiPost(request, '/recovery-group/rotate', {
+    hubId: s.secondHubId!,
+    threshold: 2,
+    totalShares: 3,
+    groupPublicKey: 'b'.repeat(64),
+    shareEnvelopes: makeShareEnvelopes(3, newHolderPubkeys),
+    shareCommitments: makeCommitments(3),
+    sigchainLinkHash: 'c'.repeat(64),
+    delayHours: 24,
+    emergencyFloorHours: 4,
+    rewrappedUserEnvelopes: [],
+  }, s.crossHubViewerSeed!)
+  s.lastStatus = status
+  s.lastBody = data as Record<string, unknown>
+  setLastResponse(world, { status, data })
+})
+
+When('the cross-hub viewer rotates the hub\'s recovery group', async ({ request, world }) => {
+  const s = getS(world)
+  expect(s.hubId).toBeDefined()
+  expect(s.crossHubViewerSeed).toBeDefined()
+
+  const newHolderPubkeys = [`${'2'.repeat(63)}1`, `${'2'.repeat(63)}2`, `${'2'.repeat(63)}3`]
+  const { status, data } = await apiPost(request, '/recovery-group/rotate', {
+    hubId: s.hubId!,
+    threshold: 2,
+    totalShares: 3,
+    groupPublicKey: 'c'.repeat(64),
+    shareEnvelopes: makeShareEnvelopes(3, newHolderPubkeys),
+    shareCommitments: makeCommitments(3),
+    sigchainLinkHash: 'd'.repeat(64),
+    delayHours: 24,
+    emergencyFloorHours: 4,
+    rewrappedUserEnvelopes: [],
+  }, s.crossHubViewerSeed!)
+  s.lastStatus = status
+  s.lastBody = data as Record<string, unknown>
+  setLastResponse(world, { status, data })
+})
+
+When('the cross-hub viewer enrolls a recovery group for the second hub', async ({ request, world }) => {
+  const s = getS(world)
+  expect(s.secondHubId).toBeDefined()
+  expect(s.crossHubViewerSeed).toBeDefined()
+
+  const { status, data } = await enrollRecoveryGroup(request, s.secondHubId!, s.crossHubViewerSeed!)
+  s.lastStatus = status
+  s.lastBody = data as Record<string, unknown>
+  setLastResponse(world, { status, data })
+})
+
+When('the cross-hub viewer enrolls a recovery group for the hub', async ({ request, world }) => {
+  const s = getS(world)
+  expect(s.hubId).toBeDefined()
+  expect(s.crossHubViewerSeed).toBeDefined()
+
+  const { status, data } = await enrollRecoveryGroup(request, s.hubId!, s.crossHubViewerSeed!)
+  s.lastStatus = status
+  s.lastBody = data as Record<string, unknown>
+  setLastResponse(world, { status, data })
+})
+
+When('the cross-hub viewer fetches the recovery group for the second hub', async ({ request, world }) => {
+  const s = getS(world)
+  expect(s.secondHubId).toBeDefined()
+  expect(s.crossHubViewerSeed).toBeDefined()
+
+  const { status, data } = await apiGet<Record<string, unknown>>(request, `/recovery-group/${s.secondHubId!}`, s.crossHubViewerSeed!)
+  s.lastStatus = status
+  s.lastBody = data
+  setLastResponse(world, { status, data })
+})
+
+When('the cross-hub viewer fetches the recovery group for the hub', async ({ request, world }) => {
+  const s = getS(world)
+  expect(s.hubId).toBeDefined()
+  expect(s.crossHubViewerSeed).toBeDefined()
+
+  const { status, data } = await apiGet<Record<string, unknown>>(request, `/recovery-group/${s.hubId!}`, s.crossHubViewerSeed!)
+  s.lastStatus = status
+  s.lastBody = data
+  setLastResponse(world, { status, data })
+})
+
+Given('a verified recovery session exists for the hub', async ({ request, world }) => {
+  const s = getS(world)
+  expect(s.hubId).toBeDefined()
+
+  const recoveringUser = await createUserViaApi(request, { name: `Verified Session User ${Date.now()}` })
+  const { pubkey: newDevicePubkey } = generateTestKeypair()
+
+  const { status, data } = await devPost<{ sessionId: string }>(request, '/test-recovery-seed-session', {
+    hubId: s.hubId!,
+    userPubkey: recoveringUser.pubkey,
+    newDevicePubkey,
+    status: 'verified',
+  })
+  expect(status).toBe(200)
+  s.sessionId = data.sessionId
+})
+
+Given('a verified recovery session exists for the second hub', async ({ request, world }) => {
+  const s = getS(world)
+
+  if (!s.secondHubId) {
+    s.secondHubId = await createHubViaApi(request, `recovery-second-hub-${Date.now()}`)
+  }
+
+  const recoveringUser = await createUserViaApi(request, { name: `Second Hub Verified Session User ${Date.now()}` })
+  const { pubkey: newDevicePubkey } = generateTestKeypair()
+
+  const { status, data } = await devPost<{ sessionId: string }>(request, '/test-recovery-seed-session', {
+    hubId: s.secondHubId!,
+    userPubkey: recoveringUser.pubkey,
+    newDevicePubkey,
+    status: 'verified',
+  })
+  expect(status).toBe(200)
+  s.secondHubSessionId = data.sessionId
+})
+
+When('the cross-hub viewer applies emergency override to the second hub\'s session', async ({ request, world }) => {
+  const s = getS(world)
+  expect(s.secondHubSessionId).toBeDefined()
+  expect(s.crossHubViewerSeed).toBeDefined()
+  expect(s.crossHubViewerPubkey).toBeDefined()
+
+  const signature = bytesToHex(ed25519.sign(utf8ToBytes(s.secondHubSessionId!), hexToBytes(s.crossHubViewerSeed!)))
+  const { status, data } = await apiPost(request, `/recovery-group/session/${s.secondHubSessionId!}/emergency`, {
+    approverPubkey: s.crossHubViewerPubkey!,
+    justification: 'cross-hub scoping test',
+    signature,
+  }, s.crossHubViewerSeed!)
+  s.lastStatus = status
+  s.lastBody = data as Record<string, unknown>
+  setLastResponse(world, { status, data })
+})
+
+When('the cross-hub viewer applies emergency override to the hub\'s session', async ({ request, world }) => {
+  const s = getS(world)
+  expect(s.sessionId).toBeDefined()
+  expect(s.crossHubViewerSeed).toBeDefined()
+  expect(s.crossHubViewerPubkey).toBeDefined()
+
+  const signature = bytesToHex(ed25519.sign(utf8ToBytes(s.sessionId!), hexToBytes(s.crossHubViewerSeed!)))
+  const { status, data } = await apiPost(request, `/recovery-group/session/${s.sessionId!}/emergency`, {
+    approverPubkey: s.crossHubViewerPubkey!,
+    justification: 'cross-hub scoping test',
+    signature,
+  }, s.crossHubViewerSeed!)
+  s.lastStatus = status
+  s.lastBody = data as Record<string, unknown>
+  setLastResponse(world, { status, data })
+})
+
+When('the cross-hub viewer cancels the second hub\'s session', async ({ request, world }) => {
+  const s = getS(world)
+  expect(s.secondHubSessionId).toBeDefined()
+  expect(s.crossHubViewerSeed).toBeDefined()
+
+  const { status, data } = await apiPost(request, `/recovery-group/session/${s.secondHubSessionId!}/cancel`, {}, s.crossHubViewerSeed!)
+  s.lastStatus = status
+  s.lastBody = data as Record<string, unknown>
+  setLastResponse(world, { status, data })
+})
+
+When('the cross-hub viewer cancels the hub\'s session', async ({ request, world }) => {
+  const s = getS(world)
+  expect(s.sessionId).toBeDefined()
+  expect(s.crossHubViewerSeed).toBeDefined()
+
+  const { status, data } = await apiPost(request, `/recovery-group/session/${s.sessionId!}/cancel`, {}, s.crossHubViewerSeed!)
+  s.lastStatus = status
+  s.lastBody = data as Record<string, unknown>
+  setLastResponse(world, { status, data })
+})
+
+// ══════════════════════════════════════════════════════════════════
 // Errata #5 — Atomic group rotation re-wraps user envelopes (D13),
 // excludes departed share holders (issue #729)
 // ══════════════════════════════════════════════════════════════════

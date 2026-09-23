@@ -140,6 +140,106 @@ Feature: Recovery Group Lifecycle
     Then the response status is 200
     And the listed sessions include the seeded session
 
+  # -- Cross-hub scoping, round 2 (issue #847 review round 2): POST /rotate,
+  #    POST /enroll, GET /:hubId, POST /session/:id/emergency, and
+  #    POST /session/:id/cancel all omitted the hub-membership check present
+  #    on GET /sessions — letting a holder of the GLOBAL recovery:manage /
+  #    recovery:view / recovery:approve permission, scoped to only one hub,
+  #    write to or read another hub's recovery group entirely. --
+
+  @backend @crypto
+  Scenario: A recovery:manage holder scoped to one hub cannot rotate another hub's recovery group
+    Given a recovery group is enrolled for the hub
+    And a second hub with a recovery group enrolled
+    And a user with global "recovery:manage" permission who is only a member of the first hub
+    When the cross-hub viewer rotates the second hub's recovery group
+    Then the response status is 403
+
+  @backend @crypto
+  Scenario: A recovery:manage holder who is a member of both hubs can rotate either hub's recovery group
+    Given a recovery group is enrolled for the hub
+    And a second hub with a recovery group enrolled
+    And a user with global "recovery:manage" permission who is only a member of the first hub
+    And the cross-hub viewer is also added as a member of the second hub
+    When the cross-hub viewer rotates the second hub's recovery group
+    Then the response status is 200
+    When the cross-hub viewer rotates the hub's recovery group
+    Then the response status is 200
+
+  @backend
+  Scenario: A recovery:manage holder scoped to one hub cannot enroll a recovery group for another hub
+    Given a user with global "recovery:manage" permission who is only a member of the first hub
+    And a second hub with a seeded recovery session
+    When the cross-hub viewer enrolls a recovery group for the second hub
+    Then the response status is 403
+
+  @backend
+  Scenario: A recovery:manage holder who is a member of both hubs can enroll a recovery group for either hub
+    Given a user with global "recovery:manage" permission who is only a member of the first hub
+    And a second hub with a seeded recovery session
+    And the cross-hub viewer is also added as a member of the second hub
+    When the cross-hub viewer enrolls a recovery group for the second hub
+    Then the response status is 200
+    When the cross-hub viewer enrolls a recovery group for the hub
+    Then the response status is 200
+
+  @backend
+  Scenario: A recovery:view holder scoped to one hub cannot fetch another hub's recovery group config
+    Given a recovery group is enrolled for the hub
+    And a second hub with a recovery group enrolled
+    And a user with global "recovery:view" permission who is only a member of the first hub
+    When the cross-hub viewer fetches the recovery group for the second hub
+    Then the response status is 403
+
+  @backend
+  Scenario: A recovery:view holder who is a member of both hubs can fetch either hub's recovery group config
+    Given a recovery group is enrolled for the hub
+    And a second hub with a recovery group enrolled
+    And a user with global "recovery:view" permission who is only a member of the first hub
+    And the cross-hub viewer is also added as a member of the second hub
+    When the cross-hub viewer fetches the recovery group for the second hub
+    Then the response status is 200
+    When the cross-hub viewer fetches the recovery group for the hub
+    Then the response status is 200
+
+  @backend
+  Scenario: A recovery:approve holder scoped to one hub cannot apply emergency override to another hub's session
+    Given a verified recovery session exists for the hub
+    And a verified recovery session exists for the second hub
+    And a user with global "recovery:approve" permission who is only a member of the first hub
+    When the cross-hub viewer applies emergency override to the second hub's session
+    Then the response status is 404
+
+  @backend
+  Scenario: A recovery:approve holder who is a member of both hubs can apply emergency override to either hub's session
+    Given a verified recovery session exists for the hub
+    And a verified recovery session exists for the second hub
+    And a user with global "recovery:approve" permission who is only a member of the first hub
+    And the cross-hub viewer is also added as a member of the second hub
+    When the cross-hub viewer applies emergency override to the second hub's session
+    Then the response status is 200
+    When the cross-hub viewer applies emergency override to the hub's session
+    Then the response status is 200
+
+  @backend
+  Scenario: A recovery:manage holder scoped to one hub cannot cancel another hub's recovery session
+    Given a recovery session exists for the hub
+    And a second hub with a seeded recovery session
+    And a user with global "recovery:manage" permission who is only a member of the first hub
+    When the cross-hub viewer cancels the second hub's session
+    Then the response status is 404
+
+  @backend
+  Scenario: A recovery:manage holder who is a member of both hubs can cancel either hub's recovery session
+    Given a recovery session exists for the hub
+    And a second hub with a seeded recovery session
+    And a user with global "recovery:manage" permission who is only a member of the first hub
+    And the cross-hub viewer is also added as a member of the second hub
+    When the cross-hub viewer cancels the second hub's session
+    Then the response status is 200
+    When the cross-hub viewer cancels the hub's session
+    Then the response status is 200
+
   # -- Atomic group rotation with envelope re-wrap (EP09 errata #5 / issue #729) --
 
   @backend @crypto

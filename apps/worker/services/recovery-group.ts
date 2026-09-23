@@ -959,6 +959,20 @@ export class RecoveryGroupService {
 
     const session = sessions[0]
 
+    // The caller-supplied `hubId` (a public route param — this endpoint is
+    // unauthenticated and session-scoped, not hubRoles-scoped) must match
+    // the session's own hub. Without this, a caller holding a valid session
+    // for hub A could substitute hub B in the path and fetch that same
+    // recovering user's hub-B envelope early, before any hub-B session of
+    // their own reached this release gate. Same error as the unmet-gate
+    // case below so the two are not distinguishable.
+    if (session.hubId !== hubId) {
+      throw new RecoveryGroupError(
+        'Recovery envelope is not yet available for this session',
+        403,
+      )
+    }
+
     // Same release gate as `getSession`'s contribution ciphertext: the
     // delay must have elapsed and the session must have reached `active`
     // (threshold met) or later. Gating on `completed` alone was backwards —
