@@ -114,8 +114,9 @@ Then('the CMS report type field {string} should have {string} enabled', async ({
 
 When('the admin creates a custom CMS report type {string}', async ({ request, world }, name: string) => {
   const hubId = getScenarioState(world).hubId
-  getReportTypeState(world).lastReportType = await createCmsReportTypeViaApi(request, { name, hubId })
-  getReportTypeState(world).lastReportTypeId = getReportTypeState(world).lastReportType.id as string
+  const reportType = await createCmsReportTypeViaApi(request, { name, hubId })
+  getReportTypeState(world).lastReportType = reportType
+  getReportTypeState(world).lastReportTypeId = reportType.id as string
 })
 
 Then('the CMS report type should be retrievable', async ({ request, world }) => {

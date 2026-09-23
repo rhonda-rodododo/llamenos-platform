@@ -92,7 +92,7 @@ When('the webhook validation runs', async ({ request, world }) => {
       headers: { 'Content-Type': 'application/json' },
       data: {
         type: 'transfer',
-        timestamp: getNetworkSecState(world).webhookRequest.timestamp,
+        timestamp: getNetworkSecState(world).webhookRequest!.timestamp,
         sig: 'invalid-signature',
       },
     })

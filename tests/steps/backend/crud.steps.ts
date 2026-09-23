@@ -404,7 +404,8 @@ When('the admin deletes the custom role', async ({ request, world }) => {
 })
 
 When('an admin attempts to delete the system {string} role', async ({ request, world }, roleId: string) => {
-  getSharedState(world).lastResponse = await deleteRoleViaApi(request, roleId)
+  const { status } = await deleteRoleViaApi(request, roleId)
+  getSharedState(world).lastResponse = { status, data: null }
 })
 
 // ─── Custom Fields ──────────────────────────────────────────────────
