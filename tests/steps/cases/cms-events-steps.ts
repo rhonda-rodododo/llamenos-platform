@@ -53,14 +53,7 @@ async function ensureEventEntityType(
     const cat = (et as { category?: string }).category
     const name = (et as { name?: string }).name
     return cat === 'event' || name === 'event' || name === 'protest'
-  })
-  // Not cast at the .find() call site — that made the whole result type,
-  // structurally match against createEntityTypeViaApi's `statuses` param
-  // fail under strict tsc (issue #648/#700). Cast narrowly at each use site
-  // instead. `isClosed` is a real, server-supported status field
-  // (packages/protocol/schemas/entity-schema.ts); the helper's inline param
-  // type in tests/api-helpers.ts (outside this lane's ownership) just
-  // hasn't caught up to it.
+  }) as { id: string; statuses?: Array<{ value: string; label: string; order?: number; isClosed?: boolean }> } | undefined
 
   if (!eventType) {
     const id = ((await createEntityTypeViaApi(request, {
@@ -79,19 +72,15 @@ async function ensureEventEntityType(
   // Template-provided event types (e.g. jail-support's mass_arrest_event with
   // active/processing/completed) lack the concluded status the status-change
   // scenario exercises — add it once per hub.
-  const typedEventType = eventType as {
-    id: string
-    statuses?: Array<{ value: string; label: string; order?: number; isClosed?: boolean }>
-  }
-  const statuses = typedEventType.statuses ?? []
+  const statuses = eventType.statuses ?? []
   if (!statuses.some(s => s.value === 'concluded')) {
-    await updateEntityTypeViaApi(request, typedEventType.id, {
+    await updateEntityTypeViaApi(request, eventType.id, {
       statuses: [...statuses, { value: 'concluded', label: 'Concluded', order: statuses.length, isClosed: true }],
     }, ADMIN_NSEC, workerHub)
   }
 
-  casesWorld.eventEntityTypeId = typedEventType.id
-  return typedEventType.id
+  casesWorld.eventEntityTypeId = eventType.id
+  return eventType.id
 }
 
 /** The jail-support template's arrest case type — the Background applies the template, so it must exist. */

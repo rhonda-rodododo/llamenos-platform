@@ -35,7 +35,7 @@ async function testInvoke(page: import('@playwright/test').Page, cmd: string, ar
   // Now the symbol is guaranteed to be on window
   return page.evaluate(async ({ cmd, args }) => {
     const sym = Symbol.for('llamenos_test_invoke')
-    const invoke = (window as unknown as Record<symbol, unknown>)[sym] as
+    const invoke = (window as Record<symbol, unknown>)[sym] as
       ((cmd: string, args?: Record<string, unknown>) => Promise<unknown>) | undefined
     if (!invoke) throw new Error('llamenos_test_invoke not available — is the Tauri mock loaded?')
     return invoke(cmd, args)
