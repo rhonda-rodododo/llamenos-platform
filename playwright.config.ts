@@ -31,7 +31,7 @@ export default defineConfig({
     timeout: process.env.CI ? 15_000 : 10_000,
   },
   use: {
-    baseURL: process.env.PLAYWRIGHT_BASE_URL || "http://localhost:8788",
+    baseURL: process.env.PLAYWRIGHT_BASE_URL || `http://localhost:${process.env.PLAYWRIGHT_PORT || "8788"}`,
     trace: "on-first-retry",
     actionTimeout: process.env.CI ? 15_000 : 10_000,
     navigationTimeout: process.env.CI ? 30_000 : 15_000,
@@ -120,9 +120,12 @@ export default defineConfig({
         // Build once, then serve static files — far more stable than Vite dev server
         // under parallel test load (4 workers × 535 tests).
         // Uses `vite preview` which serves the production build without HMR.
+        // PLAYWRIGHT_PORT lets a worker whose worktree isn't under `.worktrees/`
+        // (so the reuseExistingServer guard below doesn't trip) bind an isolated
+        // port instead of silently reusing another checkout's stale build.
         command:
-          "PLAYWRIGHT_TEST=true bun run build && PLAYWRIGHT_TEST=true bunx vite preview --port 8788 --strictPort",
-        url: "http://localhost:8788",
+          `PLAYWRIGHT_TEST=true bun run build && PLAYWRIGHT_TEST=true bunx vite preview --port ${process.env.PLAYWRIGHT_PORT || "8788"} --strictPort`,
+        url: `http://localhost:${process.env.PLAYWRIGHT_PORT || "8788"}`,
         // Never reuse a server from a different worktree or main checkout —
         // stale builds silently serve wrong code, causing hard-to-diagnose
         // test failures when testIds or API responses don't match the branch.
