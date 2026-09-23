@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next'
 import { useToast } from '@/lib/toast'
-import { updateWebAuthnSettings, type WebAuthnSettings } from '@/lib/api'
+import { updateWebAuthnSettings, getApiErrorCode, type WebAuthnSettings } from '@/lib/api'
 import { SettingsSection } from '@/components/settings-section'
 import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
@@ -22,8 +22,11 @@ export function PasskeyPolicySection({ settings, onChange, expanded, onToggle, s
     try {
       const res = await updateWebAuthnSettings({ [field]: checked })
       onChange(res)
-    } catch {
-      toast(t('common.error'), 'error')
+    } catch (err) {
+      const message = getApiErrorCode(err) === 'WEBAUTHN_CREDENTIAL_REQUIRED'
+        ? t('webauthn.credentialRequiredError')
+        : t('common.error')
+      toast(message, 'error')
     }
   }
 
@@ -43,6 +46,7 @@ export function PasskeyPolicySection({ settings, onChange, expanded, onToggle, s
           <Label>{t('webauthn.requireForAdmins')}</Label>
         </div>
         <Switch
+          data-testid="webauthn-require-for-admins-toggle"
           checked={settings.requireForAdmins}
           onCheckedChange={(checked) => handleToggle('requireForAdmins', checked)}
         />
@@ -52,6 +56,7 @@ export function PasskeyPolicySection({ settings, onChange, expanded, onToggle, s
           <Label>{t('webauthn.requireForUsers')}</Label>
         </div>
         <Switch
+          data-testid="webauthn-require-for-users-toggle"
           checked={settings.requireForUsers}
           onCheckedChange={(checked) => handleToggle('requireForUsers', checked)}
         />

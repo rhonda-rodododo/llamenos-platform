@@ -1870,6 +1870,7 @@
   },
   "webauthn": {
     "browserNotSupported": "Ri ak'uxlab'al man kutikir ta ri taq ewan etal.",
+    "credentialRequiredError": "Titz'aqatisaj na jun ewan etal, kanoq karajawaxik chike ri b'anela'.",
     "deleteKey": "Tiyuj",
     "description": "Takojo' ri retal ak'uxlab'al o PIN rech yatok chi maj ri ewan etal.",
     "label": "Rub'i' ewan etal (achi'el \"Ri Nuteléfono\")",
