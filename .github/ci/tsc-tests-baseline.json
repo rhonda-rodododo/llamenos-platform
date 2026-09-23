@@ -1,5 +1,1 @@
-{
-  "tests/steps/admin/admin-flow-steps.ts": 2,
-  "tests/steps/admin/audit-steps.ts": 5,
-  "tests/steps/auth/pin-lockout-steps.ts": 1
-}
+{}
