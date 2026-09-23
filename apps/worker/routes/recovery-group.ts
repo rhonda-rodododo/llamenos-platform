@@ -258,6 +258,19 @@ authenticatedRoutes.get('/sessions',
     const hubId = c.req.query('hubId')
     if (!hubId) return c.json({ error: 'Missing hubId query parameter' }, 400)
 
+    const user = c.get('user')
+
+    // Enforce hub-scoping: caller must be a member of the requested hub.
+    // Global admins (no hubRoles) have unrestricted access. Mirrors the
+    // identical check on GET /session/:id — recovery:view alone is a
+    // global permission grant and says nothing about which hub(s) the
+    // caller actually belongs to (multi-hub axiom: a user can hold
+    // recovery:view globally while being scoped to only one hub).
+    const hubRoles = user.hubRoles ?? []
+    if (hubRoles.length > 0 && !hubRoles.some((hr) => hr.hubId === hubId)) {
+      return c.json({ error: 'Forbidden' }, 403)
+    }
+
     const services = c.get('services')
     const sessions = await services.recoveryGroup.listSessions(hubId)
     return c.json(sessions)

@@ -5,7 +5,7 @@
  * user envelopes, liveness proofs, and permission enforcement.
  */
 import { expect } from '@playwright/test'
-import { Given, When, Then, Before, getState, setState } from './fixtures'
+import { Given, When, Then, Before, After, getState, setState } from './fixtures'
 import { setLastResponse } from './shared-state'
 import {
   encryptContent,
@@ -20,6 +20,9 @@ import {
   devPost,
   createUserViaApi,
   createRoleViaApi,
+  createHubViaApi,
+  deleteHubViaApi,
+  addHubMemberViaApi,
   generateTestKeypair,
   ADMIN_SEED,
   seedHexToPubkey,
@@ -46,6 +49,12 @@ interface RecoveryGroupState {
   sessionId?: string
   lastStatus?: number
   lastBody?: Record<string, unknown>
+
+  // -- Cross-hub scoping (issue #847) --
+  secondHubId?: string
+  secondHubSessionId?: string
+  crossHubViewerSeed?: string
+  crossHubViewerPubkey?: string
 
   // -- Rotation / departed-member-exclusion (real HPKE round-trip) --
   rotation?: {
@@ -90,6 +99,16 @@ Before({ tags: '@backend' }, async ({ world }) => {
     holderSeeds: [],
     holderPubkeys: [],
   })
+})
+
+// Cross-hub scoping scenarios (issue #847) provision a second hub on demand —
+// clean it up here rather than in `workerHub`'s teardown, which only owns the
+// single per-scenario hub. A no-op for every scenario that never sets it.
+After({ tags: '@backend' }, async ({ request, world }) => {
+  const s = getS(world)
+  if (s.secondHubId) {
+    await deleteHubViaApi(request, s.secondHubId).catch(() => {})
+  }
 })
 
 // ── Helpers ────────────────────────────────────────────────────────
@@ -563,6 +582,98 @@ Then('the listed sessions include the seeded session', async ({ world }) => {
   const s = getS(world)
   const sessions = (s.lastBody?.sessions as Array<{ sessionId: string }>) ?? []
   expect(sessions.some(sess => sess.sessionId === s.sessionId)).toBe(true)
+})
+
+// ══════════════════════════════════════════════════════════════════
+// Cross-hub scoping (issue #847) — GET /recovery-group/sessions omitted
+// the hub-scoping check present on the adjacent GET /session/:id route,
+// letting a hub-scoped recovery:view holder enumerate another hub's
+// recovery sessions (including new-device pubkeys).
+// ══════════════════════════════════════════════════════════════════
+
+Given('a second hub with a seeded recovery session', async ({ request, world }) => {
+  const s = getS(world)
+
+  const secondHubId = await createHubViaApi(request, `recovery-second-hub-${Date.now()}`)
+  s.secondHubId = secondHubId
+
+  const recoveringUser = await createUserViaApi(request, { name: `Second Hub Recovering User ${Date.now()}` })
+  const { pubkey: newDevicePubkey } = generateTestKeypair()
+
+  const { status, data } = await devPost<{ sessionId: string }>(request, '/test-recovery-seed-session', {
+    hubId: secondHubId,
+    userPubkey: recoveringUser.pubkey,
+    newDevicePubkey,
+    status: 'pending',
+  })
+  expect(status).toBe(200)
+  s.secondHubSessionId = data.sessionId
+})
+
+Given('a user with global {string} permission who is only a member of the first hub', async ({ request, world }, permission: string) => {
+  const s = getS(world)
+  expect(s.hubId).toBeDefined()
+
+  const roleSlug = `recovery-view-global-${Date.now()}`
+  const role = await createRoleViaApi(request, {
+    name: `Recovery Viewer ${Date.now()}`,
+    slug: roleSlug,
+    permissions: [permission],
+  })
+
+  // The role is granted globally (roleIds on the user, not a hub-scoped
+  // assignment) — recovery-group routes are mounted outside `hubContext`,
+  // so `requirePermission` only ever consults global roles here. Hub
+  // membership below is a SEPARATE axis: it populates `user.hubRoles`,
+  // which is what the route's hub-scoping check keys off of.
+  const user = await createUserViaApi(request, {
+    name: `Recovery Viewer User ${Date.now()}`,
+    roleIds: [role.id],
+  })
+  s.crossHubViewerSeed = user.seedHex
+  s.crossHubViewerPubkey = user.pubkey
+
+  await addHubMemberViaApi(request, s.hubId!, user.pubkey, ['role-volunteer'])
+})
+
+Given('the cross-hub viewer is also added as a member of the second hub', async ({ request, world }) => {
+  const s = getS(world)
+  expect(s.secondHubId).toBeDefined()
+  expect(s.crossHubViewerPubkey).toBeDefined()
+
+  await addHubMemberViaApi(request, s.secondHubId!, s.crossHubViewerPubkey!, ['role-volunteer'])
+})
+
+When('the cross-hub viewer lists recovery sessions for the second hub', async ({ request, world }) => {
+  const s = getS(world)
+  expect(s.secondHubId).toBeDefined()
+  expect(s.crossHubViewerSeed).toBeDefined()
+
+  const { status, data } = await apiGet<Array<Record<string, unknown>>>(
+    request, `/recovery-group/sessions?hubId=${s.secondHubId!}`, s.crossHubViewerSeed!,
+  )
+  s.lastStatus = status
+  s.lastBody = { sessions: data } as unknown as Record<string, unknown>
+  setLastResponse(world, { status, data })
+})
+
+When('the cross-hub viewer lists recovery sessions for the hub', async ({ request, world }) => {
+  const s = getS(world)
+  expect(s.hubId).toBeDefined()
+  expect(s.crossHubViewerSeed).toBeDefined()
+
+  const { status, data } = await apiGet<Array<Record<string, unknown>>>(
+    request, `/recovery-group/sessions?hubId=${s.hubId!}`, s.crossHubViewerSeed!,
+  )
+  s.lastStatus = status
+  s.lastBody = { sessions: data } as unknown as Record<string, unknown>
+  setLastResponse(world, { status, data })
+})
+
+Then('the listed sessions include the seeded session for the second hub', async ({ world }) => {
+  const s = getS(world)
+  const sessions = (s.lastBody?.sessions as Array<{ sessionId: string }>) ?? []
+  expect(sessions.some(sess => sess.sessionId === s.secondHubSessionId)).toBe(true)
 })
 
 // ══════════════════════════════════════════════════════════════════

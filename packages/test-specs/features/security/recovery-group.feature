@@ -116,6 +116,30 @@ Feature: Recovery Group Lifecycle
     When that user lists recovery sessions for the hub
     Then the response status is 403
 
+  # -- Cross-hub scoping (issue #847: recovery:view is a global permission grant
+  #    and says nothing about which hub(s) the caller is actually a member of) --
+
+  @backend
+  Scenario: A recovery:view holder scoped to one hub cannot list another hub's sessions
+    Given a recovery session exists for the hub
+    And a second hub with a seeded recovery session
+    And a user with global "recovery:view" permission who is only a member of the first hub
+    When the cross-hub viewer lists recovery sessions for the second hub
+    Then the response status is 403
+
+  @backend
+  Scenario: A recovery:view holder who is a member of both hubs can list sessions for either
+    Given a recovery session exists for the hub
+    And a second hub with a seeded recovery session
+    And a user with global "recovery:view" permission who is only a member of the first hub
+    And the cross-hub viewer is also added as a member of the second hub
+    When the cross-hub viewer lists recovery sessions for the second hub
+    Then the response status is 200
+    And the listed sessions include the seeded session for the second hub
+    When the cross-hub viewer lists recovery sessions for the hub
+    Then the response status is 200
+    And the listed sessions include the seeded session
+
   # -- Atomic group rotation with envelope re-wrap (EP09 errata #5 / issue #729) --
 
   @backend @crypto
