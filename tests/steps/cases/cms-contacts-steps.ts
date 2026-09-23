@@ -612,15 +612,19 @@ Then('the contact cases empty state should be visible', async ({ page }) => {
 Then('the contact relationships list should be visible', async ({ page }) => {
   // The previous steps selected the contact and opened its Relationships tab, and
   // the Given created a relationship — the list (not the empty state) must render.
+  // Rendering this tab depends on the same admin-side HPKE decrypt of the contact
+  // (and its relationship data) that gates the Profile tab — see issue #796 and
+  // Timeouts.DECRYPT's doc comment. Observed timing out under contended CI shard-2
+  // runs at ELEMENT's 10s even for a freshly (correctly) seeded, decryptable contact.
   await expect(page.getByTestId('contact-tab-relationships')).toHaveClass(/border-primary/, { timeout: Timeouts.ELEMENT })
-  await expect(page.getByTestId('contact-relationships-list')).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await expect(page.getByTestId('contact-relationships-list')).toBeVisible({ timeout: Timeouts.DECRYPT })
 })
 
 Then('the contact relationships empty state should be visible', async ({ page }) => {
   const empty = page.getByTestId('contact-relationships-empty')
   const list = page.getByTestId('contact-relationships-list')
   const combined = empty.or(list)
-  await expect(combined.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await expect(combined.first()).toBeVisible({ timeout: Timeouts.DECRYPT })
 })
 
 // --- Groups tab ---
@@ -628,12 +632,12 @@ Then('the contact relationships empty state should be visible', async ({ page })
 Then('the contact groups list should be visible', async ({ page }) => {
   const list = page.getByTestId('contact-groups-list')
     .or(page.getByTestId('contact-groups-empty'))
-  await expect(list.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await expect(list.first()).toBeVisible({ timeout: Timeouts.DECRYPT })
 })
 
 Then('each group should show a member count', async ({ page }) => {
   const items = page.getByTestId('contact-groups-list').getByTestId('contact-group-item')
-  await expect(items.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await expect(items.first()).toBeVisible({ timeout: Timeouts.DECRYPT })
   for (const item of await items.all()) {
     await expect(item.getByTestId('contact-group-member-count')).toHaveText(/\d/)
   }
@@ -643,7 +647,7 @@ Then('the contact groups empty state should be visible', async ({ page }) => {
   const empty = page.getByTestId('contact-groups-empty')
   const list = page.getByTestId('contact-groups-list')
   const combined = empty.or(list)
-  await expect(combined.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await expect(combined.first()).toBeVisible({ timeout: Timeouts.DECRYPT })
 })
 
 // --- Privacy-aware display ---
