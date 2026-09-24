@@ -1,0 +1,100 @@
+---
+# Shared ntfy provisioning: publish account, bearer token, access control.
+#
+# Included by roles/llamenos-ntfy/tasks/main.yml (per-service path) and by
+# roles/llamenos/tasks/main.yml (monolithic demo/staging path). The caller
+# must already have a RUNNING, healthy ntfy container and must have set:
+#   ntfy_container_name  — container to `docker exec` into
+#   ntfy_state_dir       — host dir that holds the persisted .publish-token
+# It exposes the `ntfy_auth_token` fact for the shared worker env template.
+
+- name: Ensure the ntfy state directory exists
+  ansible.builtin.file:
+    path: "{{ ntfy_state_dir }}"
+    state: directory
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_group }}"
+    mode: "0750"
+
+# ── Provision the backend's publish credential ───────────────────────────
+#
+# ntfy cannot accept a pre-chosen token value (unlike every other secret in
+# vars.yml, which the operator generates with `openssl rand`) — a token only
+# exists once `ntfy token add` mints it server-side. So instead this role
+# generates one on first run, persists it next to the compose file so a
+# re-run doesn't mint a second one, and publishes it as the `ntfy_auth_token`
+# fact that roles/llamenos-app's env template reads. Any operator-supplied
+# value for ntfy_auth_token in vars.yml is intentionally overridden here —
+# see the comment on that var in vars.yml.
+
+- name: Check for a previously-generated publish token
+  ansible.builtin.stat:
+    path: "{{ ntfy_state_dir }}/.publish-token"
+  register: ntfy_token_file
+
+- name: Generate a throwaway provisioning password (not used after account creation)
+  ansible.builtin.set_fact:
+    ntfy_provision_password: "{{ lookup('ansible.builtin.password', '/dev/null length=40 chars=ascii_letters,digits') }}"
+  no_log: true
+  when: not ntfy_token_file.stat.exists
+
+- name: Ensure the backend publish account exists
+  community.docker.docker_container_exec:
+    container: "{{ ntfy_container_name }}"
+    command: "ntfy user add --role=user {{ ntfy_publish_username }}"
+    env:
+      NTFY_PASSWORD: "{{ ntfy_provision_password }}"
+  register: ntfy_user_add
+  failed_when:
+    - ntfy_user_add.rc != 0
+    - "'already exists' not in ntfy_user_add.stderr"
+  no_log: true
+  when: not ntfy_token_file.stat.exists
+
+- name: Mint a publish token for the backend account
+  community.docker.docker_container_exec:
+    container: "{{ ntfy_container_name }}"
+    command: "ntfy token add {{ ntfy_publish_username }}"
+  register: ntfy_token_add
+  no_log: true
+  when: not ntfy_token_file.stat.exists
+
+- name: Persist the generated token for idempotent re-runs
+  ansible.builtin.copy:
+    dest: "{{ ntfy_state_dir }}/.publish-token"
+    # `ntfy token add` writes its one-line result to stderr, not stdout.
+    content: "{{ ntfy_token_add.stderr | regex_search('tk_[A-Za-z0-9]+') }}"
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_group }}"
+    mode: "0600"
+  no_log: true
+  when: not ntfy_token_file.stat.exists
+
+- name: Read back the persisted token
+  ansible.builtin.slurp:
+    src: "{{ ntfy_state_dir }}/.publish-token"
+  register: ntfy_token_slurp
+  no_log: true
+
+- name: Expose the publish token as a fact for roles/llamenos-app to consume
+  ansible.builtin.set_fact:
+    ntfy_auth_token: "{{ ntfy_token_slurp.content | b64decode | trim }}"
+  no_log: true
+
+# ── Access control ────────────────────────────────────────────────────────
+# Re-asserted every run so a manually-edited ACL (or a restored ntfy-data
+# volume from backup) always converges back to the intended state.
+
+- name: Grant the backend write-only access to every topic
+  community.docker.docker_container_exec:
+    container: "{{ ntfy_container_name }}"
+    command: 'ntfy access {{ ntfy_publish_username }} "*" write-only'
+  register: ntfy_access_publisher
+  changed_when: "'granted' in ntfy_access_publisher.stderr"
+
+- name: Grant anonymous subscribers read-only access to every topic
+  community.docker.docker_container_exec:
+    container: "{{ ntfy_container_name }}"
+    command: 'ntfy access everyone "*" read-only'
+  register: ntfy_access_anon
+  changed_when: "'granted' in ntfy_access_anon.stderr"

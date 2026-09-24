@@ -6,6 +6,12 @@ UnifiedPush distributor for the Android app and as the backend's push relay
 stack" background, and #716 for the app-side `NTFY_URL`/`NTFY_AUTH_TOKEN`
 wiring this role feeds).
 
+> Transport decision, staging requirements, verification and Android tester
+> setup live in [`deploy/PUSH_NOTIFICATIONS.md`](../../../PUSH_NOTIFICATIONS.md).
+> The token/ACL provisioning in `tasks/provision.yml` and the compose service
+> body in `templates/compose/_ntfy-service.j2` are also used by the
+> monolithic demo/staging role (`roles/llamenos`).
+
 ## Why this needs its own role
 
 `deploy/docker/docker-compose.yml` already ships an `ntfy` service behind

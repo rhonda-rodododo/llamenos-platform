@@ -29,6 +29,33 @@
       ansible.builtin.include_tasks: tasks/guard-demo-mode.yml
       tags: always
 
+    # Android testers are rung through a self-hosted ntfy/UnifiedPush relay
+    # (no FCM — see deploy/PUSH_NOTIFICATIONS.md). A staging backend without
+    # it looks healthy but can never wake an Android device for a call, so a
+    # demo/staging deploy REFUSES to proceed without it (issue #959).
+    - name: Assert the ntfy push relay is enabled and publicly addressable
+      ansible.builtin.assert:
+        that:
+          - llamenos_ntfy_enabled | default(false) | bool
+          - ntfy_domain is defined
+          - ntfy_domain | length > 0
+          - ntfy_domain != domain
+          - ntfy_domain.endswith('.llamenos.org')
+        fail_msg: |
+          REFUSING TO DEPLOY: the staging/demo backend must run the ntfy push relay,
+          otherwise Android testers can never be rung for an incoming call.
+
+          Set in demo_vars.yml:
+            llamenos_ntfy_enabled: true
+            ntfy_domain: "push.<your staging host>.llamenos.org"   # real DNS + TLS, reachable from testers' phones
+
+          Current values:
+            llamenos_ntfy_enabled: {{ llamenos_ntfy_enabled | default(false) }}
+            ntfy_domain:           {{ ntfy_domain | default('NOT SET') }}
+            domain:                {{ domain | default('NOT SET') }}
+        success_msg: "ntfy push relay enabled at {{ ntfy_domain }}"
+      tags: always
+
 - name: Harden demo server
   hosts: demo
   become: true
@@ -52,3 +79,15 @@
       tags: [docker, deploy]
     - role: llamenos
       tags: [llamenos, deploy]
+
+# Deploy is not "done" until the push relay demonstrably works from outside
+# the host: health over public TLS, anonymous publish rejected, the backend's
+# token accepted, and a subscriber receiving the message (issue #959).
+- name: Verify the ntfy push relay end to end
+  hosts: demo
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Verify ntfy relay
+      ansible.builtin.include_tasks: tasks/verify-ntfy.yml
+      tags: [ntfy, verify]

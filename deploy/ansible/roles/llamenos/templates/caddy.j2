@@ -15,3 +15,13 @@ api.{{ domain }} {
     reverse_proxy app:3000
     tls {{ acme_email }}
 }
+
+{% if llamenos_ntfy_enabled | default(false) | bool and ntfy_domain | default("") | length > 0 %}
+# ntfy/UnifiedPush push relay (issue #959) — reached by the Android app to
+# subscribe (anonymous, read-only, keyed by an unguessable topic name).
+# Caddy proxies WebSocket upgrades automatically.
+{{ ntfy_domain }} {
+    reverse_proxy ntfy:80
+    tls {{ acme_email }}
+}
+{% endif %}

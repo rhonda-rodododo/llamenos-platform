@@ -164,6 +164,9 @@ apns_team_id: ""
 
 # ntfy/UnifiedPush (Android push). Set llamenos_ntfy_enabled: true to stand
 # up a self-hosted ntfy broker (roles/llamenos-ntfy) via this playbook.
+# Off by default here, but a staging/demo backend MUST enable it — without it
+# Android devices can never be rung for a call (no FCM by design). See
+# deploy/PUSH_NOTIFICATIONS.md; playbooks/deploy-demo.yml enforces it.
 llamenos_ntfy_enabled: false
 ntfy_url: "http://ntfy:80" # Compose service name:port, not a public URL
 ntfy_domain: "push.hotline.example.org" # Public hostname — required when enabled

@@ -41,15 +41,6 @@
     mode: "0640"
   notify: Restart llamenos stack
 
-- name: Template .env file
-  ansible.builtin.template:
-    src: env.j2
-    dest: "{{ app_dir }}/.env"
-    owner: "{{ deploy_user }}"
-    group: "{{ deploy_group }}"
-    mode: "0600"
-  notify: Restart llamenos stack
-
 - name: Template Caddyfile
   ansible.builtin.template:
     src: caddy.j2
@@ -57,6 +48,62 @@
     owner: "{{ deploy_user }}"
     group: "{{ deploy_group }}"
     mode: "0640"
+  notify: Restart llamenos stack
+
+# ── ntfy/UnifiedPush push relay (issue #959) ─────────────────────────────
+# Android testers can only be rung for an incoming call through this relay,
+# so on the staging/demo path it is brought up and provisioned BEFORE the
+# app's .env is rendered: the backend's publish token only exists once
+# `ntfy token add` has run inside the running broker, and the .env must
+# carry it. Compose validates every service's env_file when it loads the
+# project (even for `up ntfy`), so an empty placeholder .env is created
+# first on a fresh host; it is overwritten with the real one right after.
+- name: Ensure a .env file exists so compose can load the project
+  ansible.builtin.file:
+    path: "{{ app_dir }}/.env"
+    state: touch
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_group }}"
+    mode: "0600"
+    modification_time: preserve
+    access_time: preserve
+  when: llamenos_ntfy_enabled | default(false) | bool
+
+- name: Start the ntfy push relay
+  community.docker.docker_compose_v2:
+    project_src: "{{ app_dir }}"
+    services: [ntfy]
+    state: present
+  register: ntfy_up
+  when: llamenos_ntfy_enabled | default(false) | bool
+
+- name: Wait for ntfy health check
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:{{ llamenos_ntfy_local_port | default(2586) }}/v1/health"
+    method: GET
+    status_code: 200
+  register: ntfy_health
+  retries: 20
+  delay: 3
+  until: ntfy_health.status == 200
+  when: llamenos_ntfy_enabled | default(false) | bool
+
+- name: Provision the ntfy publish account, token and access control
+  ansible.builtin.include_role:
+    name: llamenos-ntfy
+    tasks_from: provision.yml
+  vars:
+    ntfy_container_name: "llamenos-ntfy-1"
+    ntfy_state_dir: "{{ app_dir }}/ntfy"
+  when: llamenos_ntfy_enabled | default(false) | bool
+
+- name: Template .env file
+  ansible.builtin.template:
+    src: env.j2
+    dest: "{{ app_dir }}/.env"
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_group }}"
+    mode: "0600"
   notify: Restart llamenos stack
 
 - name: Pull Docker images

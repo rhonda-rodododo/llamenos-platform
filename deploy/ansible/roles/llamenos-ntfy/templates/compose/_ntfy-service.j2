@@ -1,0 +1,43 @@
+{#
+  Body of the `ntfy` compose service — shared by this role's standalone
+  compose file (ntfy.j2, per-service path) and the monolithic demo/staging
+  role's compose file (roles/llamenos/templates/docker-compose.j2), so the
+  two can never drift on auth/ACL settings. Rendered at column 0 and
+  indented by the includer. Networks and the loopback port mapping are NOT
+  part of this body: they differ per path and live in each includer.
+#}
+image: {{ llamenos_ntfy_image }}
+command: serve
+restart: unless-stopped
+environment:
+  # Public URL Android's UnifiedPush client and the ntfy CLI use to build
+  # links — must match the Caddy vhost for ntfy_domain.
+  - NTFY_BASE_URL=https://{{ ntfy_domain }}
+  - NTFY_BEHIND_PROXY=true
+  # Deny-all default: nobody (including anonymous callers) gets any
+  # access to a topic unless explicitly granted by `ntfy access`.
+  # This is what makes an unauthenticated `curl -d ... /sometopic`
+  # publish fail — see the role README's "Auth model" section.
+  - NTFY_AUTH_DEFAULT_ACCESS=deny-all
+  - NTFY_AUTH_FILE=/var/lib/ntfy/auth.db
+  # No self-service accounts and no login UI — the only account is the
+  # one this role provisions for the backend.
+  - NTFY_ENABLE_SIGNUP=false
+  - NTFY_ENABLE_LOGIN=false
+  # No browser topic UI. This is a private push relay for our own
+  # Android client and backend, not a public ntfy.sh-style instance.
+  - NTFY_WEB_ROOT=disable
+volumes:
+  - ntfy-data:/var/lib/ntfy
+healthcheck:
+  test: ["CMD", "wget", "-q", "--tries=1", "http://localhost:80/v1/health", "-O", "-"]
+  interval: 30s
+  timeout: 5s
+  retries: 3
+  start_period: 10s
+logging:
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+    tag: "llamenos-ntfy"
