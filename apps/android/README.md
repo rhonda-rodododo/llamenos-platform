@@ -14,7 +14,8 @@ Native Kotlin/Compose Android client for Llamenos (minSdk 26, Material 3, Hilt D
 bun run setup:android    # Install Android SDK components
 # Build Rust JNI libraries (produces debug + release variants)
 cd packages/crypto && ./scripts/build-mobile.sh android
-# Copy to build-type source sets
+# Copy to build-type source sets (these dirs are gitignored — create them first)
+mkdir -p ../../apps/android/app/src/debug/jniLibs ../../apps/android/app/src/release/jniLibs
 cp -r dist/android/jniLibs-debug/* ../../apps/android/app/src/debug/jniLibs/
 cp -r dist/android/jniLibs-release/* ../../apps/android/app/src/release/jniLibs/
 ```
@@ -63,8 +64,9 @@ This produces two variants:
 - `dist/android/jniLibs-debug/` — test-kdf params (1MB/1iter/1lane), x86_64 emulator only
 - `dist/android/jniLibs-release/` — production Argon2id params (64MB/3iter/4lanes), arm64-v8a + armeabi-v7a
 
-Copy to the corresponding Gradle build-type source sets:
+Copy to the corresponding Gradle build-type source sets (gitignored, so absent in a fresh checkout — `cp` will not create them):
 ```bash
+mkdir -p ../../apps/android/app/src/debug/jniLibs ../../apps/android/app/src/release/jniLibs
 cp -r dist/android/jniLibs-debug/* ../../apps/android/app/src/debug/jniLibs/
 cp -r dist/android/jniLibs-release/* ../../apps/android/app/src/release/jniLibs/
 ```

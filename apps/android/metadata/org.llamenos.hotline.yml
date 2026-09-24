@@ -21,6 +21,7 @@ Builds:
     prebuild:
       - cd ../../packages/crypto
       - ./scripts/build-mobile.sh android
+      - mkdir -p ../../apps/android/app/src/release/jniLibs
       - cp -r dist/android/jniLibs-release/* ../../apps/android/app/src/release/jniLibs/
 
 AutoUpdateMode: Version
