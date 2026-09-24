@@ -500,10 +500,11 @@ test.describe('Global Setup: Provision Test Accounts', () => {
   test('cache the fixed admin session for loginAsAdmin() reuse', async ({ page }) => {
     await page.goto('/login')
     await page.waitForLoadState('domcontentloaded')
-    await page.waitForFunction(() => !!(window as any).__TEST_PLATFORM, { timeout: Timeouts.AUTH })
+    await page.waitForFunction(() => !!window.__TEST_PLATFORM, { timeout: Timeouts.AUTH })
 
     await page.evaluate(async ({ secretHex, pin }) => {
-      const platform = (window as any).__TEST_PLATFORM
+      const platform = window.__TEST_PLATFORM
+      if (!platform) throw new Error('__TEST_PLATFORM not available')
       const encrypted = await platform.deviceImportAndLoad(secretHex, pin, crypto.randomUUID())
       await platform.persistAndUnlockDeviceKeys(encrypted, pin)
       await platform.lockCrypto()

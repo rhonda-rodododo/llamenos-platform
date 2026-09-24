@@ -5,7 +5,7 @@ import { useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   HelpCircle, Shield, Phone, FileText, Users, Clock,
-  ShieldBan, Search, ChevronDown, ExternalLink, Lock,
+  ShieldBan, Search, ChevronDown,
   Keyboard, LayoutDashboard, StickyNote, Settings,
 } from 'lucide-react'
 

@@ -12,8 +12,6 @@ import {
   decryptFileMetadata as platformDecryptFileMetadata,
   rewrapFileKey as platformRewrapFileKey,
   hpkeWrapKey,
-  hpkeSealKey,
-  hpkeOpenKeyFromState,
   aesGcmEncrypt,
   aesGcmDecrypt,
 } from './platform'

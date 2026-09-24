@@ -87,7 +87,7 @@ function OnboardingPage() {
     }
     validateInvite(inviteCode).then(result => {
       if (result.valid) {
-        setInviteData({ name: result.name!, roleIds: result.roleIds || ['role-volunteer'] })
+        setInviteData({ name: result.name, roleIds: result.roleIds || ['role-volunteer'] })
         setStep('welcome')
       } else {
         setStep('error')

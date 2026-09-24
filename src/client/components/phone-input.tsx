@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { useState, useCallback, forwardRef } from 'react'
+import { useState, forwardRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import PhoneInputPrimitive, {
   getCountryCallingCode,
@@ -98,19 +98,21 @@ function CountrySelect({ disabled, value: selectedCountry, options, onChange }: 
           <CommandList className="max-h-[300px]">
             <CommandEmpty>{t('phone.noCountry', 'No country found.')}</CommandEmpty>
             <CommandGroup>
-              {options.filter(o => o.value).map(({ value, label }) => (
+              {options
+                .filter((o): o is { label: string; value: Country } => !!o.value)
+                .map(({ value, label }) => (
                 <CommandItem
                   key={value}
                   className="gap-2"
                   onSelect={() => {
-                    onChange(value as Country)
+                    onChange(value)
                     setOpen(false)
                   }}
                 >
-                  <FlagComponent country={value!} countryName={label} />
+                  <FlagComponent country={value} countryName={label} />
                   <span className="flex-1 text-sm">{label}</span>
                   <span className="text-sm text-foreground/50">
-                    +{getCountryCallingCode(value!)}
+                    +{getCountryCallingCode(value)}
                   </span>
                   <CheckIcon
                     className={cn('ml-auto size-4', value === selectedCountry ? 'opacity-100' : 'opacity-0')}

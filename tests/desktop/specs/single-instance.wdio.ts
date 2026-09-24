@@ -17,15 +17,15 @@ describe('Single Instance', () => {
   it('should have the single-instance plugin loaded', async () => {
     const result = await browser.execute(() => {
       try {
-        const internals = (window as any).__TAURI_INTERNALS__
+        const internals = window.__TAURI_INTERNALS__
         if (!internals?.metadata) return { found: false, reason: 'no metadata' }
         return {
           found: true,
           label: internals.metadata.currentWindow?.label,
           windowCount: internals.metadata.windows?.length,
         }
-      } catch (e: any) {
-        return { found: false, reason: String(e?.message || e) }
+      } catch (e: unknown) {
+        return { found: false, reason: e instanceof Error ? e.message : String(e) }
       }
     })
 
@@ -40,16 +40,16 @@ describe('Single Instance', () => {
   it('should have only one window open', async () => {
     const result = await browser.execute(() => {
       try {
-        const internals = (window as any).__TAURI_INTERNALS__
+        const internals = window.__TAURI_INTERNALS__
         if (!internals?.metadata?.windows) return { count: -1, reason: 'no metadata.windows' }
-        return { count: internals.metadata.windows.length }
-      } catch (e: any) {
-        return { count: -1, reason: String(e?.message || e) }
+        return { count: internals.metadata.windows.length, reason: '' }
+      } catch (e: unknown) {
+        return { count: -1, reason: e instanceof Error ? e.message : String(e) }
       }
     })
 
     if (result.count === -1) {
-      console.warn('Window count check skipped:', (result as any).reason)
+      console.warn('Window count check skipped:', result.reason)
     } else {
       expect(result.count).toBe(1)
     }
@@ -74,13 +74,13 @@ describe('Single Instance', () => {
   it('should have window visible after second instance attempt', async () => {
     const result = await browser.execute(async () => {
       try {
-        const invoke = (window as any).__TAURI_INTERNALS__?.invoke
+        const invoke = window.__TAURI_INTERNALS__?.invoke
         if (!invoke) return { error: '__TAURI_INTERNALS__.invoke not available' }
 
-        const visible = await invoke('plugin:window|is_visible', { label: 'main' })
+        const visible = await invoke('plugin:window|is_visible', { label: 'main' }) as boolean
         return { visible }
-      } catch (e: any) {
-        return { error: String(e?.message || e) }
+      } catch (e: unknown) {
+        return { error: e instanceof Error ? e.message : String(e) }
       }
     })
 

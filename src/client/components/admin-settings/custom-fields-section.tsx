@@ -48,7 +48,7 @@ export function CustomFieldsSection({ fields, onChange, expanded, onToggle, stat
   }
 
   async function handleSave() {
-    if (!editing?.label?.trim() || !editing?.name?.trim()) return
+    if (!editing || !editing.label?.trim() || !editing.name?.trim()) return
     setSaving(true)
     try {
       let next: CustomFieldDefinition[]
@@ -59,8 +59,8 @@ export function CustomFieldsSection({ fields, onChange, expanded, onToggle, stat
       } else {
         const newField: CustomFieldDefinition = {
           id: crypto.randomUUID(),
-          name: editing.name!,
-          label: editing.label!,
+          name: editing.name,
+          label: editing.label,
           type: editing.type || 'text',
           required: editing.required ?? false,
           options: editing.options,
@@ -145,11 +145,11 @@ export function CustomFieldsSection({ fields, onChange, expanded, onToggle, stat
                 onChange={e => {
                   const label = e.target.value
                   const autoName = !editing.id
-                  setEditing(prev => ({
-                    ...prev!,
+                  setEditing({
+                    ...editing,
                     label,
                     ...(autoName ? { name: label.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '').slice(0, 50) } : {}),
-                  }))
+                  })
                 }}
                 placeholder="e.g. Severity Rating"
               />
@@ -160,7 +160,7 @@ export function CustomFieldsSection({ fields, onChange, expanded, onToggle, stat
                 id="custom-field-name"
                 data-testid="custom-field-name-input"
                 value={editing.name || ''}
-                onChange={e => setEditing(prev => ({ ...prev!, name: e.target.value }))}
+                onChange={e => setEditing({ ...editing, name: e.target.value })}
                 placeholder="e.g. severity"
                 maxLength={50}
               />
@@ -174,7 +174,7 @@ export function CustomFieldsSection({ fields, onChange, expanded, onToggle, stat
                 id="custom-field-type"
                 data-testid="custom-field-type-select"
                 value={editing.type || 'text'}
-                onChange={e => setEditing(prev => ({ ...prev!, type: e.target.value as CustomFieldDefinition['type'] }))}
+                onChange={e => setEditing({ ...editing, type: e.target.value as CustomFieldDefinition['type'] })}
                 className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
               >
                 <option value="text">{t('customFields.types.text')}</option>
@@ -191,7 +191,7 @@ export function CustomFieldsSection({ fields, onChange, expanded, onToggle, stat
                 id="field-context"
                 data-testid="field-context-select"
                 value={editing.context || 'all'}
-                onChange={e => setEditing(prev => ({ ...prev!, context: e.target.value as CustomFieldContext }))}
+                onChange={e => setEditing({ ...editing, context: e.target.value as CustomFieldContext })}
                 className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
               >
                 {(Object.entries(CUSTOM_FIELD_CONTEXT_LABELS) as [CustomFieldContext, string][]).map(([key, label]) => (
@@ -204,7 +204,7 @@ export function CustomFieldsSection({ fields, onChange, expanded, onToggle, stat
           <div className="flex items-center gap-2">
             <Switch
               checked={editing.required ?? false}
-              onCheckedChange={checked => setEditing(prev => ({ ...prev!, required: checked }))}
+              onCheckedChange={checked => setEditing({ ...editing, required: checked })}
             />
             <Label className="text-sm">{t('customFields.required')}</Label>
           </div>
@@ -220,18 +220,18 @@ export function CustomFieldsSection({ fields, onChange, expanded, onToggle, stat
                     onChange={e => {
                       const next = [...(editing.options || [])]
                       next[i] = e.target.value
-                      setEditing(prev => ({ ...prev!, options: next }))
+                      setEditing({ ...editing, options: next })
                     }}
                   />
                   <Button variant="ghost" size="sm" onClick={() => {
-                    setEditing(prev => ({ ...prev!, options: prev!.options!.filter((_, j) => j !== i) }))
+                    setEditing({ ...editing, options: (editing.options ?? []).filter((_, j) => j !== i) })
                   }} aria-label={t('common.delete')}>
                     <Trash2 className="h-3 w-3" />
                   </Button>
                 </div>
               ))}
               <Button data-testid="custom-field-add-option-btn" variant="outline" size="sm" onClick={() => {
-                setEditing(prev => ({ ...prev!, options: [...(prev!.options || []), ''] }))
+                setEditing({ ...editing, options: [...(editing.options || []), ''] })
               }}>
                 <Plus className="h-3 w-3" />
                 {t('customFields.addOption')}
@@ -247,10 +247,10 @@ export function CustomFieldsSection({ fields, onChange, expanded, onToggle, stat
                 <Input
                   type="number"
                   value={editing.validation?.minLength ?? ''}
-                  onChange={e => setEditing(prev => ({
-                    ...prev!,
-                    validation: { ...prev!.validation, minLength: e.target.value ? Number(e.target.value) : undefined },
-                  }))}
+                  onChange={e => setEditing({
+                    ...editing,
+                    validation: { ...editing.validation, minLength: e.target.value ? Number(e.target.value) : undefined },
+                  })}
                   min={0}
                 />
               </div>
@@ -259,10 +259,10 @@ export function CustomFieldsSection({ fields, onChange, expanded, onToggle, stat
                 <Input
                   type="number"
                   value={editing.validation?.maxLength ?? ''}
-                  onChange={e => setEditing(prev => ({
-                    ...prev!,
-                    validation: { ...prev!.validation, maxLength: e.target.value ? Number(e.target.value) : undefined },
-                  }))}
+                  onChange={e => setEditing({
+                    ...editing,
+                    validation: { ...editing.validation, maxLength: e.target.value ? Number(e.target.value) : undefined },
+                  })}
                   min={0}
                 />
               </div>
@@ -275,10 +275,10 @@ export function CustomFieldsSection({ fields, onChange, expanded, onToggle, stat
                 <Input
                   type="number"
                   value={editing.validation?.min ?? ''}
-                  onChange={e => setEditing(prev => ({
-                    ...prev!,
-                    validation: { ...prev!.validation, min: e.target.value ? Number(e.target.value) : undefined },
-                  }))}
+                  onChange={e => setEditing({
+                    ...editing,
+                    validation: { ...editing.validation, min: e.target.value ? Number(e.target.value) : undefined },
+                  })}
                 />
               </div>
               <div className="space-y-1">
@@ -286,10 +286,10 @@ export function CustomFieldsSection({ fields, onChange, expanded, onToggle, stat
                 <Input
                   type="number"
                   value={editing.validation?.max ?? ''}
-                  onChange={e => setEditing(prev => ({
-                    ...prev!,
-                    validation: { ...prev!.validation, max: e.target.value ? Number(e.target.value) : undefined },
-                  }))}
+                  onChange={e => setEditing({
+                    ...editing,
+                    validation: { ...editing.validation, max: e.target.value ? Number(e.target.value) : undefined },
+                  })}
                 />
               </div>
             </div>
@@ -300,14 +300,14 @@ export function CustomFieldsSection({ fields, onChange, expanded, onToggle, stat
             <div className="flex items-center gap-2">
               <Switch
                 checked={editing.visibleToUsers ?? true}
-                onCheckedChange={checked => setEditing(prev => ({ ...prev!, visibleToUsers: checked }))}
+                onCheckedChange={checked => setEditing({ ...editing, visibleToUsers: checked })}
               />
               <Label className="text-sm">{t('customFields.visibleToUsers')}</Label>
             </div>
             <div className="flex items-center gap-2">
               <Switch
                 checked={editing.editableByUsers ?? true}
-                onCheckedChange={checked => setEditing(prev => ({ ...prev!, editableByUsers: checked }))}
+                onCheckedChange={checked => setEditing({ ...editing, editableByUsers: checked })}
               />
               <Label className="text-sm">{t('customFields.editableByUsers')}</Label>
             </div>
