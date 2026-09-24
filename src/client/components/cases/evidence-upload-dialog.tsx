@@ -92,10 +92,11 @@ export function EvidenceUploadDialog({
   open,
   onOpenChange,
   onUploadComplete,
+  readerPubkeys,
 }: EvidenceUploadDialogProps) {
   const { t } = useTranslation()
   const { toast } = useToast()
-  const { publicKey } = useAuth()
+  const { publicKey, adminDecryptionPubkey } = useAuth()
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const [selectedFile, setSelectedFile] = useState<globalThis.File | null>(null)
