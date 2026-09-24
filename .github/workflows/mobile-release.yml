@@ -344,7 +344,15 @@ jobs:
             echo "This is a separate \`android-v${VERSION}\` release because the \`v${VERSION}\` release is immutable once published and cannot accept Android assets."
           } > release-body.md
 
-          mapfile -t ASSETS < <(find release-assets -maxdepth 1 -type f | sort)
+          # bash-3.2-safe (macOS /bin/bash): no `mapfile`/`readarray` (bash 4+).
+          ASSETS=()
+          while IFS= read -r asset; do
+            ASSETS+=("$asset")
+          done < <(find release-assets -maxdepth 1 -type f | sort)
+          if [ "${#ASSETS[@]}" -eq 0 ]; then
+            echo "::error::No release assets found in release-assets/ — refusing to publish an empty release."
+            exit 1
+          fi
           echo "Publishing ${#ASSETS[@]} assets to ${TAG}"
 
           # A leftover draft from a failed earlier attempt is deleted and rebuilt;
@@ -356,6 +364,9 @@ jobs:
             for i in $id; do gh api -X DELETE "repos/${GITHUB_REPOSITORY}/releases/${i}"; done
           }
 
+          # Empty under `set -u` unless a prerelease; expand with the bash-3.2-safe
+          # `${arr[@]+"${arr[@]}"}` idiom (a bare "${arr[@]}" on an empty array is an
+          # "unbound variable" error in bash < 4.4).
           PRERELEASE_FLAG=()
           case "$VERSION" in *-*) PRERELEASE_FLAG=(--prerelease) ;; esac
 
@@ -371,7 +382,7 @@ jobs:
               --target "${GITHUB_SHA}" \
               --title "Android v${VERSION}" \
               --notes-file release-body.md \
-              "${PRERELEASE_FLAG[@]}" \
+              ${PRERELEASE_FLAG[@]+"${PRERELEASE_FLAG[@]}"} \
               "${ASSETS[@]}"; then
               break
             fi
@@ -670,7 +681,15 @@ jobs:
             echo "This is a separate \`ios-v${VERSION}\` release because the \`v${VERSION}\` release is immutable once published and cannot accept iOS assets."
           } > release-body.md
 
-          mapfile -t ASSETS < <(find release-assets -maxdepth 1 -type f | sort)
+          # bash-3.2-safe (macOS /bin/bash): no `mapfile`/`readarray` (bash 4+).
+          ASSETS=()
+          while IFS= read -r asset; do
+            ASSETS+=("$asset")
+          done < <(find release-assets -maxdepth 1 -type f | sort)
+          if [ "${#ASSETS[@]}" -eq 0 ]; then
+            echo "::error::No release assets found in release-assets/ — refusing to publish an empty release."
+            exit 1
+          fi
           echo "Publishing ${#ASSETS[@]} assets to ${TAG}"
 
           # A leftover draft from a failed earlier attempt is deleted and rebuilt;
@@ -682,6 +701,9 @@ jobs:
             for i in $id; do gh api -X DELETE "repos/${GITHUB_REPOSITORY}/releases/${i}"; done
           }
 
+          # Empty under `set -u` unless a prerelease; expand with the bash-3.2-safe
+          # `${arr[@]+"${arr[@]}"}` idiom (a bare "${arr[@]}" on an empty array is an
+          # "unbound variable" error in bash < 4.4).
           PRERELEASE_FLAG=()
           case "$VERSION" in *-*) PRERELEASE_FLAG=(--prerelease) ;; esac
 
@@ -697,7 +719,7 @@ jobs:
               --target "${GITHUB_SHA}" \
               --title "iOS v${VERSION}" \
               --notes-file release-body.md \
-              "${PRERELEASE_FLAG[@]}" \
+              ${PRERELEASE_FLAG[@]+"${PRERELEASE_FLAG[@]}"} \
               "${ASSETS[@]}"; then
               break
             fi
