@@ -85,14 +85,15 @@ export class TranscriptionManager {
 
     try {
       // Create Web Worker — Vite handles the URL transform for worker imports
-      this.worker = new Worker(
+      const worker = new Worker(
         new URL('./transcription-worker.ts', import.meta.url),
         { type: 'module' },
       )
+      this.worker = worker
 
       // Set up message handler
-      this.worker.onmessage = (event) => this.handleWorkerMessage(event.data)
-      this.worker.onerror = (event) => {
+      worker.onmessage = (event) => this.handleWorkerMessage(event.data)
+      worker.onerror = (event) => {
         this.setStatus('error')
         this.options.onError?.(event.message || 'Worker error')
       }
@@ -100,23 +101,23 @@ export class TranscriptionManager {
       // Initialize the model in the worker
       await new Promise<void>((resolve, reject) => {
         const timeout = setTimeout(() => reject(new Error('Model initialization timed out')), 300_000) // 5 min for download
-        const originalHandler = this.worker!.onmessage
-        this.worker!.onmessage = (event) => {
+        const originalHandler = worker.onmessage
+        worker.onmessage = (event) => {
           const msg = event.data
           if (msg.type === 'ready') {
             clearTimeout(timeout)
-            this.worker!.onmessage = originalHandler
+            worker.onmessage = originalHandler
             resolve()
           } else if (msg.type === 'error') {
             clearTimeout(timeout)
             reject(new Error(msg.error))
           } else if (msg.type === 'progress' || msg.type === 'status') {
             // Forward progress during init
-            originalHandler?.call(this.worker!, event)
+            originalHandler?.call(worker, event)
           }
         }
 
-        this.worker!.postMessage({
+        worker.postMessage({
           type: 'init',
           model: this.options.model || 'tiny.en',
           language: this.options.language || 'en',

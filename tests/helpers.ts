@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { type Page, type APIRequestContext, expect } from '@playwright/test'
 import { TestIds } from './test-ids'
 
@@ -145,7 +144,7 @@ export async function navigateAfterLogin(page: Page, url: string, expectAccessDe
   // page components fire data-fetching useEffects before activeHubId is set.
   // In CI with Docker backend, getConfig() takes longer, making this race likely.
   await page.waitForFunction(() => {
-    const getHub = (window as any).__TEST_GET_ACTIVE_HUB
+    const getHub = window.__TEST_GET_ACTIVE_HUB
     return getHub ? !!getHub() : false
   }, { timeout: Timeouts.AUTH }).catch(() => {
     // If __TEST_GET_ACTIVE_HUB isn't available, continue — will work locally
@@ -156,10 +155,10 @@ export async function navigateAfterLogin(page: Page, url: string, expectAccessDe
   const searchParams = Object.fromEntries(parsed.searchParams.entries())
 
   // Wait for the router to be available (may take a moment after login in CI)
-  await page.waitForFunction(() => !!(window as any).__TEST_ROUTER, { timeout: 10000 })
+  await page.waitForFunction(() => !!window.__TEST_ROUTER, { timeout: 10000 })
 
   await page.evaluate(({ pathname, search }) => {
-    const router = (window as any).__TEST_ROUTER
+    const router = window.__TEST_ROUTER
     if (!router) return
     if (Object.keys(search).length > 0) {
       router.navigate({ to: pathname, search })
@@ -210,7 +209,7 @@ export async function navigateViaSpa(page: Page, url: string): Promise<void> {
   // page components fire data-fetching useEffects before activeHubId is set.
   // In CI with Docker backend, getConfig() takes longer, making this race likely.
   await page.waitForFunction(() => {
-    const getHub = (window as any).__TEST_GET_ACTIVE_HUB
+    const getHub = window.__TEST_GET_ACTIVE_HUB
     return getHub ? !!getHub() : false
   }, { timeout: Timeouts.AUTH }).catch(() => {
     // If __TEST_GET_ACTIVE_HUB isn't available, continue — will work locally
@@ -221,10 +220,10 @@ export async function navigateViaSpa(page: Page, url: string): Promise<void> {
   const searchParams = Object.fromEntries(parsed.searchParams.entries())
 
   // Wait for the router to be available (may take a moment after login in CI)
-  await page.waitForFunction(() => !!(window as any).__TEST_ROUTER, { timeout: 10000 })
+  await page.waitForFunction(() => !!window.__TEST_ROUTER, { timeout: 10000 })
 
   await page.evaluate(({ pathname, search }) => {
-    const router = (window as any).__TEST_ROUTER
+    const router = window.__TEST_ROUTER
     if (!router) return
     if (Object.keys(search).length > 0) {
       router.navigate({ to: pathname, search })
@@ -361,7 +360,7 @@ export async function loginAsAdmin(page: Page) {
   // Ensure hub context is ready before asserting page content — prevents race
   // where components fetch data before ConfigProvider sets activeHubId.
   await page.waitForFunction(() => {
-    const getHub = (window as any).__TEST_GET_ACTIVE_HUB
+    const getHub = window.__TEST_GET_ACTIVE_HUB
     return getHub ? !!getHub() : false
   }, { timeout: 15000 }).catch(() => {})
   // Wait for the authenticated layout — use longer timeout for CI (PBKDF2 + Docker overhead)
@@ -400,11 +399,12 @@ export async function loginAsVolunteer(page: Page, seedHex: string) {
   await page.waitForLoadState('domcontentloaded')
 
   // Wait for __TEST_PLATFORM to be loaded
-  await page.waitForFunction(() => !!(window as any).__TEST_PLATFORM, { timeout: Timeouts.AUTH })
+  await page.waitForFunction(() => !!window.__TEST_PLATFORM, { timeout: Timeouts.AUTH })
 
   // Import Ed25519 seed
   await page.evaluate(async ({ secretHex, pin }) => {
-    const platform = (window as any).__TEST_PLATFORM
+    const platform = window.__TEST_PLATFORM
+    if (!platform) throw new Error('__TEST_PLATFORM not available')
     const encrypted = await platform.deviceImportAndLoad(secretHex, pin, crypto.randomUUID())
     await platform.persistAndUnlockDeviceKeys(encrypted, pin)
     await platform.lockCrypto()
@@ -418,7 +418,7 @@ export async function loginAsVolunteer(page: Page, seedHex: string) {
   // Ensure hub context is ready before asserting page content — prevents race
   // where components fetch data before ConfigProvider sets activeHubId.
   await page.waitForFunction(() => {
-    const getHub = (window as any).__TEST_GET_ACTIVE_HUB
+    const getHub = window.__TEST_GET_ACTIVE_HUB
     return getHub ? !!getHub() : false
   }, { timeout: 15000 }).catch(() => {})
 

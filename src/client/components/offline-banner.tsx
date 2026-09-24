@@ -39,7 +39,6 @@ export function OfflineBanner() {
       handleReplay()
     }
     // Only trigger on isOffline change to avoid infinite loops
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOffline])
 
   const handleReplay = useCallback(async () => {

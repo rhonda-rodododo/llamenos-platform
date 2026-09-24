@@ -32,4 +32,21 @@ export default tseslint.config(
       '@typescript-eslint/no-unused-vars': ['error', { varsIgnorePattern: '^_', argsIgnorePattern: '^_' }],
     },
   },
+  // Desktop lane (#703) takes the `any` ban back for its own trees: src/client's
+  // colocated tests and everything under tests/ except tests/steps/backend/, which
+  // is the backend lane (#702, still open) and stays exempt via the block above.
+  // Every other tests/steps/ subtree is desktop Playwright step code. The shared
+  // lane's packages/test-specs/ stays exempt too (#704).
+  {
+    files: [
+      'src/client/**/__tests__/**/*.ts',
+      'src/client/**/*.test.ts',
+      'src/client/**/*.spec.ts',
+      'tests/**/*.ts',
+    ],
+    ignores: ['tests/steps/backend/**/*.ts'],
+    rules: {
+      '@typescript-eslint/no-explicit-any': 'error',
+    },
+  },
 )

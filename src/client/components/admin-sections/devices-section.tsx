@@ -69,6 +69,7 @@ export function DevicesSection() {
                 {entry.devices.map((device) => {
                   const Icon = device.platform === 'ios' || device.platform === 'android'
                     ? Smartphone : Monitor
+                  const ed25519Pubkey = device.ed25519Pubkey
                   return (
                     <div key={device.id} className="flex items-center gap-2 text-sm pl-2">
                       <Icon className="h-4 w-4 text-muted-foreground" />
@@ -77,21 +78,21 @@ export function DevicesSection() {
                         <span className="text-xs text-muted-foreground">{device.deviceModel}</span>
                       )}
                       <div className="ml-auto flex gap-1">
-                        {device.ed25519Pubkey && (
+                        {ed25519Pubkey && (
                           <Button
                             size="sm"
                             variant="ghost"
                             className="text-xs"
                             onClick={() => setVerifyTarget({
                               deviceId: device.id,
-                              targetPubkey: device.ed25519Pubkey!,
+                              targetPubkey: ed25519Pubkey,
                               deviceName: device.deviceName ?? device.platform,
                             })}
                           >
                             {t('admin.devices.verify')}
                           </Button>
                         )}
-                        {device.ed25519Pubkey && (
+                        {ed25519Pubkey && (
                           <Button
                             size="sm"
                             variant="ghost"
@@ -99,7 +100,7 @@ export function DevicesSection() {
                             data-testid={`wipe-device-${device.id}`}
                             onClick={() => setWipeTarget({
                               userPubkey: entry.userPubkey,
-                              devicePubkey: device.ed25519Pubkey!,
+                              devicePubkey: ed25519Pubkey,
                               deviceName: device.deviceName ?? device.platform,
                             })}
                           >

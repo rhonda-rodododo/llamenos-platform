@@ -47,11 +47,11 @@ export function ReportTypesSection({ expanded, onToggle, statusSummary }: Props)
   }, [expanded, loadTypes])
 
   const handleCreate = useCallback(async () => {
-    if (!editing?.name?.trim()) return
+    if (!editing || !editing.name?.trim()) return
     setSaving(true)
     try {
       const created = await createReportType({
-        name: editing.name!.trim(),
+        name: editing.name.trim(),
         description: editing.description?.trim(),
         icon: editing.icon?.trim() || undefined,
         fields: editing.fields || [],
@@ -68,11 +68,11 @@ export function ReportTypesSection({ expanded, onToggle, statusSummary }: Props)
   }, [editing, toast, t])
 
   const handleUpdate = useCallback(async () => {
-    if (!editing?.id || !editing?.name?.trim()) return
+    if (!editing || !editing.id || !editing.name?.trim()) return
     setSaving(true)
     try {
       const updated = await updateReportType(editing.id, {
-        name: editing.name!.trim(),
+        name: editing.name.trim(),
         description: editing.description?.trim(),
         icon: editing.icon?.trim() || undefined,
         fields: editing.fields || [],
@@ -211,7 +211,7 @@ export function ReportTypesSection({ expanded, onToggle, statusSummary }: Props)
                     id="rt-name"
                     data-testid="report-type-name-input"
                     value={editing.name || ''}
-                    onChange={e => setEditing(prev => ({ ...prev!, name: e.target.value }))}
+                    onChange={e => setEditing({ ...editing, name: e.target.value })}
                     placeholder={t('reportTypes.namePlaceholder')}
                     maxLength={100}
                   />
@@ -222,7 +222,7 @@ export function ReportTypesSection({ expanded, onToggle, statusSummary }: Props)
                     id="rt-icon"
                     data-testid="report-type-icon-input"
                     value={editing.icon || ''}
-                    onChange={e => setEditing(prev => ({ ...prev!, icon: e.target.value }))}
+                    onChange={e => setEditing({ ...editing, icon: e.target.value })}
                     placeholder={t('reportTypes.iconPlaceholder')}
                     maxLength={50}
                   />
@@ -235,7 +235,7 @@ export function ReportTypesSection({ expanded, onToggle, statusSummary }: Props)
                   id="rt-description"
                   data-testid="report-type-description-input"
                   value={editing.description || ''}
-                  onChange={e => setEditing(prev => ({ ...prev!, description: e.target.value }))}
+                  onChange={e => setEditing({ ...editing, description: e.target.value })}
                   placeholder={t('reportTypes.descriptionPlaceholder')}
                   rows={2}
                   className="resize-y"
@@ -245,7 +245,7 @@ export function ReportTypesSection({ expanded, onToggle, statusSummary }: Props)
               <div className="flex items-center gap-2">
                 <Switch
                   checked={editing.isDefault ?? false}
-                  onCheckedChange={checked => setEditing(prev => ({ ...prev!, isDefault: checked }))}
+                  onCheckedChange={checked => setEditing({ ...editing, isDefault: checked })}
                 />
                 <Label className="text-sm">{t('reportTypes.default')}</Label>
                 <p className="text-xs text-muted-foreground ml-2">{t('reportTypes.defaultHelp')}</p>
@@ -254,7 +254,7 @@ export function ReportTypesSection({ expanded, onToggle, statusSummary }: Props)
               {/* Fields editor inline */}
               <FieldDefinitionEditor
                 fields={(editing.fields || []).map(f => ({ ...f, order: f.order ?? 0 }) as EditableField)}
-                onChange={fields => setEditing(prev => ({ ...prev!, fields: fields as CustomFieldDefinition[] }))}
+                onChange={fields => setEditing({ ...editing, fields: fields as CustomFieldDefinition[] })}
               />
 
               <div className="flex gap-2">

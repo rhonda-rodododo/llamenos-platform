@@ -5,7 +5,11 @@ pre-commit:
       run: bun run typecheck
       stage_fixed: true
     lint:
-      glob: "**/*.{ts,tsx}"
+      # Covers src/ and tests/ (incl. the k6 load-test *.js specs under
+      # tests/load/ — ESLint's TS-oriented rules still apply to plain JS via
+      # espree) alongside every other *.ts/*.tsx in the repo. #703 took
+      # src + tests (minus tests/steps/backend/, backend-owned, #702) to zero.
+      glob: "{**/*.{ts,tsx},tests/**/*.js}"
       files: git diff --cached --diff-filter=d --name-only
       run: bunx eslint {files}
       stage_fixed: true

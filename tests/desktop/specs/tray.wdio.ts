@@ -11,12 +11,12 @@ describe('System Tray', () => {
   it('should have the window visible on launch', async () => {
     const result = await browser.execute(async () => {
       try {
-        const invoke = (window as any).__TAURI_INTERNALS__?.invoke
+        const invoke = window.__TAURI_INTERNALS__?.invoke
         if (!invoke) return { error: '__TAURI_INTERNALS__.invoke not available' }
-        const visible = await invoke('plugin:window|is_visible', { label: 'main' })
+        const visible = await invoke('plugin:window|is_visible', { label: 'main' }) as boolean
         return { visible }
-      } catch (e: any) {
-        return { error: String(e?.message || e) }
+      } catch (e: unknown) {
+        return { error: e instanceof Error ? e.message : String(e) }
       }
     })
 
@@ -31,18 +31,18 @@ describe('System Tray', () => {
   it('should be able to hide and show the window', async () => {
     const result = await browser.execute(async () => {
       try {
-        const invoke = (window as any).__TAURI_INTERNALS__?.invoke
+        const invoke = window.__TAURI_INTERNALS__?.invoke
         if (!invoke) return { error: '__TAURI_INTERNALS__.invoke not available' }
 
         await invoke('plugin:window|hide', { label: 'main' })
-        const hiddenState = await invoke('plugin:window|is_visible', { label: 'main' })
+        const hiddenState = await invoke('plugin:window|is_visible', { label: 'main' }) as boolean
 
         await invoke('plugin:window|show', { label: 'main' })
-        const visibleState = await invoke('plugin:window|is_visible', { label: 'main' })
+        const visibleState = await invoke('plugin:window|is_visible', { label: 'main' }) as boolean
 
         return { hidden: hiddenState, visible: visibleState }
-      } catch (e: any) {
-        return { error: String(e?.message || e) }
+      } catch (e: unknown) {
+        return { error: e instanceof Error ? e.message : String(e) }
       }
     })
 
@@ -57,19 +57,19 @@ describe('System Tray', () => {
   it('should be able to minimize and restore the window', async () => {
     const result = await browser.execute(async () => {
       try {
-        const invoke = (window as any).__TAURI_INTERNALS__?.invoke
+        const invoke = window.__TAURI_INTERNALS__?.invoke
         if (!invoke) return { error: '__TAURI_INTERNALS__.invoke not available' }
 
         await invoke('plugin:window|minimize', { label: 'main' })
-        const minimized = await invoke('plugin:window|is_minimized', { label: 'main' })
+        const minimized = await invoke('plugin:window|is_minimized', { label: 'main' }) as boolean
 
         await invoke('plugin:window|unminimize', { label: 'main' })
         await new Promise(r => setTimeout(r, 200))
-        const restored = await invoke('plugin:window|is_minimized', { label: 'main' })
+        const restored = await invoke('plugin:window|is_minimized', { label: 'main' }) as boolean
 
         return { minimized, restored: !restored }
-      } catch (e: any) {
-        return { error: String(e?.message || e) }
+      } catch (e: unknown) {
+        return { error: e instanceof Error ? e.message : String(e) }
       }
     })
 
@@ -86,19 +86,19 @@ describe('System Tray', () => {
   it('should be able to set window title', async () => {
     const result = await browser.execute(async () => {
       try {
-        const invoke = (window as any).__TAURI_INTERNALS__?.invoke
+        const invoke = window.__TAURI_INTERNALS__?.invoke
         if (!invoke) return { error: '__TAURI_INTERNALS__.invoke not available' }
 
-        const originalTitle = await invoke('plugin:window|title', { label: 'main' })
+        const originalTitle = await invoke('plugin:window|title', { label: 'main' }) as string
         await invoke('plugin:window|set_title', { label: 'main', value: 'Test Title' })
-        const newTitle = await invoke('plugin:window|title', { label: 'main' })
+        const newTitle = await invoke('plugin:window|title', { label: 'main' }) as string
 
         // Restore original title
         await invoke('plugin:window|set_title', { label: 'main', value: originalTitle })
 
         return { originalTitle, newTitle }
-      } catch (e: any) {
-        return { error: String(e?.message || e) }
+      } catch (e: unknown) {
+        return { error: e instanceof Error ? e.message : String(e) }
       }
     })
 

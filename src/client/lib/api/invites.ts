@@ -27,7 +27,10 @@ export async function validateInvite(code: string) {
   const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
   try {
     const res = await netFetch(getApiUrl(`/invites/validate/${code}`), { signal: controller.signal })
-    return res.json() as Promise<{ valid: boolean; name?: string; roleIds?: string[]; error?: string }>
+    return res.json() as Promise<
+      | { valid: true; name: string; roleIds?: string[] }
+      | { valid: false; error?: string }
+    >
   } finally {
     clearTimeout(timeout)
   }

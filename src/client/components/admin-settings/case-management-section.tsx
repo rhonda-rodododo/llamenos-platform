@@ -82,21 +82,21 @@ export function CaseManagementSection({ expanded, onToggle, statusSummary }: Pro
   const archivedTypes = entityTypes.filter(et => et.isArchived)
 
   const handleCreate = useCallback(async () => {
-    if (!editing?.name?.trim() || !editing?.label?.trim() || !editing?.labelPlural?.trim()) return
-    if (!editing.statuses?.length || !editing.defaultStatus) return
+    if (!editing || !editing.name?.trim() || !editing.label?.trim() || !editing.labelPlural?.trim()) return
+    if (!editing.statuses || editing.statuses.length === 0 || !editing.defaultStatus) return
     setSaving(true)
     try {
       const body: CreateEntityTypeBody = {
-        name: editing.name!.trim(),
-        label: editing.label!.trim(),
-        labelPlural: editing.labelPlural!.trim(),
+        name: editing.name.trim(),
+        label: editing.label.trim(),
+        labelPlural: editing.labelPlural.trim(),
         description: editing.description?.trim() ?? '',
         icon: editing.icon?.trim() || undefined,
         color: editing.color || undefined,
         category: editing.category || 'case',
         fields: (editing.fields || []) as EntityFieldDefinition[],
-        statuses: editing.statuses!,
-        defaultStatus: editing.defaultStatus!,
+        statuses: editing.statuses,
+        defaultStatus: editing.defaultStatus,
         closedStatuses: editing.closedStatuses || [],
         severities: editing.severities || undefined,
         defaultSeverity: editing.defaultSeverity || undefined,
@@ -358,7 +358,7 @@ export function CaseManagementSection({ expanded, onToggle, statusSummary }: Pro
               {activeTab === 'fields' && (
                 <FieldsEditor
                   fields={(editing.fields || []) as EntityFieldDefinition[]}
-                  onChange={fields => setEditing(prev => ({ ...prev!, fields }))}
+                  onChange={fields => setEditing({ ...editing, fields })}
                 />
               )}
 
@@ -366,13 +366,13 @@ export function CaseManagementSection({ expanded, onToggle, statusSummary }: Pro
               {activeTab === 'statuses' && (
                 <EnumListEditor
                   items={normalizeEnumOptions(editing.statuses || [])}
-                  onChange={statuses => setEditing(prev => ({
-                    ...prev!,
+                  onChange={statuses => setEditing({
+                    ...editing,
                     statuses,
                     closedStatuses: statuses.filter(s => s.isClosed).map(s => s.value),
-                  }))}
+                  })}
                   defaultValue={editing.defaultStatus}
-                  onDefaultChange={val => setEditing(prev => ({ ...prev!, defaultStatus: val }))}
+                  onDefaultChange={val => setEditing({ ...editing, defaultStatus: val })}
                   showColor
                   showClosed
                   addLabel={t('caseManagement.addStatus')}
@@ -385,9 +385,9 @@ export function CaseManagementSection({ expanded, onToggle, statusSummary }: Pro
               {activeTab === 'severities' && (
                 <EnumListEditor
                   items={normalizeEnumOptions(editing.severities || [])}
-                  onChange={severities => setEditing(prev => ({ ...prev!, severities }))}
+                  onChange={severities => setEditing({ ...editing, severities })}
                   defaultValue={editing.defaultSeverity}
-                  onDefaultChange={val => setEditing(prev => ({ ...prev!, defaultSeverity: val }))}
+                  onDefaultChange={val => setEditing({ ...editing, defaultSeverity: val })}
                   showColor
                   addLabel={t('caseManagement.addSeverity')}
                   itemLabel={t('caseManagement.severityLabel')}
@@ -399,7 +399,7 @@ export function CaseManagementSection({ expanded, onToggle, statusSummary }: Pro
               {activeTab === 'contactRoles' && (
                 <EnumListEditor
                   items={normalizeEnumOptions(editing.contactRoles || [])}
-                  onChange={contactRoles => setEditing(prev => ({ ...prev!, contactRoles }))}
+                  onChange={contactRoles => setEditing({ ...editing, contactRoles })}
                   addLabel={t('caseManagement.addContactRole')}
                   itemLabel={t('caseManagement.contactRoleLabel')}
                   testIdPrefix="contact-role"
@@ -591,7 +591,7 @@ function FieldsEditor({
   }
 
   function handleSaveField() {
-    if (!editingField?.label?.trim() || !editingField?.name?.trim()) return
+    if (!editingField || !editingField.label?.trim() || !editingField.name?.trim()) return
 
     let next: EntityFieldDefinition[]
     if (editingField.id) {
@@ -601,8 +601,8 @@ function FieldsEditor({
     } else {
       const newField: EntityFieldDefinition = {
         id: crypto.randomUUID(),
-        name: editingField.name!,
-        label: editingField.label!,
+        name: editingField.name,
+        label: editingField.label,
         type: editingField.type || 'text',
         required: editingField.required ?? false,
         options: editingField.options,
@@ -694,11 +694,11 @@ function FieldsEditor({
                 onChange={e => {
                   const label = e.target.value
                   const autoName = !editingField.id
-                  setEditingField(prev => ({
-                    ...prev!,
+                  setEditingField({
+                    ...editingField,
                     label,
                     ...(autoName ? { name: label.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '').slice(0, 50) } : {}),
-                  }))
+                  })
                 }}
                 placeholder="e.g. Location"
                 className="text-xs"
@@ -709,7 +709,7 @@ function FieldsEditor({
               <select
                 data-testid="entity-field-type-select"
                 value={editingField.type || 'text'}
-                onChange={e => setEditingField(prev => ({ ...prev!, type: e.target.value as EntityFieldDefinition['type'] }))}
+                onChange={e => setEditingField({ ...editingField, type: e.target.value as EntityFieldDefinition['type'] })}
                 className="w-full rounded-md border border-input bg-background px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-ring"
               >
                 <option value="text">{t('customFields.types.text')}</option>
@@ -731,7 +731,7 @@ function FieldsEditor({
                 data-testid="entity-field-section-input"
                 size={1}
                 value={editingField.section || ''}
-                onChange={e => setEditingField(prev => ({ ...prev!, section: e.target.value }))}
+                onChange={e => setEditingField({ ...editingField, section: e.target.value })}
                 placeholder="e.g. Arrest Details"
                 className="text-xs"
               />
@@ -741,7 +741,7 @@ function FieldsEditor({
               <select
                 data-testid="entity-field-access-select"
                 value={editingField.accessLevel || 'all'}
-                onChange={e => setEditingField(prev => ({ ...prev!, accessLevel: e.target.value as EntityFieldDefinition['accessLevel'] }))}
+                onChange={e => setEditingField({ ...editingField, accessLevel: e.target.value as EntityFieldDefinition['accessLevel'] })}
                 className="w-full rounded-md border border-input bg-background px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-ring"
               >
                 <option value="all">{t('caseManagement.summaryTier')}</option>
@@ -755,14 +755,14 @@ function FieldsEditor({
             <div className="flex items-center gap-2">
               <Switch
                 checked={editingField.required ?? false}
-                onCheckedChange={checked => setEditingField(prev => ({ ...prev!, required: checked }))}
+                onCheckedChange={checked => setEditingField({ ...editingField, required: checked })}
               />
               <Label className="text-xs">{t('caseManagement.fieldRequired')}</Label>
             </div>
             <div className="flex items-center gap-2">
               <Switch
                 checked={editingField.visibleToUsers ?? true}
-                onCheckedChange={checked => setEditingField(prev => ({ ...prev!, visibleToUsers: checked }))}
+                onCheckedChange={checked => setEditingField({ ...editingField, visibleToUsers: checked })}
               />
               <Label className="text-xs">{t('customFields.visibleToUsers')}</Label>
             </div>
@@ -781,20 +781,20 @@ function FieldsEditor({
                       const next = [...(editingField.options || [])]
                       const label = e.target.value
                       next[i] = { ...next[i], label, key: label.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '') }
-                      setEditingField(prev => ({ ...prev!, options: next }))
+                      setEditingField({ ...editingField, options: next })
                     }}
                     className="text-xs"
                     placeholder="Option label"
                   />
                   <Button variant="ghost" size="icon-xs" onClick={() => {
-                    setEditingField(prev => ({ ...prev!, options: prev!.options!.filter((_, j) => j !== i) }))
+                    setEditingField({ ...editingField, options: (editingField.options ?? []).filter((_, j) => j !== i) })
                   }}>
                     <Trash2 className="h-3 w-3" />
                   </Button>
                 </div>
               ))}
               <Button variant="outline" size="sm" data-testid="entity-field-add-option-btn" onClick={() => {
-                setEditingField(prev => ({ ...prev!, options: [...(prev!.options || []), { key: '', label: '' }] }))
+                setEditingField({ ...editingField, options: [...(editingField.options || []), { key: '', label: '' }] })
               }}>
                 <Plus className="h-3 w-3" />
                 {t('customFields.addOption')}
@@ -865,10 +865,10 @@ function EnumListEditor({
   }
 
   function handleSaveItem() {
-    if (!editingItem?.label?.trim() || !editingItem?.value?.trim()) return
+    if (!editingItem || !editingItem.label?.trim() || !editingItem.value?.trim()) return
     const item: EnumOption = {
-      value: editingItem.value!.trim(),
-      label: editingItem.label!.trim(),
+      value: editingItem.value.trim(),
+      label: editingItem.label.trim(),
       color: editingItem.color,
       icon: editingItem.icon,
       order: editingItem.order ?? items.length,
@@ -975,11 +975,11 @@ function EnumListEditor({
                 onChange={e => {
                   const label = e.target.value
                   const autoValue = editingIndex === null
-                  setEditingItem(prev => ({
-                    ...prev!,
+                  setEditingItem({
+                    ...editingItem,
                     label,
                     ...(autoValue ? { value: label.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '') } : {}),
-                  }))
+                  })
                 }}
                 className="text-xs"
               />
@@ -990,7 +990,7 @@ function EnumListEditor({
                 data-testid={`${testIdPrefix}-value-input`}
                 size={1}
                 value={editingItem.value || ''}
-                onChange={e => setEditingItem(prev => ({ ...prev!, value: e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, '') }))}
+                onChange={e => setEditingItem({ ...editingItem, value: e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, '') })}
                 className="text-xs font-mono"
               />
             </div>
@@ -1003,7 +1003,7 @@ function EnumListEditor({
                   data-testid={`${testIdPrefix}-color-input`}
                   type="color"
                   value={editingItem.color || '#3b82f6'}
-                  onChange={e => setEditingItem(prev => ({ ...prev!, color: e.target.value }))}
+                  onChange={e => setEditingItem({ ...editingItem, color: e.target.value })}
                   className="h-7 w-10 cursor-pointer p-0.5"
                 />
               </div>
@@ -1012,7 +1012,7 @@ function EnumListEditor({
               <div className="flex items-center gap-2">
                 <Switch
                   checked={editingItem.isClosed ?? false}
-                  onCheckedChange={checked => setEditingItem(prev => ({ ...prev!, isClosed: checked }))}
+                  onCheckedChange={checked => setEditingItem({ ...editingItem, isClosed: checked })}
                 />
                 <Label className="text-xs">{t('caseManagement.closedStatus')}</Label>
               </div>

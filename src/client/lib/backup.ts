@@ -58,7 +58,7 @@ export function generateRecoveryKey(): string {
   if (bits > 0) {
     base32 += BASE32_CHARS[(buffer << (5 - bits)) & 0x1f]
   }
-  return base32.match(/.{1,4}/g)!.join('-')
+  return (base32.match(/.{1,4}/g) ?? [base32]).join('-')
 }
 
 /**

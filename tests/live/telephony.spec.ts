@@ -43,7 +43,7 @@ test.describe('Live Telephony', () => {
 
     // Navigate to call history to verify the call appears
     await page.evaluate(() => {
-      const router = (window as any).__TEST_ROUTER
+      const router = window.__TEST_ROUTER
       if (router) router.navigate({ to: '/calls' })
     })
     await page.waitForURL(/\/calls/, { timeout: 10_000 })
@@ -72,7 +72,7 @@ test.describe('Live Telephony', () => {
 
     // Check call log — navigate to calls page
     await page.evaluate(() => {
-      const router = (window as any).__TEST_ROUTER
+      const router = window.__TEST_ROUTER
       if (router) router.navigate({ to: '/calls' })
     })
     await page.waitForURL(/\/calls/, { timeout: 10_000 })
@@ -87,7 +87,7 @@ test.describe('Live Telephony', () => {
 
     // Navigate to dashboard where incoming calls appear
     await page.evaluate(() => {
-      const router = (window as any).__TEST_ROUTER
+      const router = window.__TEST_ROUTER
       if (router) router.navigate({ to: '/' })
     })
     await page.waitForURL(/\/$/, { timeout: 10_000 })
@@ -147,7 +147,7 @@ test.describe('Live Telephony', () => {
 
     // Navigate to call history via SPA router
     await page.evaluate(() => {
-      const router = (window as any).__TEST_ROUTER
+      const router = window.__TEST_ROUTER
       if (router) router.navigate({ to: '/calls' })
     })
     await page.waitForURL(/\/calls/, { timeout: 10_000 })
@@ -159,12 +159,12 @@ test.describe('Live Telephony', () => {
       if (await callEntry.isVisible().catch(() => false)) break
       // Re-navigate to refresh the data
       await page.evaluate(() => {
-        const router = (window as any).__TEST_ROUTER
+        const router = window.__TEST_ROUTER
         if (router) router.navigate({ to: '/' })
       })
       await sleep(2_000)
       await page.evaluate(() => {
-        const router = (window as any).__TEST_ROUTER
+        const router = window.__TEST_ROUTER
         if (router) router.navigate({ to: '/calls' })
       })
       await sleep(3_000)
@@ -191,7 +191,7 @@ test.describe('Live Telephony', () => {
 
     // Navigate to conversations page
     await page.evaluate(() => {
-      const router = (window as any).__TEST_ROUTER
+      const router = window.__TEST_ROUTER
       if (router) router.navigate({ to: '/conversations' })
     })
     await page.waitForURL(/\/conversations/, { timeout: 10_000 })

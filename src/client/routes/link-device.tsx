@@ -91,7 +91,7 @@ function LinkDevicePage() {
         try {
           const status = await pollProvisioningRoom(s.roomId, s.token)
           if (status.status === 'ready' && status.encryptedNsec && status.primaryPubkey) {
-            clearInterval(pollRef.current!)
+            if (pollRef.current) clearInterval(pollRef.current)
             pollRef.current = null
             // Compute SAS in Rust — ephemeral secret stays in CryptoState
             const sas = await computeSASForNewDevice(status.primaryPubkey)
@@ -99,7 +99,7 @@ function LinkDevicePage() {
             setEncryptedNsecData({ encryptedNsec: status.encryptedNsec, primaryPubkey: status.primaryPubkey })
             setStep('verify-sas')
           } else if (status.status === 'expired') {
-            clearInterval(pollRef.current!)
+            if (pollRef.current) clearInterval(pollRef.current)
             pollRef.current = null
             setError(t('deviceLink.linkExpired'))
             setStep('error')

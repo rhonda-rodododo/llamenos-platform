@@ -18,8 +18,12 @@ export function EntityCalendarView({ records, onSelectRecord }: EntityCalendarVi
     for (const r of records) {
       const date = new Date(r.createdAt)
       const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
-      if (!map.has(key)) map.set(key, [])
-      map.get(key)!.push(r)
+      const existing = map.get(key)
+      if (existing) {
+        existing.push(r)
+      } else {
+        map.set(key, [r])
+      }
     }
     return Array.from(map.entries()).sort(([a], [b]) => b.localeCompare(a))
   }, [records])
