@@ -143,14 +143,16 @@ Then('each volunteer should show a workload indicator', async ({ page }) => {
 
 When('I open the assignment dialog for the case', async ({ page }) => {
   await navigateAfterLogin(page, '/cases')
+  // Each control renders only once the previous click has landed, so wait for
+  // it rather than probing — a non-waiting isVisible() skipped these clicks
+  // whenever the case list was still loading, leaving nothing selected.
   const card = page.getByTestId('case-card').first()
-  if (await card.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)) {
-    await card.click()
-  }
+  await expect(card).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await card.click()
   const assignBtn = page.getByTestId('case-assign-dialog-btn')
-  if (await assignBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
-    await assignBtn.click()
-  }
+  await expect(assignBtn).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await assignBtn.click()
+  await expect(page.getByTestId('assignment-dialog')).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 Then('each suggested volunteer should show match reasons', async ({ page }) => {
@@ -168,35 +170,29 @@ Then('reasons should include availability and workload', async ({ page }) => {
 })
 
 When('I click assign on the first suggested volunteer', async ({ page }) => {
-  const btn = page.getByTestId('assign-volunteer-btn').first()
-  if (await btn.isVisible({ timeout: 5000 }).catch(() => false)) {
-    await btn.click()
-  } else {
-    // No suggestions available — close the dialog and fall back to "Assign to me"
-    // so the subsequent "success toast should appear" assertion can be satisfied.
-    await page.keyboard.press('Escape')
-    const overlay = page.locator('[data-slot="dialog-overlay"]')
-    await overlay.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {})
-    const assignToMe = page.getByTestId('case-assign-btn')
-    if (await assignToMe.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await assignToMe.click()
-    }
+  const suggestion = page.getByTestId('suggestion-card')
+  // The dialog shows a spinner while suggestions load; it is settled once it
+  // renders either suggestions or the empty state. Only then is branching on
+  // the suggestion count deterministic.
+  await expect(suggestion.first().or(page.getByTestId('no-suggestions'))).toBeVisible({ timeout: Timeouts.ELEMENT })
+  if (await suggestion.count() > 0) {
+    await page.getByTestId('assign-volunteer-btn').first().click()
+    return
   }
+  // No on-shift volunteers with capacity — close the dialog and fall back to
+  // "Assign to me" so the scenario still exercises the assign flow.
+  await page.keyboard.press('Escape')
+  await expect(page.getByTestId('assignment-dialog')).toBeHidden({ timeout: Timeouts.ELEMENT })
+  const assignToMe = page.getByTestId('case-assign-btn')
+  await expect(assignToMe).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await assignToMe.click()
 })
 
 Then('the case should show the volunteer as assigned', async ({ page }) => {
-  // After assignment, the case detail should reflect the assignment.
-  // If the detail panel closed or was never opened (e.g. after dialog dismiss+fallback),
-  // click the first case card to re-open the detail view.
-  const header = page.getByTestId('case-detail-header')
-  const isVisible = await header.isVisible({ timeout: 3000 }).catch(() => false)
-  if (!isVisible) {
-    const card = page.getByTestId('case-card').first()
-    if (await card.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await card.click()
-    }
-  }
+  // The selected case's detail panel stays open after assignment and, once the
+  // list state reflects the assignee, offers Unassign.
   await expect(page.getByTestId('case-detail-header')).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await expect(page.getByTestId('case-unassign-btn')).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 // "I click the {string} button" is already in common/interaction-steps.ts
