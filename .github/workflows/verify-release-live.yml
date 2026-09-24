@@ -358,7 +358,7 @@ jobs:
             exit 0
           fi
 
-          TAG=$(gh release list --repo "$GITHUB_REPOSITORY" --limit 1 --json tagName --jq '.[0].tagName')
+          TAG=$(gh release list --repo "$GITHUB_REPOSITORY" --limit 20 --json tagName --jq 'first(.[] | select(.tagName | startswith("v")) | .tagName) // empty')
           if [ -z "$TAG" ]; then
             echo "::error::SURFACE BROKEN: Play internal track — no GitHub Release exists to compare against"
             exit 1
@@ -530,7 +530,7 @@ jobs:
             exit 0
           fi
 
-          TAG=$(gh release list --repo "$GITHUB_REPOSITORY" --limit 1 --json tagName --jq '.[0].tagName')
+          TAG=$(gh release list --repo "$GITHUB_REPOSITORY" --limit 20 --json tagName --jq 'first(.[] | select(.tagName | startswith("v")) | .tagName) // empty')
           if [ -z "$TAG" ]; then
             echo "::error::SURFACE BROKEN: TestFlight — no GitHub Release exists to compare against"
             exit 1

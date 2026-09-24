@@ -1,6 +1,26 @@
 # CI workflow for desktop (Tauri) release builds.
-# Builds signed desktop apps for macOS, Windows, and Linux (AppImage, deb).
+# Builds signed desktop apps for macOS, Windows, and Linux (AppImage, deb, rpm).
 # Generates latest.json manifest for auto-updater.
+#
+# Two publish channels, deliberately independent:
+#   1. GitHub Release `desktop-v<version>` — ALWAYS published. Carries every
+#      installer plus its minisign .sig, CHECKSUMS.txt, SBOM and build-info.json.
+#      This is what internal-beta testers install from. It needs no secrets
+#      beyond the built-in GITHUB_TOKEN and the Tauri signing key.
+#   2. RustFS bucket + llamenos-releases metadata repo (the auto-updater channel).
+#      Published ONLY when it is fully configured (all five RELEASES_REPO_PAT /
+#      RUSTFS_* secrets). Entirely absent => skipped cleanly. Partially
+#      configured, or configured but broken => the job FAILS (issue #720): a
+#      broken channel must never be silently skipped.
+#
+# Why a dedicated `desktop-v<version>` release instead of attaching to `v<version>`:
+# release.yml publishes `v<version>` BEFORE dispatching this workflow, and the
+# repo has immutable releases enabled — assets cannot be added to a published
+# release, so `gh release upload v<version>` is rejected. A separate release
+# tag is the only place this (asynchronously dispatched) workflow can publish.
+#
+# NEVER publishes an unsigned installer: every installer must carry a minisign
+# signature that verifies against plugins.updater.pubkey, or the job fails.
 #
 # Trigger: workflow_dispatch from release.yml with version input.
 # Epics 87, 97: Desktop Auto-Updater & Release Pipeline.
@@ -49,6 +69,23 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      # Fail fast and loudly if the updater signing key is unavailable. Without it
+      # every installer would be unsigned; we never publish those.
+      - name: Require updater signing key (never build unsigned installers)
+        shell: bash
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          missing=""
+          [ -n "${TAURI_SIGNING_PRIVATE_KEY:-}" ] || missing="${missing} TAURI_SIGNING_PRIVATE_KEY"
+          [ -n "${TAURI_SIGNING_PRIVATE_KEY_PASSWORD:-}" ] || missing="${missing} TAURI_SIGNING_PRIVATE_KEY_PASSWORD"
+          if [ -n "$missing" ]; then
+            echo "::error::Missing required secret(s):${missing}. Refusing to build desktop installers that would be unsigned."
+            exit 1
+          fi
+          echo "Updater signing key + password present."
 
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@02cb101ec7c40f2c49e1d9714d64511d8e1b74de # stable
@@ -275,6 +312,60 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: bun run tauri:build
 
+      # `createUpdaterArtifacts: true` (Tauri v2 layout) makes the bundler sign
+      # its updater artifacts itself: on Linux the .AppImage, .deb and .rpm; on
+      # Windows the -setup.exe and .msi; on macOS only the .app.tar.gz. The macOS
+      # .dmg — the installer a human actually opens — is NOT an updater artifact,
+      # so Tauri leaves it unsigned (observed in run 35573475019). Sign any
+      # .deb/.rpm/.dmg that has no .sig with the SAME key, so every installer we
+      # publish carries a minisign .sig verifiable against plugins.updater.pubkey.
+      # A missing installer or a failed signature fails the leg — never publish an
+      # unsigned installer. (Already-signed bundles are left untouched.)
+      - name: Sign any .deb / .rpm / .dmg installer Tauri left unsigned
+        if: matrix.platform != 'windows-latest'
+        shell: bash
+        env:
+          MATRIX_OS: ${{ matrix.os_label }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [ "$MATRIX_OS" = "macOS" ]; then
+            REQUIRED=(dmg)
+          else
+            REQUIRED=(deb rpm)
+          fi
+          for ext in "${REQUIRED[@]}"; do
+            found=0
+            while IFS= read -r f; do
+              found=$((found + 1))
+              if [ -s "${f}.sig" ]; then
+                echo "Already signed by the Tauri bundler: ${f}"
+                continue
+              fi
+              echo "Signing ${f}"
+              bunx tauri signer sign "$f"
+              if [ ! -s "${f}.sig" ]; then
+                echo "::error::Signing ${f} produced no signature file — refusing to continue."
+                exit 1
+              fi
+            done < <(find apps/desktop/target -path '*/release/bundle/*' -type f -name "*.${ext}" | sort)
+            if [ "$found" -eq 0 ]; then
+              echo "::error::No .${ext} installer was produced on ${MATRIX_OS} — bundle targets are 'all', so this is a build failure."
+              exit 1
+            fi
+          done
+
+      # Marker consumed by the release job: a macOS bundle that is not Apple-signed
+      # and notarized is rejected by Gatekeeper on testers' Macs, so the release job
+      # keeps it OFF the GitHub Release (it still goes to the updater channel, where
+      # the app itself downloads it, unquarantined, and minisign-verifies it).
+      # Kept as its own step so "Report unsigned macOS build" above stays non-failing.
+      - name: Mark unsigned macOS bundle
+        if: matrix.platform == 'macos-latest' && env.APPLE_SIGNING_CONFIGURED != 'true'
+        run: |
+          echo "macOS bundle is not Apple-signed/notarized (see #741); excluded from the GitHub Release." > apple-unsigned.marker
+
       # Upload build artifacts.
       #
       # bundle.targets is "all" (tauri.conf.json) with no per-OS overrides, so each
@@ -283,7 +374,10 @@ jobs:
       # updater. Per Tauri v2 docs, these are NOT the same file:
       #   - macOS:   *.dmg (installable)              + *.app.tar.gz (updater-only)
       #   - Windows: *-setup.exe, *.msi (installable)  + *.nsis.zip, *.msi.zip (updater-only)
-      #   - Linux:   *.deb, *.AppImage (installable)   + *.AppImage.tar.gz (updater-only)
+      #   - Linux:   *.deb, *.rpm, *.AppImage (installable) + *.AppImage.tar.gz (updater-only)
+      # (The list above is the v1-compatible layout. With `createUpdaterArtifacts: true`
+      # — the v2 layout this repo uses — the installers themselves are the updater
+      # artifacts and carry the .sig; the globs below cover both layouts.)
       # Previously only the updater-only variants were captured for Windows/Linux —
       # meaning no human-runnable Windows or Linux installer ever left this workflow.
       - name: Upload artifacts
@@ -307,13 +401,19 @@ jobs:
             apps/desktop/target/**/release/bundle/**/*.AppImage.tar.gz
             apps/desktop/target/**/release/bundle/**/*.AppImage.tar.gz.sig
             apps/desktop/target/**/release/bundle/**/*.deb
+            apps/desktop/target/**/release/bundle/**/*.deb.sig
+            apps/desktop/target/**/release/bundle/**/*.rpm
+            apps/desktop/target/**/release/bundle/**/*.rpm.sig
+            apps/desktop/target/**/release/bundle/**/*.dmg.sig
+            apple-unsigned.marker
+          if-no-files-found: error
           retention-days: 5
 
-  # ─── Publish to RustFS + Metadata Repo ───────────────────────────
+  # ─── Publish: GitHub Release (always) + updater channel (when configured) ───
   release:
     needs: [build]
     runs-on: [self-hosted, linux, x64]
-    name: Publish to RustFS
+    name: Publish (GitHub Release + updater channel)
     permissions:
       contents: write
       id-token: write
@@ -351,6 +451,64 @@ jobs:
           echo "VERSION=${RELEASE_VERSION}" >> "$GITHUB_ENV"
           echo "Releasing v${RELEASE_VERSION}"
 
+      # Immutable releases: once `desktop-v<version>` is published its assets can
+      # never change. A re-run would build DIFFERENT bytes, so it cannot converge
+      # on the published release — stop before touching any channel rather than
+      # half-publish (bucket updated, GitHub Release frozen with stale files).
+      - name: Refuse to rebuild an already-published desktop release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="desktop-v${VERSION}"
+          PUBLISHED=$(gh api "repos/${GITHUB_REPOSITORY}/releases" --paginate \
+            --jq ".[] | select(.tag_name == \"${TAG}\" and .draft == false) | .html_url")
+          if [ -n "$PUBLISHED" ]; then
+            echo "::error::${TAG} is already published (${PUBLISHED}) and GitHub releases are immutable — its assets cannot be replaced. Bump the version and cut a new release instead of re-running this one."
+            exit 1
+          fi
+          echo "No published ${TAG} release exists — safe to proceed."
+
+      # ── Is the updater channel (RustFS + llamenos-releases) configured? ─────
+      # "Not configured" and "configured but broken" are different outcomes and
+      # must stay different:
+      #   - NONE of the five secrets set  => the channel simply does not exist yet.
+      #     Skip it cleanly; the GitHub Release below is still published.
+      #   - ALL five set                  => run the full #720 protection: probe
+      #     push access, upload, commit metadata. Any failure fails the job.
+      #   - SOME but not all set          => a half-configured channel is a
+      #     misconfiguration, never "not configured". FAIL, naming what is missing.
+      # An empty-string secret counts as unset (GitHub interpolates unset secrets
+      # as empty), so this never treats a blank value as configured.
+      - name: Detect updater channel configuration
+        id: channel
+        env:
+          RELEASES_REPO_PAT: ${{ secrets.RELEASES_REPO_PAT }}
+          RUSTFS_ACCESS_KEY: ${{ secrets.RUSTFS_ACCESS_KEY }}
+          RUSTFS_SECRET_KEY: ${{ secrets.RUSTFS_SECRET_KEY }}
+          RUSTFS_ENDPOINT: ${{ secrets.RUSTFS_ENDPOINT }}
+          RUSTFS_STAGING_BUCKET: ${{ secrets.RUSTFS_STAGING_BUCKET }}
+        run: |
+          set_names=""
+          unset_names=""
+          for name in RELEASES_REPO_PAT RUSTFS_ACCESS_KEY RUSTFS_SECRET_KEY RUSTFS_ENDPOINT RUSTFS_STAGING_BUCKET; do
+            if [ -n "${!name:-}" ]; then
+              set_names="${set_names} ${name}"
+            else
+              unset_names="${unset_names} ${name}"
+            fi
+          done
+
+          if [ -z "$set_names" ]; then
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::Updater channel (RustFS + llamenos-releases) is NOT CONFIGURED — none of its five secrets are set. Skipping it cleanly: v${VERSION} will be published to the GitHub Release only, and the in-app auto-updater will NOT see this version until the channel is configured."
+          elif [ -z "$unset_names" ]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+            echo "Updater channel is fully configured — publishing to RustFS + llamenos-releases as well."
+          else
+            echo "::error::Updater channel is PARTIALLY configured (set:${set_names}; missing:${unset_names}). A half-configured channel is a misconfiguration, not an opt-out — set all five secrets or remove the rest. Refusing to publish."
+            exit 1
+          fi
+
       - name: Download all artifacts
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
@@ -367,10 +525,112 @@ jobs:
             -o -name '*.msi' -o -name '*.msi.sig' -o -name '*.msi.zip' -o -name '*.msi.zip.sig' \
             -o -name '*.AppImage' -o -name '*.AppImage.sig' \
             -o -name '*.AppImage.tar.gz' -o -name '*.AppImage.tar.gz.sig' \
-            -o -name '*.dmg' -o -name '*.deb' \
+            -o -name '*.dmg' -o -name '*.dmg.sig' \
+            -o -name '*.deb' -o -name '*.deb.sig' \
+            -o -name '*.rpm' -o -name '*.rpm.sig' \
           \) -exec cp {} flat-artifacts/ \;
           echo "--- Artifacts ---"
           ls -la flat-artifacts/
+          if [ -z "$(ls -A flat-artifacts)" ]; then
+            echo "::error::No build artifacts were collected — refusing to publish an empty release."
+            exit 1
+          fi
+
+      # ── Every installer must be signed, and the signature must verify ───
+      # NEVER publish an unsigned installer. This is a real cryptographic check,
+      # not a file-exists check: each .sig (minisign, prehashed Ed25519) is verified
+      # against plugins.updater.pubkey from tauri.conf.json, which is the key the
+      # shipped app trusts. It also proves the TAURI_SIGNING_PRIVATE_KEY secret
+      # actually matches the pubkey baked into the app (a mismatch would publish
+      # installers no updater would accept). Runs BEFORE checksums, attestation and
+      # any upload so a failure leaves nothing published anywhere.
+      - name: Verify every installer is signed with the updater key
+        run: |
+          set -euo pipefail
+          cd flat-artifacts
+
+          # Every build must have produced each installer type.
+          missing=""
+          for pat in '*.AppImage' '*.deb' '*.rpm' '*-setup.exe' '*.msi' '*.dmg' '*.app.tar.gz'; do
+            compgen -G "$pat" >/dev/null || missing="${missing} ${pat}"
+          done
+          if [ -n "$missing" ]; then
+            echo "::error::Expected installers are missing from the build output:${missing}"
+            exit 1
+          fi
+
+          # Pair every payload with a .sig, and every .sig with a payload.
+          payloads=()
+          for f in *; do
+            case "$f" in
+              *.sig)
+                if [ ! -f "${f%.sig}" ]; then
+                  echo "::error::Orphan signature with no file: $f"
+                  exit 1
+                fi ;;
+              *)
+                if [ ! -s "${f}.sig" ]; then
+                  echo "::error::UNSIGNED artifact (no ${f}.sig) — refusing to publish."
+                  exit 1
+                fi
+                payloads+=("$f") ;;
+            esac
+          done
+
+          cat > "$RUNNER_TEMP/verify-minisign.mjs" <<'VERIFYEOF'
+          // Verify minisign signatures (as written by `tauri signer sign` / tauri build)
+          // against the updater public key in tauri.conf.json.
+          //   node verify-minisign.mjs <tauri.conf.json> <file> [<file> ...]
+          import { readFileSync } from 'node:fs'
+          import { createHash, createPublicKey, verify } from 'node:crypto'
+
+          const [confPath, ...files] = process.argv.slice(2)
+          if (!confPath || files.length === 0) {
+            console.error('usage: verify-minisign.mjs <tauri.conf.json> <file>...')
+            process.exit(2)
+          }
+          const unb64 = (s) => Buffer.from(s.trim(), 'base64')
+          const lines = (b) => unb64(b).toString('utf8').split('\n')
+
+          // Public key file: "untrusted comment: ...\n<base64: 'Ed' | keyid(8) | pk(32)>"
+          const pubRaw = unb64(lines(JSON.parse(readFileSync(confPath, 'utf8')).plugins.updater.pubkey)[1])
+          if (pubRaw.length !== 42 || pubRaw.subarray(0, 2).toString() !== 'Ed') throw new Error('malformed updater pubkey')
+          const pubKeyId = pubRaw.subarray(2, 10)
+          const pub = createPublicKey({
+            key: Buffer.concat([Buffer.from('302a300506032b6570032100', 'hex'), pubRaw.subarray(10)]),
+            format: 'der',
+            type: 'spki',
+          })
+
+          let failed = 0
+          for (const file of files) {
+            try {
+              const l = lines(readFileSync(`${file}.sig`, 'utf8'))
+              const sigRaw = unb64(l[1])
+              const trusted = l[2].replace(/^trusted comment: /, '')
+              const globalSig = unb64(l[3])
+              if (sigRaw.length !== 74) throw new Error('malformed signature')
+              const alg = sigRaw.subarray(0, 2).toString()
+              if (!sigRaw.subarray(2, 10).equals(pubKeyId)) throw new Error('signed by a DIFFERENT key than plugins.updater.pubkey')
+              const data = readFileSync(file)
+              const msg = alg === 'ED' ? createHash('blake2b512').update(data).digest() : alg === 'Ed' ? data : null
+              if (!msg) throw new Error(`unknown signature algorithm ${alg}`)
+              if (!verify(null, msg, pub, sigRaw.subarray(10))) throw new Error('signature does not match file contents')
+              if (!verify(null, Buffer.concat([sigRaw.subarray(10), Buffer.from(trusted)]), pub, globalSig)) throw new Error('trusted-comment signature invalid')
+              console.log(`OK    ${file}`)
+            } catch (e) {
+              failed++
+              console.error(`FAIL  ${file}: ${e.message}`)
+            }
+          }
+          process.exit(failed ? 1 : 0)
+          VERIFYEOF
+
+          if ! node "$RUNNER_TEMP/verify-minisign.mjs" ../apps/desktop/tauri.conf.json "${payloads[@]}"; then
+            echo "::error::One or more installers have a signature that does NOT verify against plugins.updater.pubkey — refusing to publish."
+            exit 1
+          fi
+          echo "All ${#payloads[@]} artifacts carry a valid signature for the updater public key."
 
       # ── Generate checksums ──────────────────────────────────────
       - name: Generate SHA-256 checksums
@@ -433,6 +693,21 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      # When the updater channel is configured, latest.json is what installed apps
+      # read. A manifest that silently omits a platform would strand that
+      # platform's users on the old version — fail loudly instead.
+      - name: Verify latest.json covers every platform
+        if: steps.channel.outputs.configured == 'true'
+        run: |
+          missing=""
+          for key in darwin-aarch64 darwin-x86_64 windows-x86_64 linux-x86_64; do
+            jq -e --arg k "$key" '.platforms[$k].signature | length > 0' latest.json >/dev/null || missing="${missing} ${key}"
+          done
+          if [ -n "$missing" ]; then
+            echo "::error::latest.json has no signed entry for:${missing}. Publishing it to the updater channel would strand those platforms — fix scripts/generate-update-manifest.sh (it must match the Tauri v2 artifact names) before enabling this channel."
+            exit 1
+          fi
+
       # ── Verify metadata-repo push access BEFORE touching the bucket ─────
       # Issue #720: a failed metadata push after the RustFS upload used to leave
       # a partial, unannounced release — a bucket with a version nothing describes.
@@ -441,6 +716,7 @@ jobs:
       # probe pushes an empty commit to a run-scoped throwaway ref (never main)
       # and deletes it immediately — no trace left in the metadata repo.
       - name: Verify releases repo push access
+        if: steps.channel.outputs.configured == 'true'
         env:
           GH_TOKEN: ${{ secrets.RELEASES_REPO_PAT }}
         run: |
@@ -475,8 +751,9 @@ jobs:
           rm -rf "$PROBE_DIR"
           echo "Push access to llamenos-releases verified for v${VERSION}."
 
-      # ── Upload binaries to RustFS ───────────────────────────────
+      # ── Upload binaries to RustFS (updater channel; configured only) ───
       - name: Install AWS CLI
+        if: steps.channel.outputs.configured == 'true'
         run: |
           curl -sSf "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "$RUNNER_TEMP/awscliv2.zip"
           unzip -q "$RUNNER_TEMP/awscliv2.zip" -d "$RUNNER_TEMP"
@@ -485,6 +762,7 @@ jobs:
 
       - name: Upload artifacts to RustFS staging bucket
         id: upload_artifacts
+        if: steps.channel.outputs.configured == 'true'
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.RUSTFS_ACCESS_KEY }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.RUSTFS_SECRET_KEY }}
@@ -530,6 +808,7 @@ jobs:
       # rebase, and retry a bounded number of times before giving up.
       - name: Commit metadata to llamenos-releases repo
         id: commit_metadata
+        if: steps.channel.outputs.configured == 'true'
         env:
           GH_TOKEN: ${{ secrets.RELEASES_REPO_PAT }}
           RUSTFS_BUCKET: ${{ secrets.RUSTFS_STAGING_BUCKET }}
@@ -589,85 +868,160 @@ jobs:
           cd "$OLDPWD"
           rm -rf "$RELEASES_DIR"
 
-      # ── Create metadata-only GitHub Release ─────────────────────
-      # Already idempotent by construction (upload --clobber on an existing
-      # release, create on a new one); retry only transient gh/API failures.
-      - name: Create metadata-only GitHub Release
+      # ── Publish the GitHub Release: signed installers + signatures ───────
+      # THE beta-tester channel. Attaches every installer and its minisign .sig
+      # alongside CHECKSUMS.txt / SBOM / build-info.json so artifacts stay
+      # verifiable. Needs no secret beyond GITHUB_TOKEN and always runs (after the
+      # updater channel, when that is configured, so #720's ordering is untouched).
+      #
+      # Draft-first, then publish: releases are immutable once published, so the
+      # asset set is created and verified as a draft and only then made public.
+      # A leftover draft from a failed attempt is deleted and rebuilt; a PUBLISHED
+      # release was already refused near the top of this job.
+      - name: Publish GitHub Release with signed installers
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CHANNEL_CONFIGURED: ${{ steps.channel.outputs.configured }}
           RUSTFS_BUCKET: ${{ secrets.RUSTFS_STAGING_BUCKET }}
         run: |
-          TAG="v${VERSION}"
+          set -euo pipefail
+          TAG="desktop-v${VERSION}"
 
-          # Build release body
-          cat > release-body.md << BODYEOF
-          ## Desktop v${VERSION}
+          # ── Assemble the asset set ──
+          mkdir -p release-assets
+          cp flat-artifacts/* release-assets/
 
-          ### Download Binaries
+          # A macOS bundle that is not Apple-signed/notarized is rejected by
+          # Gatekeeper ("app is damaged") — do not hand testers something that
+          # cannot open. Keep it off the Release and say so in the notes.
+          MACOS_INCLUDED=true
+          if [ -n "$(find artifacts -name apple-unsigned.marker -print -quit)" ]; then
+            MACOS_INCLUDED=false
+            rm -f release-assets/*.dmg release-assets/*.dmg.sig release-assets/*.app.tar.gz release-assets/*.app.tar.gz.sig
+            echo "::warning::macOS bundle is not Apple-signed/notarized (see #741) — EXCLUDED from the GitHub Release."
+          fi
 
-          Binaries are hosted on our self-hosted infrastructure:
+          cp CHECKSUMS.txt sbom-desktop.cdx.json build-info.json release-assets/
 
-          | Platform | Download |
-          |----------|----------|
-          | macOS (Universal) | [DMG](https://releases.llamenos.org/desktop/v${VERSION}/Hotline.dmg) |
-          | Windows (x64) | [NSIS Installer](https://releases.llamenos.org/desktop/v${VERSION}/Hotline_${VERSION}_x64-setup.exe) \| [MSI](https://releases.llamenos.org/desktop/v${VERSION}/Hotline_${VERSION}_x64_en-US.msi) |
-          | Linux (x64) | [AppImage](https://releases.llamenos.org/desktop/v${VERSION}/hotline_${VERSION}_amd64.AppImage) \| [deb](https://releases.llamenos.org/desktop/v${VERSION}/hotline_${VERSION}_amd64.deb) |
+          # Re-assert the no-unsigned-installer rule on the exact set being published.
+          for f in release-assets/*; do
+            case "$f" in
+              *.sig|*/CHECKSUMS.txt|*/sbom-desktop.cdx.json|*/build-info.json) ;;
+              *) [ -s "${f}.sig" ] || { echo "::error::Refusing to publish ${f} — no signature file alongside it."; exit 1; } ;;
+            esac
+          done
 
-          The \`.nsis.zip\` / \`.msi.zip\` / \`.AppImage.tar.gz\` variants alongside these are
-          updater-only bundles consumed by the in-app auto-updater — not meant for direct
-          download. Use the links above to install.
+          # ── Release notes (generated from the real file names) ──
+          PUBKEY_B64=$(jq -r '.plugins.updater.pubkey' apps/desktop/tauri.conf.json | base64 -d | sed -n '2p')
+          PUBKEY_ID=$(jq -r '.plugins.updater.pubkey' apps/desktop/tauri.conf.json | base64 -d | sed -n '1p' | sed 's/.*: //')
+          FENCE='```'
+          list_files() { # $1 = extended regex over installer file names (signatures excluded)
+            local f
+            for f in release-assets/*; do
+              f=$(basename "$f")
+              case "$f" in *.sig) continue ;; esac
+              if [[ "$f" =~ $1 ]]; then echo "- \`${f}\`"; fi
+            done
+          }
+          {
+            echo "## Desktop v${VERSION} — internal beta"
+            echo
+            echo "Every installer below is signed with the project's minisign updater key (\`${PUBKEY_ID}\`); its \`.sig\` sits next to it. **Verify before you install.**"
+            echo
+            echo "### Which file to download"
+            echo
+            echo "**Linux (x64)** — pick one:"
+            list_files '\.(AppImage|deb|rpm)$'
+            echo
+            echo "**Windows (x64)** — pick one:"
+            list_files '(-setup\.exe|\.msi)$'
+            echo
+            if [ "$MACOS_INCLUDED" = true ]; then
+              echo "**macOS (universal)**:"
+              list_files '\.dmg$'
+            else
+              echo "**macOS** — not attached. This build is not Apple-signed/notarized (paid Apple Developer account pending, #741), so Gatekeeper would refuse to open it."
+            fi
+            echo
+            echo "### Verify"
+            echo
+            echo "${FENCE}bash"
+            echo "# 1. Checksums (download CHECKSUMS.txt next to the installer)"
+            echo "sha256sum -c CHECKSUMS.txt --ignore-missing"
+            echo
+            echo "# 2. Signature — the .sig is base64-wrapped minisign; unwrap, then verify with the updater public key"
+            echo "base64 -d <installer>.sig > <installer>.minisig"
+            echo "minisign -V -m <installer> -x <installer>.minisig -P ${PUBKEY_B64}"
+            echo
+            echo "# 3. Build provenance (SLSA attestation)"
+            echo "gh attestation verify <installer> --repo ${GITHUB_REPOSITORY}"
+            echo "${FENCE}"
+            echo
+            echo "Public key ID \`${PUBKEY_ID}\` is the same key as \`plugins.updater.pubkey\` in \`apps/desktop/tauri.conf.json\`."
+            echo
+            echo "### Notes"
+            echo
+            echo "- Windows installers are not Authenticode-signed, so SmartScreen will warn. The minisign signature above is your integrity check."
+            echo "- AppImage: \`chmod +x\` it before running."
+            echo "- This is a separate \`desktop-v${VERSION}\` release because the \`v${VERSION}\` release is immutable once published and cannot accept desktop assets."
+            if [ "$CHANNEL_CONFIGURED" != "true" ]; then
+              echo "- The in-app auto-updater channel is not configured yet, so this build will **not** auto-update. Install new versions manually from their releases."
+            fi
+          } > release-body.md
+          echo "--- release-body.md ---"
+          cat release-body.md
 
-          ### Verification
+          mapfile -t ASSETS < <(find release-assets -maxdepth 1 -type f | sort)
+          echo "Publishing ${#ASSETS[@]} assets to ${TAG}"
 
-          \`\`\`bash
-          # Download the checksum file
-          curl -O https://raw.githubusercontent.com/rhonda-rodododo/llamenos-releases/main/desktop/v${VERSION}/CHECKSUMS.txt
+          # ── Draft -> upload -> verify -> publish ──
+          delete_draft() {
+            local id
+            id=$(gh api "repos/${GITHUB_REPOSITORY}/releases" --paginate \
+              --jq ".[] | select(.tag_name == \"${TAG}\" and .draft == true) | .id")
+            for i in $id; do gh api -X DELETE "repos/${GITHUB_REPOSITORY}/releases/${i}"; done
+          }
 
-          # Verify your download
-          sha256sum -c CHECKSUMS.txt --ignore-missing
-          \`\`\`
+          PRERELEASE_FLAG=()
+          case "$VERSION" in *-*) PRERELEASE_FLAG=(--prerelease) ;; esac
 
-          ### Build Metadata
-
-          - [CHECKSUMS.txt](https://github.com/rhonda-rodododo/llamenos-releases/blob/main/desktop/v${VERSION}/CHECKSUMS.txt)
-          - [SBOM (CycloneDX)](https://github.com/rhonda-rodododo/llamenos-releases/blob/main/desktop/v${VERSION}/sbom-desktop.cdx.json)
-          - [Build Info](https://github.com/rhonda-rodododo/llamenos-releases/blob/main/desktop/v${VERSION}/build-info.json)
-          BODYEOF
-
-          # Create release (or upload to existing). Idempotent by construction
-          # (--clobber on an existing release, create on a new one), so we only
-          # need to retry transient gh/API failures, not handle a "partial" state.
           MAX_ATTEMPTS=3
           attempt=1
           while true; do
-            if gh release view "${TAG}" --repo "${GITHUB_REPOSITORY}" &>/dev/null; then
-              echo "Release ${TAG} exists — uploading metadata (attempt ${attempt}/${MAX_ATTEMPTS})..."
-              if gh release upload "${TAG}" \
-                CHECKSUMS.txt \
-                sbom-desktop.cdx.json \
-                build-info.json \
-                --clobber; then
-                break
-              fi
-            else
-              echo "Creating new metadata-only release ${TAG} (attempt ${attempt}/${MAX_ATTEMPTS})..."
-              if gh release create "${TAG}" \
-                --title "v${VERSION}" \
-                --notes-file release-body.md \
-                CHECKSUMS.txt \
-                sbom-desktop.cdx.json \
-                build-info.json; then
-                break
-              fi
+            delete_draft
+            echo "Creating draft release ${TAG} (attempt ${attempt}/${MAX_ATTEMPTS})..."
+            if gh release create "${TAG}" \
+              --repo "${GITHUB_REPOSITORY}" \
+              --draft \
+              --latest=false \
+              --target "${GITHUB_SHA}" \
+              --title "Desktop v${VERSION}" \
+              --notes-file release-body.md \
+              "${PRERELEASE_FLAG[@]}" \
+              "${ASSETS[@]}"; then
+              break
             fi
-
             if [ "$attempt" -ge "$MAX_ATTEMPTS" ]; then
-              echo "::error::PARTIAL RELEASE: v${VERSION} artifacts are uploaded to s3://${RUSTFS_BUCKET}/desktop/v${VERSION} and metadata is committed to llamenos-releases, but creating/updating the GitHub Release for ${TAG} failed after ${MAX_ATTEMPTS} attempts. Re-run this workflow with the same version to retry — this step is idempotent and will converge."
+              delete_draft
+              echo "::error::Creating the GitHub Release ${TAG} failed after ${MAX_ATTEMPTS} attempts. Nothing was published to it (the draft was removed). If the updater channel is configured and this job got that far, s3://${RUSTFS_BUCKET:-<unset>}/desktop/v${VERSION} may already hold binaries — re-run with the same version to converge."
               exit 1
             fi
             attempt=$((attempt + 1))
             sleep $((attempt * 2))
           done
+
+          # Exactly the intended files must be attached, byte-for-byte in size.
+          EXPECTED=$(for f in "${ASSETS[@]}"; do printf '%s %s\n' "$(basename "$f")" "$(stat -c %s "$f")"; done | sort)
+          ACTUAL=$(gh api "repos/${GITHUB_REPOSITORY}/releases" --paginate \
+            --jq ".[] | select(.tag_name == \"${TAG}\" and .draft == true) | .assets[] | \"\\(.name) \\(.size)\"" | sort)
+          if [ "$EXPECTED" != "$ACTUAL" ]; then
+            echo "::error::Draft release ${TAG} asset set does not match what was uploaded — not publishing."
+            diff <(echo "$EXPECTED") <(echo "$ACTUAL") || true
+            exit 1
+          fi
+
+          gh release edit "${TAG}" --repo "${GITHUB_REPOSITORY}" --draft=false --latest=false
+          echo "Published https://github.com/${GITHUB_REPOSITORY}/releases/tag/${TAG}"
 
       # ── Fail loudly if the bucket has a version nothing describes ──────
       # Issue #720: only the steps below this point in the job can leave a
