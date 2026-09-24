@@ -1,6 +1,14 @@
 # CI workflow for mobile (iOS + Android) release builds.
 # Builds signed mobile apps and uploads to TestFlight / Play Store / GitHub Releases.
 #
+# GitHub Releases: each platform publishes to its OWN release —
+# `android-v<version>` (signed APK + SHA-256 + android-build-meta.json) and
+# `ios-v<version>` (ios-build-meta.json) — never to `v<version>`. release.yml
+# publishes `v<version>` BEFORE dispatching this workflow and the repo has
+# immutable releases enabled, so assets cannot be added to it. Same scheme as
+# tauri-release.yml's `desktop-v<version>` (#957). verify-release-live.yml reads
+# the build metadata from the latest `android-v*` / `ios-v*` release.
+#
 # Trigger: workflow_dispatch only, from release.yml's `dispatch` job (see #712).
 # This workflow used to also declare `on: release: [published]`, but GitHub
 # Releases created by GITHUB_TOKEN (as release.yml does) never fire that event
@@ -53,6 +61,46 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Resolve version
+        id: version
+        env:
+          INPUT_VER: ${{ inputs.version }}
+        run: |
+          # Only workflow_dispatch triggers this workflow now (#712) — the
+          # `release` event branch this used to have was unreachable dead
+          # code (GITHUB_TOKEN-created releases never fire `release: published`)
+          # and has been removed.
+          if [[ -n "$INPUT_VER" ]]; then
+            VERSION="$INPUT_VER"
+          else
+            VERSION="$(jq -r .version package.json)"
+          fi
+          # The version becomes part of a release tag name — refuse anything
+          # that is not plain semver before it gets near `gh release`.
+          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?$ ]]; then
+            echo "::error::Invalid version format: $VERSION (expected semver)"
+            exit 1
+          fi
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+
+      # Immutable releases: once `android-v<version>` is published its assets can
+      # never change, and a re-run builds DIFFERENT bytes (new versionCode), so it
+      # cannot converge on the published release. Stop before spending a Rust +
+      # Gradle build on a run whose upload is guaranteed to be refused.
+      - name: Refuse to rebuild an already-published Android release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RESOLVED_VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          TAG="android-v${RESOLVED_VERSION}"
+          PUBLISHED=$(gh api "repos/${GITHUB_REPOSITORY}/releases" --paginate \
+            --jq ".[] | select(.tag_name == \"${TAG}\" and .draft == false) | .html_url")
+          if [ -n "$PUBLISHED" ]; then
+            echo "::error::${TAG} is already published (${PUBLISHED}) and GitHub releases are immutable — its assets cannot be replaced. Bump the version and cut a new release instead of re-running this one."
+            exit 1
+          fi
+          echo "No published ${TAG} release exists — safe to proceed."
 
       - name: Setup Java 17
         uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
@@ -114,21 +162,6 @@ jobs:
 
       - name: Install dependencies and run codegen
         run: bun install --frozen-lockfile && bun run codegen && bun run i18n:codegen
-
-      - name: Resolve version
-        id: version
-        env:
-          INPUT_VER: ${{ inputs.version }}
-        run: |
-          # Only workflow_dispatch triggers this workflow now (#712) — the
-          # `release` event branch this used to have was unreachable dead
-          # code (GITHUB_TOKEN-created releases never fire `release: published`)
-          # and has been removed.
-          if [[ -n "$INPUT_VER" ]]; then
-            echo "version=${INPUT_VER}" >> "$GITHUB_OUTPUT"
-          else
-            echo "version=$(jq -r .version package.json)" >> "$GITHUB_OUTPUT"
-          fi
 
       - name: Require signing credentials
         env:
@@ -220,7 +253,10 @@ jobs:
         run: |
           APK=$(find apps/android/app/build/outputs/apk/release -name "*.apk" | head -1)
           [ -n "$APK" ] || { echo "::error::no release APK to checksum"; exit 1; }
-          sha256sum "$APK" > "${APK}.sha256"
+          # Hash from inside the APK's directory so the .sha256 records the bare
+          # file name — `sha256sum -c` then works next to a downloaded copy
+          # (a CI-workspace path in the file would make it fail for everyone).
+          (cd "$(dirname "$APK")" && sha256sum "$(basename "$APK")" > "$(basename "$APK").sha256")
           echo "APK checksum:"
           cat "${APK}.sha256"
 
@@ -242,26 +278,30 @@ jobs:
             apps/android/app/build/outputs/mapping/release/mapping.txt
           retention-days: 30
 
-      # Runs BEFORE the Play upload so an installable APK is attached to the
-      # release even if the Play Console step fails (it fails loudly, after this).
-      - name: Upload Android artifacts to GitHub Release
+      # Runs BEFORE the Play upload so an installable APK is published even if
+      # the Play Console step fails (it fails loudly, after this).
+      #
+      # Published to a DEDICATED `android-v<version>` release, not `v<version>`:
+      # release.yml publishes `v<version>` BEFORE dispatching this workflow and
+      # the repo has immutable releases enabled, so `gh release upload
+      # v<version>` is rejected — assets can never be added to a published
+      # release. Same approach (and naming) as tauri-release.yml's
+      # `desktop-v<version>` (#957).
+      #
+      # Draft-first, then publish: the release is created with its full asset set,
+      # the set is verified, and only then made public (and so immutable). Any
+      # failure to create, attach or publish fails the job — nothing is masked.
+      # The checksum and android-build-meta.json ride along with the APK so the
+      # artifact stays verifiable and verify-release-live.yml (#721) can find the
+      # build metadata.
+      - name: Publish Android GitHub Release (APK + checksum + build metadata)
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RUN_NUMBER: ${{ github.run_number }}
         run: |
-          TAG="v${VERSION}"
+          set -euo pipefail
+          TAG="android-v${VERSION}"
 
-          # Create the release if it doesn't exist yet — needed for both the
-          # binaries below and the build-metadata record further down, which
-          # must land even on runs that produce no APK (e.g. an upload
-          # failure), so the live-verification workflow (#721) can tell
-          # "no build metadata recorded" apart from "metadata says X but
-          # Play Console shows Y".
-          if ! gh release view "${TAG}" --repo "${GITHUB_REPOSITORY}" &>/dev/null; then
-            gh release create "${TAG}" --repo "${GITHUB_REPOSITORY}" --title "${TAG}" --generate-notes --draft
-          fi
-
-          # Find the APK and checksum
           APK=$(find apps/android/app/build/outputs/apk/release -name "*.apk" | head -1)
           CHECKSUM=$(find apps/android/app/build/outputs/apk/release -name "*.sha256" | head -1)
           # A release with no installable artifact is a failed run, not a
@@ -270,16 +310,103 @@ jobs:
             echo "::error::release APK/checksum missing at upload time"
             exit 1
           fi
-          gh release upload "${TAG}" "$APK" "$CHECKSUM" --clobber
 
           # Record which versionCode this run targeted for this release, so
           # verify-release-live.yml (#721) can compare it against whatever
           # versionCode is actually LIVE on the Play Console internal track
           # — the only way to tell a successful Play upload apart from a
           # swallowed one after the fact.
+          mkdir -p release-assets
+          cp "$APK" "$CHECKSUM" release-assets/
           jq -n --arg version "$VERSION" --argjson versionCode "$RUN_NUMBER" \
-            '{version: $version, versionCode: $versionCode}' > android-build-meta.json
-          gh release upload "${TAG}" android-build-meta.json --clobber
+            '{version: $version, versionCode: $versionCode}' > release-assets/android-build-meta.json
+
+          APK_NAME=$(basename "$APK")
+          FENCE='```'
+          {
+            echo "## Android v${VERSION} — internal beta"
+            echo
+            echo "Signed release APK for direct install (\`${APK_NAME}\`), its SHA-256 checksum and the build metadata. **Verify before you install.**"
+            echo
+            echo "${FENCE}bash"
+            echo "# 1. Checksum (download the .sha256 next to the APK)"
+            echo "sha256sum -c ${APK_NAME}.sha256"
+            echo
+            echo "# 2. APK signature (Android SDK build-tools)"
+            echo "apksigner verify --print-certs ${APK_NAME}"
+            echo
+            echo "# 3. Build provenance (SLSA attestation)"
+            echo "gh attestation verify ${APK_NAME} --repo ${GITHUB_REPOSITORY}"
+            echo "${FENCE}"
+            echo
+            echo "Build number (versionCode): \`${RUN_NUMBER}\`."
+            echo
+            echo "This is a separate \`android-v${VERSION}\` release because the \`v${VERSION}\` release is immutable once published and cannot accept Android assets."
+          } > release-body.md
+
+          # bash-3.2-safe (macOS /bin/bash): no `mapfile`/`readarray` (bash 4+).
+          ASSETS=()
+          while IFS= read -r asset; do
+            ASSETS+=("$asset")
+          done < <(find release-assets -maxdepth 1 -type f | sort)
+          if [ "${#ASSETS[@]}" -eq 0 ]; then
+            echo "::error::No release assets found in release-assets/ — refusing to publish an empty release."
+            exit 1
+          fi
+          echo "Publishing ${#ASSETS[@]} assets to ${TAG}"
+
+          # A leftover draft from a failed earlier attempt is deleted and rebuilt;
+          # a PUBLISHED release was already refused near the top of this job.
+          delete_draft() {
+            local id i
+            id=$(gh api "repos/${GITHUB_REPOSITORY}/releases" --paginate \
+              --jq ".[] | select(.tag_name == \"${TAG}\" and .draft == true) | .id")
+            for i in $id; do gh api -X DELETE "repos/${GITHUB_REPOSITORY}/releases/${i}"; done
+          }
+
+          # Empty under `set -u` unless a prerelease; expand with the bash-3.2-safe
+          # `${arr[@]+"${arr[@]}"}` idiom (a bare "${arr[@]}" on an empty array is an
+          # "unbound variable" error in bash < 4.4).
+          PRERELEASE_FLAG=()
+          case "$VERSION" in *-*) PRERELEASE_FLAG=(--prerelease) ;; esac
+
+          MAX_ATTEMPTS=3
+          attempt=1
+          while true; do
+            delete_draft
+            echo "Creating draft release ${TAG} (attempt ${attempt}/${MAX_ATTEMPTS})..."
+            if gh release create "${TAG}" \
+              --repo "${GITHUB_REPOSITORY}" \
+              --draft \
+              --latest=false \
+              --target "${GITHUB_SHA}" \
+              --title "Android v${VERSION}" \
+              --notes-file release-body.md \
+              ${PRERELEASE_FLAG[@]+"${PRERELEASE_FLAG[@]}"} \
+              "${ASSETS[@]}"; then
+              break
+            fi
+            if [ "$attempt" -ge "$MAX_ATTEMPTS" ]; then
+              delete_draft
+              echo "::error::Creating the GitHub Release ${TAG} failed after ${MAX_ATTEMPTS} attempts. Nothing was published to it (the draft was removed)."
+              exit 1
+            fi
+            attempt=$((attempt + 1))
+            sleep $((attempt * 2))
+          done
+
+          # Exactly the intended files must be attached, byte-for-byte in size.
+          EXPECTED=$(for f in "${ASSETS[@]}"; do printf '%s %s\n' "$(basename "$f")" "$(stat -c %s "$f")"; done | sort)
+          ACTUAL=$(gh api "repos/${GITHUB_REPOSITORY}/releases" --paginate \
+            --jq ".[] | select(.tag_name == \"${TAG}\" and .draft == true) | .assets[] | \"\(.name) \(.size)\"" | sort)
+          if [ "$EXPECTED" != "$ACTUAL" ]; then
+            echo "::error::Draft release ${TAG} asset set does not match what was uploaded — not publishing."
+            diff <(echo "$EXPECTED") <(echo "$ACTUAL") || true
+            exit 1
+          fi
+
+          gh release edit "${TAG}" --repo "${GITHUB_REPOSITORY}" --draft=false --latest=false
+          echo "Published https://github.com/${GITHUB_REPOSITORY}/releases/tag/${TAG}"
 
       - name: Setup Ruby
         if: env.HAS_PLAY_SERVICE_ACCOUNT == 'true'
@@ -314,6 +441,60 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Resolve version
+        id: version
+        run: |
+          if [[ -n "$INPUT_VERSION" ]]; then
+            VERSION="$INPUT_VERSION"
+          else
+            VERSION="$(jq -r .version package.json)"
+          fi
+          # The version becomes part of a release tag name — refuse anything
+          # that is not plain semver before it gets near `gh release`.
+          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?$ ]]; then
+            echo "::error::Invalid version format: $VERSION (expected semver)"
+            exit 1
+          fi
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+
+      # Immutable releases: once `ios-v<version>` is published its assets can
+      # never change. Stop before spending a macOS build on a run whose build
+      # metadata upload is guaranteed to be refused.
+      - name: Refuse to rebuild an already-published iOS release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RESOLVED_VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          TAG="ios-v${RESOLVED_VERSION}"
+          PUBLISHED=$(gh api "repos/${GITHUB_REPOSITORY}/releases" --paginate \
+            --jq ".[] | select(.tag_name == \"${TAG}\" and .draft == false) | .html_url")
+          if [ -n "$PUBLISHED" ]; then
+            echo "::error::${TAG} is already published (${PUBLISHED}) and GitHub releases are immutable — its assets cannot be replaced. Bump the version and cut a new release instead of re-running this one."
+            exit 1
+          fi
+          echo "No published ${TAG} release exists — safe to proceed."
+
+      - name: Require iOS signing credentials
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.IOS_CERTIFICATE_BASE64 }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.IOS_CERTIFICATE_PASSWORD }}
+          PROVISIONING_PROFILE: ${{ secrets.IOS_PROVISIONING_PROFILE_BASE64 }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          # Without these the archive cannot be signed — and an empty
+          # APPLE_TEAM_ID would be passed to xcodebuild as DEVELOPMENT_TEAM="",
+          # overriding the project's own team setting with nothing. Fail here,
+          # naming what is missing, instead of building an archive that cannot
+          # exist (#743).
+          missing=0
+          for v in APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD PROVISIONING_PROFILE APPLE_TEAM_ID; do
+            if [ -z "${!v}" ]; then
+              echo "::error::iOS signing credential missing: $v"
+              missing=1
+            fi
+          done
+          exit $missing
 
       - name: Select Xcode
         run: sudo xcode-select -s /Applications/Xcode.app
@@ -354,8 +535,9 @@ jobs:
         shell: bash
         env:
           RUN_NUMBER: ${{ github.run_number }}
+          RESOLVED_VERSION: ${{ steps.version.outputs.version }}
         run: |
-          VERSION="$INPUT_VERSION"
+          VERSION="$RESOLVED_VERSION"
           echo "Building version: ${VERSION}"
           echo "VERSION=${VERSION}" >> "$GITHUB_ENV"
 
@@ -399,6 +581,13 @@ jobs:
         env:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
+          # pipefail: a failed xcodebuild must fail this step even though its
+          # output goes through a formatter. This step used to swallow the
+          # pipeline's exit status with an unconditional-success suffix, which
+          # turned "** ARCHIVE FAILED **" into a green job that produced
+          # nothing (#743).
+          set -o pipefail
+          if command -v xcpretty >/dev/null; then FORMATTER="xcpretty"; else FORMATTER="cat"; fi
           xcodebuild archive \
             -project Llamenos.xcodeproj \
             -scheme Llamenos \
@@ -410,18 +599,20 @@ jobs:
             CODE_SIGN_STYLE=Manual \
             DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
             INFOPLIST_FILE=Sources/App/Info.plist \
-            | xcpretty || true
+            2>&1 | "$FORMATTER"
 
       - name: Export IPA
         if: success()
         working-directory: apps/ios
         run: |
+          set -o pipefail
+          if command -v xcpretty >/dev/null; then FORMATTER="xcpretty"; else FORMATTER="cat"; fi
           xcodebuild -exportArchive \
             -archivePath build/Llamenos.xcarchive \
             -exportOptionsPlist ExportOptions.plist \
             -exportPath build/export \
             -allowProvisioningUpdates \
-            | xcpretty || true
+            2>&1 | "$FORMATTER"
 
       - name: Upload IPA artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -454,32 +645,106 @@ jobs:
               --apiIssuer "$APPLE_API_ISSUER_ID"
           fi
 
-      - name: Record iOS build metadata to GitHub Release
-        if: always()
+      # Published to a DEDICATED `ios-v<version>` release, not `v<version>`:
+      # release.yml publishes `v<version>` BEFORE dispatching this workflow and
+      # the repo has immutable releases enabled, so `gh release upload
+      # v<version>` is rejected. Same approach (and naming) as tauri-release.yml's
+      # `desktop-v<version>` (#957). No IPA is attached — TestFlight is the
+      # distribution channel; this release carries the build metadata only.
+      #
+      # Runs only when every step above succeeded (no `if: always()` any more).
+      # Publishing is irreversible, and a run that failed to archive/export/upload
+      # now fails the job loudly on its own — recording metadata for it would only
+      # freeze the version's release and block the retry. A run that "succeeds"
+      # without reaching TestFlight (no API key configured) still records what it
+      # targeted, which is exactly what verify-release-live.yml (#721) compares
+      # against the live TestFlight build number (#743).
+      - name: Publish iOS build metadata to GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RUN_NUMBER: ${{ github.run_number }}
+          RESOLVED_VERSION: ${{ steps.version.outputs.version }}
         run: |
-          # Records which build number (CFBundleVersion) this run targeted
-          # for this release, so verify-release-live.yml (#721) can compare
-          # it against whatever build number is actually LIVE on
-          # TestFlight — the only way to tell a successful upload apart
-          # from a no-op one (#743) after the fact. Runs even if the
-          # archive/export/upload steps above failed, so a swallowed
-          # upload shows up as "metadata says N, TestFlight has stale M"
-          # rather than silently having no record to check against.
-          VERSION="$INPUT_VERSION"
-          if [ -z "$VERSION" ]; then
-            echo "No version resolved (workflow_dispatch ran without a version input) — nothing to record."
-            exit 0
-          fi
-          TAG="v${VERSION}"
-          if ! gh release view "${TAG}" --repo "${GITHUB_REPOSITORY}" &>/dev/null; then
-            gh release create "${TAG}" --repo "${GITHUB_REPOSITORY}" --title "${TAG}" --generate-notes --draft
-          fi
+          set -euo pipefail
+          VERSION="$RESOLVED_VERSION"
+          TAG="ios-v${VERSION}"
+
+          mkdir -p release-assets
           jq -n --arg version "$VERSION" --argjson buildNumber "$RUN_NUMBER" \
-            '{version: $version, buildNumber: $buildNumber}' > ios-build-meta.json
-          gh release upload "${TAG}" ios-build-meta.json --clobber
+            '{version: $version, buildNumber: $buildNumber}' > release-assets/ios-build-meta.json
+
+          {
+            echo "## iOS v${VERSION} — build record"
+            echo
+            echo "Build number (CFBundleVersion): \`${RUN_NUMBER}\`. The build itself is distributed through TestFlight; this release records what the run targeted (\`ios-build-meta.json\`) so verify-release-live.yml can compare it to the live TestFlight build."
+            echo
+            echo "This is a separate \`ios-v${VERSION}\` release because the \`v${VERSION}\` release is immutable once published and cannot accept iOS assets."
+          } > release-body.md
+
+          # bash-3.2-safe (macOS /bin/bash): no `mapfile`/`readarray` (bash 4+).
+          ASSETS=()
+          while IFS= read -r asset; do
+            ASSETS+=("$asset")
+          done < <(find release-assets -maxdepth 1 -type f | sort)
+          if [ "${#ASSETS[@]}" -eq 0 ]; then
+            echo "::error::No release assets found in release-assets/ — refusing to publish an empty release."
+            exit 1
+          fi
+          echo "Publishing ${#ASSETS[@]} assets to ${TAG}"
+
+          # A leftover draft from a failed earlier attempt is deleted and rebuilt;
+          # a PUBLISHED release was already refused near the top of this job.
+          delete_draft() {
+            local id i
+            id=$(gh api "repos/${GITHUB_REPOSITORY}/releases" --paginate \
+              --jq ".[] | select(.tag_name == \"${TAG}\" and .draft == true) | .id")
+            for i in $id; do gh api -X DELETE "repos/${GITHUB_REPOSITORY}/releases/${i}"; done
+          }
+
+          # Empty under `set -u` unless a prerelease; expand with the bash-3.2-safe
+          # `${arr[@]+"${arr[@]}"}` idiom (a bare "${arr[@]}" on an empty array is an
+          # "unbound variable" error in bash < 4.4).
+          PRERELEASE_FLAG=()
+          case "$VERSION" in *-*) PRERELEASE_FLAG=(--prerelease) ;; esac
+
+          MAX_ATTEMPTS=3
+          attempt=1
+          while true; do
+            delete_draft
+            echo "Creating draft release ${TAG} (attempt ${attempt}/${MAX_ATTEMPTS})..."
+            if gh release create "${TAG}" \
+              --repo "${GITHUB_REPOSITORY}" \
+              --draft \
+              --latest=false \
+              --target "${GITHUB_SHA}" \
+              --title "iOS v${VERSION}" \
+              --notes-file release-body.md \
+              ${PRERELEASE_FLAG[@]+"${PRERELEASE_FLAG[@]}"} \
+              "${ASSETS[@]}"; then
+              break
+            fi
+            if [ "$attempt" -ge "$MAX_ATTEMPTS" ]; then
+              delete_draft
+              echo "::error::Creating the GitHub Release ${TAG} failed after ${MAX_ATTEMPTS} attempts. Nothing was published to it (the draft was removed)."
+              exit 1
+            fi
+            attempt=$((attempt + 1))
+            sleep $((attempt * 2))
+          done
+
+          # Exactly the intended files must be attached, byte-for-byte in size
+          # (`wc -c`, not `stat`: the macOS runner has BSD stat).
+          EXPECTED=$(for f in "${ASSETS[@]}"; do printf '%s %s\n' "$(basename "$f")" "$(wc -c < "$f" | tr -d ' ')"; done | sort)
+          ACTUAL=$(gh api "repos/${GITHUB_REPOSITORY}/releases" --paginate \
+            --jq ".[] | select(.tag_name == \"${TAG}\" and .draft == true) | .assets[] | \"\(.name) \(.size)\"" | sort)
+          if [ "$EXPECTED" != "$ACTUAL" ]; then
+            echo "::error::Draft release ${TAG} asset set does not match what was uploaded — not publishing."
+            diff <(echo "$EXPECTED") <(echo "$ACTUAL") || true
+            exit 1
+          fi
+
+          gh release edit "${TAG}" --repo "${GITHUB_REPOSITORY}" --draft=false --latest=false
+          echo "Published https://github.com/${GITHUB_REPOSITORY}/releases/tag/${TAG}"
 
       - name: Cleanup keychain
         if: always()

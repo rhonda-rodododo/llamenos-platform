@@ -18,10 +18,11 @@
 #      reachable and reports healthy (#959).
 #   3. play-track — the Play Console internal track's live versionCode
 #      matches what the most recent mobile-release.yml run targeted for
-#      the most recent GitHub Release (recorded as android-build-meta.json
-#      on that release).
+#      the most recent `android-v<version>` GitHub Release (recorded as
+#      android-build-meta.json on that release — mobile builds publish to
+#      their own release because `v<version>` is immutable once published).
 #   4. testflight — same idea for the TestFlight build number, via
-#      ios-build-meta.json.
+#      ios-build-meta.json on the most recent `ios-v<version>` release.
 #
 # Hard rule (project memory "audit gates by breaking them" + this issue's
 # AC): a check that cannot run because a credential or a required target
@@ -391,9 +392,9 @@ jobs:
             exit 0
           fi
 
-          TAG=$(gh release list --repo "$GITHUB_REPOSITORY" --limit 20 --json tagName --jq 'first(.[] | select(.tagName | startswith("v")) | .tagName) // empty')
+          TAG=$(gh release list --repo "$GITHUB_REPOSITORY" --limit 50 --json tagName,isDraft --jq 'first(.[] | select((.isDraft | not) and (.tagName | startswith("android-v"))) | .tagName) // empty')
           if [ -z "$TAG" ]; then
-            echo "::error::SURFACE BROKEN: Play internal track — no GitHub Release exists to compare against"
+            echo "::error::SURFACE BROKEN: Play internal track — no published android-v<version> GitHub Release exists to compare against"
             exit 1
           fi
 
@@ -563,9 +564,9 @@ jobs:
             exit 0
           fi
 
-          TAG=$(gh release list --repo "$GITHUB_REPOSITORY" --limit 20 --json tagName --jq 'first(.[] | select(.tagName | startswith("v")) | .tagName) // empty')
+          TAG=$(gh release list --repo "$GITHUB_REPOSITORY" --limit 50 --json tagName,isDraft --jq 'first(.[] | select((.isDraft | not) and (.tagName | startswith("ios-v"))) | .tagName) // empty')
           if [ -z "$TAG" ]; then
-            echo "::error::SURFACE BROKEN: TestFlight — no GitHub Release exists to compare against"
+            echo "::error::SURFACE BROKEN: TestFlight — no published ios-v<version> GitHub Release exists to compare against"
             exit 1
           fi
 
