@@ -138,7 +138,9 @@ apns_key_p8: ""
 apns_key_id: ""
 apns_team_id: ""
 
-# ntfy/UnifiedPush (Android). Setting llamenos_ntfy_enabled: true stands up a
+# ntfy/UnifiedPush (Android) — the ONLY Android push transport (no FCM; see
+# deploy/PUSH_NOTIFICATIONS.md). Any deployment that serves Android testers
+# must set llamenos_ntfy_enabled: true. Setting llamenos_ntfy_enabled: true stands up a
 # self-hosted ntfy broker (roles/llamenos-ntfy) reachable by the app
 # container at ntfy_url and by Android devices at ntfy_domain over TLS.
 llamenos_ntfy_enabled: false
