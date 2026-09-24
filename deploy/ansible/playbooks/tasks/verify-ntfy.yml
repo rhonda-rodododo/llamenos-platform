@@ -1,0 +1,92 @@
+---
+# Post-deploy verification of the ntfy/UnifiedPush push relay (issue #959).
+#
+# Android testers can only be rung for an incoming call through this relay,
+# so a deploy that leaves it unreachable or mis-authenticated must FAIL, not
+# report green. None of these tasks use ignore_errors.
+#
+# Expects (already in scope after a deploy with llamenos_ntfy_enabled: true):
+#   ntfy_domain          — public hostname Android devices subscribe through
+#   ntfy_auth_token      — the publish token provisioning minted (a fact set by
+#                          roles/llamenos-ntfy or roles/llamenos)
+#   llamenos_ntfy_local_port (optional) — loopback health port, default 2586
+#
+# The public checks are delegated to the Ansible control node, i.e. they hit
+# the relay from OUTSIDE the host over the real DNS name and TLS chain — the
+# same path a tester's phone takes.
+
+- name: ntfy — local health endpoint answers on the host
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:{{ llamenos_ntfy_local_port | default(2586) }}/v1/health"
+    method: GET
+    status_code: 200
+    return_content: true
+  register: ntfy_local_health
+  retries: 10
+  delay: 3
+  until: ntfy_local_health.status == 200
+
+- name: ntfy — public health endpoint reachable from outside the host (TLS + DNS)
+  ansible.builtin.uri:
+    url: "https://{{ ntfy_domain }}/v1/health"
+    method: GET
+    status_code: 200
+    return_content: true
+  delegate_to: localhost
+  become: false
+  register: ntfy_public_health
+  # First deploy: Caddy is still obtaining the certificate for ntfy_domain.
+  retries: 30
+  delay: 10
+  until: ntfy_public_health.status == 200
+
+- name: ntfy — public health reports healthy
+  ansible.builtin.assert:
+    that:
+      - ntfy_public_health.json.healthy | default(false) | bool
+    fail_msg: "https://{{ ntfy_domain }}/v1/health answered 200 but did not report healthy: {{ ntfy_public_health.content | default('') }}"
+    success_msg: "https://{{ ntfy_domain }}/v1/health -> 200 healthy"
+
+- name: ntfy — pick a throwaway verification topic
+  ansible.builtin.set_fact:
+    ntfy_check_topic: "llamenos-deploy-check-{{ lookup('ansible.builtin.password', '/dev/null length=24 chars=ascii_lowercase,digits') }}"
+  delegate_to: localhost
+  become: false
+
+- name: ntfy — anonymous publish must be rejected (deny-all default)
+  ansible.builtin.uri:
+    url: "https://{{ ntfy_domain }}/{{ ntfy_check_topic }}"
+    method: POST
+    body: "anonymous publish must never be delivered"
+    status_code: [401, 403]
+  delegate_to: localhost
+  become: false
+
+- name: ntfy — publish with the backend's NTFY_AUTH_TOKEN (proves the app credential matches ntfy's auth config)
+  ansible.builtin.uri:
+    url: "https://{{ ntfy_domain }}/{{ ntfy_check_topic }}"
+    method: POST
+    headers:
+      Authorization: "Bearer {{ ntfy_auth_token }}"
+    body: "llamenos deploy verification"
+    status_code: 200
+  delegate_to: localhost
+  become: false
+  no_log: true
+
+- name: ntfy — anonymous subscriber receives the published message (what an Android device does)
+  ansible.builtin.uri:
+    url: "https://{{ ntfy_domain }}/{{ ntfy_check_topic }}/json?poll=1&since=all"
+    method: GET
+    status_code: 200
+    return_content: true
+  delegate_to: localhost
+  become: false
+  register: ntfy_roundtrip
+
+- name: ntfy — the round trip delivered the message
+  ansible.builtin.assert:
+    that:
+      - "'llamenos deploy verification' in ntfy_roundtrip.content"
+    fail_msg: "Published to https://{{ ntfy_domain }}/{{ ntfy_check_topic }} but a subscriber did not receive it: {{ ntfy_roundtrip.content | default('') }}"
+    success_msg: "ntfy publish -> subscribe round trip OK via https://{{ ntfy_domain }}"

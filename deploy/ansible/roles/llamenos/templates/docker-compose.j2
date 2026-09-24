@@ -75,6 +75,22 @@ services:
       app:
         condition: service_healthy
 
+{% if llamenos_ntfy_enabled | default(false) | bool %}
+  # ntfy/UnifiedPush push relay — Android testers cannot be woken for an
+  # incoming call without it (issue #959). Service body is shared with
+  # roles/llamenos-ntfy so auth/ACL settings cannot drift between deploy
+  # paths. Provisioned (publish token + ACLs) by roles/llamenos/tasks/main.yml
+  # before the .env is rendered.
+  ntfy:
+{{ lookup('ansible.builtin.template', playbook_dir ~ '/../roles/llamenos-ntfy/templates/compose/_ntfy-service.j2') | indent(4, first=true) }}
+    ports:
+      # Loopback-only — local health check + `ntfy` CLI provisioning.
+      - "127.0.0.1:{{ llamenos_ntfy_local_port | default(2586) }}:80"
+    networks:
+      - web
+      - internal
+
+{% endif %}
   rustfs:
     image: {{ llamenos_rustfs_image | default('rustfs/rustfs:latest') }}
     command: server /data --console-address ":9001"
@@ -99,6 +115,9 @@ volumes:
   caddy-data:
   caddy-config:
   rustfs-data:
+{% if llamenos_ntfy_enabled | default(false) | bool %}
+  ntfy-data:
+{% endif %}
 
 networks:
   web:

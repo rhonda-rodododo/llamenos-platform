@@ -12,8 +12,10 @@
 #   1. desktop-updater — the canonical Tauri updater manifest resolves,
 #      and every platform binary it points at downloads and matches the
 #      published CHECKSUMS.txt.
-#   2. staging-backend — the staging backend's health probes are up and
-#      /api/config reports demoMode: true.
+#   2. staging-backend — the staging backend's health probes are up,
+#      /api/config reports demoMode: true, and the self-hosted ntfy push
+#      relay Android testers are rung through (UnifiedPush, no FCM) is
+#      reachable and reports healthy (#959).
 #   3. play-track — the Play Console internal track's live versionCode
 #      matches what the most recent mobile-release.yml run targeted for
 #      the most recent GitHub Release (recorded as android-build-meta.json
@@ -196,7 +198,7 @@ jobs:
 
   # ─── Surface 2: Staging backend ──────────────────────────────────
   staging-backend:
-    name: "Surface 2 — Staging backend health + demo mode"
+    name: "Surface 2 — Staging backend health + demo mode + ntfy push relay"
     runs-on: ubuntu-latest
     steps:
       - name: Start local fixture server (testing only)
@@ -213,6 +215,8 @@ jobs:
               def do_GET(self):
                   if self.path in ("/health/ready", "/health/live"):
                       body = json.dumps({"status": "ok"}).encode()
+                  elif self.path == "/v1/health":
+                      body = json.dumps({"healthy": True}).encode()
                   elif self.path == "/api/config":
                       body = json.dumps({"demoMode": True}).encode()
                   else:
@@ -276,6 +280,35 @@ jobs:
           if [ "$FAILED" != "0" ]; then
             exit 1
           fi
+
+      # Android push is UnifiedPush over a self-hosted ntfy relay — there is
+      # no FCM fallback. A staging backend whose relay is down or was never
+      # deployed is healthy-looking but can never wake a tester's phone for
+      # an incoming call, so this check is unconditional: an unset URL or an
+      # unreachable/unhealthy relay FAILS, it never skips (#959).
+      - name: Verify the ntfy push relay is reachable and healthy
+        env:
+          # The testing-only fixture server (staging_base_url = http://127.0.0.1...)
+          # also serves /v1/health, so the same override exercises this step.
+          STAGING_NTFY_URL: ${{ (startsWith(inputs.staging_base_url, 'http://127.0.0.1') && inputs.staging_base_url) || vars.STAGING_NTFY_URL }}
+        run: |
+          set -euo pipefail
+          if [ -z "${STAGING_NTFY_URL:-}" ]; then
+            echo "::error::SURFACE BROKEN: staging ntfy push relay — no relay URL is configured (vars.STAGING_NTFY_URL is unset); Android testers cannot be rung without it; refusing to report green without checking"
+            exit 1
+          fi
+          NTFY_BASE="${STAGING_NTFY_URL%/}"
+          CODE=$(curl -sS -o /tmp/ntfy-health.json --max-time 15 -w '%{http_code}' "${NTFY_BASE}/v1/health" || true)
+          if [ "$CODE" != "200" ]; then
+            echo "::error::SURFACE BROKEN: staging ntfy push relay — ${NTFY_BASE}/v1/health returned HTTP $CODE"
+            exit 1
+          fi
+          HEALTHY=$(jq -r '.healthy | tostring' /tmp/ntfy-health.json 2>/dev/null || echo "")
+          if [ "$HEALTHY" != "true" ]; then
+            echo "::error::SURFACE BROKEN: staging ntfy push relay — ${NTFY_BASE}/v1/health answered 200 but healthy is '${HEALTHY:-<missing>}', expected true"
+            exit 1
+          fi
+          echo "OK: ${NTFY_BASE}/v1/health -> 200 healthy=true"
 
   # ─── Surface 3: Play Console internal track ──────────────────────
   play-track:

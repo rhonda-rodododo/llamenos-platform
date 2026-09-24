@@ -2,32 +2,10 @@ name: llamenos-ntfy
 
 services:
   ntfy:
-    image: {{ llamenos_ntfy_image }}
-    command: serve
-    restart: unless-stopped
-    environment:
-      # Public URL Android's UnifiedPush client and the ntfy CLI use to build
-      # links — must match the Caddy vhost in roles/llamenos-caddy.
-      - NTFY_BASE_URL=https://{{ ntfy_domain }}
-      - NTFY_BEHIND_PROXY=true
-      # Deny-all default: nobody (including anonymous callers) gets any
-      # access to a topic unless explicitly granted below by `ntfy access`.
-      # This is what makes an unauthenticated `curl -d ... /sometopic`
-      # publish fail — see the role README's "Auth model" section.
-      - NTFY_AUTH_DEFAULT_ACCESS=deny-all
-      - NTFY_AUTH_FILE=/var/lib/ntfy/auth.db
-      # No self-service accounts and no login UI — the only account is the
-      # one this role provisions for the backend.
-      - NTFY_ENABLE_SIGNUP=false
-      - NTFY_ENABLE_LOGIN=false
-      # No browser topic UI. This is a private push relay for our own
-      # Android client and backend, not a public ntfy.sh-style instance.
-      - NTFY_WEB_ROOT=disable
-    volumes:
-      - ntfy-data:/var/lib/ntfy
+{{ lookup('ansible.builtin.template', playbook_dir ~ '/../roles/llamenos-ntfy/templates/compose/_ntfy-service.j2') | indent(4, first=true) }}
     ports:
       # Loopback-only — for the local health check and `ntfy` CLI
-      # provisioning tasks below. Public/Android traffic reaches this
+      # provisioning tasks. Public/Android traffic reaches this
       # container via Caddy on the llamenos-web network, never this port.
       - "127.0.0.1:{{ llamenos_ntfy_local_port }}:80"
     networks:
@@ -35,18 +13,6 @@ services:
       # llamenos-web: reachable by Caddy for the public ntfy_domain vhost
       - llamenos-internal
       - llamenos-web
-    healthcheck:
-      test: ["CMD", "wget", "-q", "--tries=1", "http://localhost:80/v1/health", "-O", "-"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 10s
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
-        tag: "llamenos-ntfy"
 
 volumes:
   ntfy-data:
