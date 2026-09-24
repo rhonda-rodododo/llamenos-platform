@@ -39,7 +39,16 @@ jobs:
 
     env:
       HAS_KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
-      HAS_PLAY_SERVICE_ACCOUNT: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON != '' }}
+      # The secret is named PLAY_SERVICE_ACCOUNT (verify-release-live.yml reads
+      # the same one). This used to say PLAY_SERVICE_ACCOUNT_JSON, which does
+      # not exist, so the Play upload was silently skipped on every run.
+      HAS_PLAY_SERVICE_ACCOUNT: ${{ secrets.PLAY_SERVICE_ACCOUNT != '' }}
+      # app/build.gradle.kts relocates the Gradle build dir to $RUNNER_TEMP on
+      # Linux (ecryptfs workaround for self-hosted dev boxes), which would put
+      # every output OUTSIDE apps/android/app/build/ — where the checksum,
+      # attestation, upload-artifact, fastlane and release-upload steps below
+      # all look. Pin it back so those paths are real.
+      ANDROID_BUILD_DIR: ${{ github.workspace }}/apps/android/app/build
 
     steps:
       - name: Checkout
@@ -72,7 +81,31 @@ jobs:
         run: |
           cd packages/crypto
           ./scripts/build-mobile.sh android
-          cp -r dist/android/jniLibs-release/* ../../apps/android/app/src/release/jniLibs/
+
+          # apps/android/app/src/release/jniLibs/ is gitignored, so it does not
+          # exist in a fresh checkout; `cp` does not create its destination.
+          # Only the RELEASE variant (production Argon2id, arm64-v8a +
+          # armeabi-v7a) may be installed here. The debug variant (test-kdf,
+          # x86_64) is deliberately never copied into a release build.
+          JNI_DEST=../../apps/android/app/src/release/jniLibs
+          mkdir -p "$JNI_DEST"
+          cp -r dist/android/jniLibs-release/* "$JNI_DEST/"
+
+          # Fail loudly if the tree is not exactly the two production ABIs.
+          for abi in arm64-v8a armeabi-v7a; do
+            test -s "$JNI_DEST/$abi/libllamenos_core.so" \
+              || { echo "::error::missing release libllamenos_core.so for $abi"; exit 1; }
+          done
+          UNEXPECTED=$(find "$JNI_DEST" -type f ! -path "*/arm64-v8a/libllamenos_core.so" ! -path "*/armeabi-v7a/libllamenos_core.so")
+          if [ -n "$UNEXPECTED" ]; then
+            echo "::error::unexpected files in release jniLibs (debug/test-kdf leak?): $UNEXPECTED"
+            exit 1
+          fi
+          # Defence in depth: a debug (test-kdf) build must never be present.
+          if [ -e ../../apps/android/app/src/debug/jniLibs ]; then
+            echo "::error::apps/android/app/src/debug/jniLibs exists in a release build"
+            exit 1
+          fi
 
       - name: Setup Bun (for codegen)
         uses: oven-sh/setup-bun@4bc047ad259df6fc24a6c9b0f9a0cb08cf17fbe5 # v2.0.2
@@ -97,8 +130,26 @@ jobs:
             echo "version=$(jq -r .version package.json)" >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Require signing credentials
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          # build.gradle.kts silently produces an UNSIGNED release when the
+          # credentials are absent. An unsigned APK is not installable, so a
+          # beta build without a keystore must fail here, not upload junk.
+          missing=0
+          for v in HAS_KEYSTORE KEYSTORE_PASSWORD KEY_ALIAS KEY_PASSWORD; do
+            val="${!v}"
+            if [ -z "$val" ] || [ "$val" = "false" ]; then
+              echo "::error::release signing credential missing: $v"
+              missing=1
+            fi
+          done
+          exit $missing
+
       - name: Decode keystore
-        if: env.HAS_KEYSTORE == 'true'
         env:
           KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
         run: echo "$KEYSTORE_BASE64" | base64 --decode > apps/android/release.keystore
@@ -135,14 +186,43 @@ jobs:
           KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: ./gradlew assembleRelease
 
+      - name: Verify release artifacts (signed, production native libs only)
+        run: |
+          OUT=apps/android/app/build/outputs
+          APK=$(find "$OUT/apk/release" -name "*.apk" | head -1)
+          AAB=$(find "$OUT/bundle/release" -name "*.aab" | head -1)
+          [ -n "$APK" ] || { echo "::error::no release APK produced under $OUT/apk/release"; exit 1; }
+          [ -n "$AAB" ] || { echo "::error::no release AAB produced under $OUT/bundle/release"; exit 1; }
+
+          # 1. Signed (an unsigned APK is not installable).
+          APKSIGNER=$(find "$ANDROID_HOME/build-tools" -name apksigner | sort -V | tail -1)
+          [ -n "$APKSIGNER" ] || { echo "::error::apksigner not found under $ANDROID_HOME/build-tools"; exit 1; }
+          "$APKSIGNER" verify --verbose --print-certs "$APK"
+
+          # 2. Native crypto present for exactly the production ABIs.
+          #    An APK without libllamenos_core.so builds fine but every crypto
+          #    call fails at runtime (CryptoService.nativeLibLoaded=false).
+          #    x86/x86_64 would mean the emulator test-kdf variant leaked in.
+          for f in "$APK" "$AAB"; do
+            LIBS=$(unzip -Z1 "$f" | grep -E '(^|/)lib/[^/]+/libllamenos_core\.so$' || true)
+            echo "native crypto libs in $f:"; echo "$LIBS"
+            for abi in arm64-v8a armeabi-v7a; do
+              echo "$LIBS" | grep -q "lib/$abi/libllamenos_core.so" \
+                || { echo "::error::$f is missing lib/$abi/libllamenos_core.so"; exit 1; }
+            done
+            if echo "$LIBS" | grep -Eq 'lib/(x86|x86_64)/'; then
+              echo "::error::$f contains an x86/x86_64 crypto lib — emulator/test-kdf variant leaked into a release build"
+              exit 1
+            fi
+          done
+
       - name: Generate APK checksum
         run: |
           APK=$(find apps/android/app/build/outputs/apk/release -name "*.apk" | head -1)
-          if [ -n "$APK" ]; then
-            sha256sum "$APK" > "${APK}.sha256"
-            echo "APK checksum:"
-            cat "${APK}.sha256"
-          fi
+          [ -n "$APK" ] || { echo "::error::no release APK to checksum"; exit 1; }
+          sha256sum "$APK" > "${APK}.sha256"
+          echo "APK checksum:"
+          cat "${APK}.sha256"
 
       - name: Generate SLSA build provenance for Android artifacts
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v2.1.0
@@ -162,24 +242,8 @@ jobs:
             apps/android/app/build/outputs/mapping/release/mapping.txt
           retention-days: 30
 
-      - name: Setup Ruby
-        if: env.HAS_PLAY_SERVICE_ACCOUNT == 'true'
-        uses: ruby/setup-ruby@95ef2b042f9d7a56d8268cba8559e2842e2ad01b
-        with:
-          ruby-version: '3.3'
-          bundler-cache: true
-          working-directory: apps/android
-
-      - name: Upload to Play Console internal track
-        if: env.HAS_PLAY_SERVICE_ACCOUNT == 'true'
-        working-directory: apps/android
-        env:
-          GOOGLE_PLAY_JSON_KEY: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
-        run: |
-          echo "$GOOGLE_PLAY_JSON_KEY" > /tmp/play-key.json
-          SUPPLY_JSON_KEY=/tmp/play-key.json bundle exec fastlane android internal
-          rm -f /tmp/play-key.json
-
+      # Runs BEFORE the Play upload so an installable APK is attached to the
+      # release even if the Play Console step fails (it fails loudly, after this).
       - name: Upload Android artifacts to GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -200,12 +264,13 @@ jobs:
           # Find the APK and checksum
           APK=$(find apps/android/app/build/outputs/apk/release -name "*.apk" | head -1)
           CHECKSUM=$(find apps/android/app/build/outputs/apk/release -name "*.sha256" | head -1)
-          if [ -n "$APK" ]; then
-            gh release upload "${TAG}" "$APK" --clobber
-            if [ -n "$CHECKSUM" ]; then
-              gh release upload "${TAG}" "$CHECKSUM" --clobber
-            fi
+          # A release with no installable artifact is a failed run, not a
+          # green one: the earlier verify step guarantees these exist.
+          if [ -z "$APK" ] || [ -z "$CHECKSUM" ]; then
+            echo "::error::release APK/checksum missing at upload time"
+            exit 1
           fi
+          gh release upload "${TAG}" "$APK" "$CHECKSUM" --clobber
 
           # Record which versionCode this run targeted for this release, so
           # verify-release-live.yml (#721) can compare it against whatever
@@ -215,6 +280,24 @@ jobs:
           jq -n --arg version "$VERSION" --argjson versionCode "$RUN_NUMBER" \
             '{version: $version, versionCode: $versionCode}' > android-build-meta.json
           gh release upload "${TAG}" android-build-meta.json --clobber
+
+      - name: Setup Ruby
+        if: env.HAS_PLAY_SERVICE_ACCOUNT == 'true'
+        uses: ruby/setup-ruby@95ef2b042f9d7a56d8268cba8559e2842e2ad01b
+        with:
+          ruby-version: '3.3'
+          bundler-cache: true
+          working-directory: apps/android
+
+      - name: Upload to Play Console internal track
+        if: env.HAS_PLAY_SERVICE_ACCOUNT == 'true'
+        working-directory: apps/android
+        env:
+          GOOGLE_PLAY_JSON_KEY: ${{ secrets.PLAY_SERVICE_ACCOUNT }}
+        run: |
+          echo "$GOOGLE_PLAY_JSON_KEY" > /tmp/play-key.json
+          SUPPLY_JSON_KEY=/tmp/play-key.json bundle exec fastlane android internal
+          rm -f /tmp/play-key.json
 
   # ─── iOS Release ──────────────────────────────────────────────
   build-ios:
