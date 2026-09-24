@@ -11,12 +11,49 @@ import { Hono } from 'hono'
 import { describeRoute, resolver, validator } from 'hono-openapi'
 import type { AppEnv } from '../types'
 import { authErrors } from '../openapi/helpers'
-import { registerDeviceBodySchema, voipTokenBodySchema, deviceDetailListResponseSchema, renameDeviceBodySchema, revokeDeviceBodySchema, verifyDeviceBodySchema, clearPushTokenBodySchema, renameDeviceResponseSchema, revokeDeviceResponseSchema, verifyDeviceResponseSchema } from '@protocol/schemas/devices'
+import { registerDeviceBodySchema, voipTokenBodySchema, pushEndpointRejectedResponseSchema, deviceDetailListResponseSchema, renameDeviceBodySchema, revokeDeviceBodySchema, verifyDeviceBodySchema, clearPushTokenBodySchema, renameDeviceResponseSchema, revokeDeviceResponseSchema, verifyDeviceResponseSchema } from '@protocol/schemas/devices'
 import { requirePermission } from '../middleware/permission-guard'
 import { rateLimit } from '../middleware/rate-limit'
-import { validateExternalUrl } from '../lib/ssrf-guard'
+import { resolveTrustedPushOrigins, expectedPushOrigin, isTrustedPushEndpoint, isUrlPushToken } from '../lib/push-endpoint-policy'
+import type { z } from 'zod'
+import type { Context } from 'hono'
 
 const devicesRoutes = new Hono<AppEnv>()
+
+type PushEndpointRejected = z.infer<typeof pushEndpointRejectedResponseSchema>
+
+/**
+ * #960: a URL-form push token is a UnifiedPush endpoint the server will later
+ * POST wake signals to. Accept it only when it sits on the operator's own ntfy
+ * relay origin; otherwise the wake signal (and its timing) would transit a third
+ * party — notably ntfy.sh, the ntfy app's default server.
+ *
+ * Opaque tokens (APNs) are never fetched by the server and pass through.
+ * With no relay configured no URL can be trusted, so URL tokens are refused
+ * rather than stored (fail closed).
+ *
+ * Returns the 422 response to send, or null when the token is acceptable. The
+ * rejected endpoint is never echoed or logged.
+ */
+function rejectUntrustedPushEndpoint(c: Context<AppEnv>, token: string | undefined): Response | null {
+  if (!token || !isUrlPushToken(token)) return null
+
+  const trustedOrigins = resolveTrustedPushOrigins(c.env)
+  if (isTrustedPushEndpoint(token, trustedOrigins)) return null
+
+  const body: PushEndpointRejected = trustedOrigins.length === 0
+    ? {
+        error: 'This hotline has no push relay configured',
+        code: 'PUSH_RELAY_NOT_CONFIGURED',
+        expectedOrigin: null,
+      }
+    : {
+        error: 'Push endpoint is not on this hotline\'s push relay',
+        code: 'PUSH_ENDPOINT_UNTRUSTED',
+        expectedOrigin: expectedPushOrigin(c.env),
+      }
+  return c.json(body, 422)
+}
 
 /**
  * GET /api/devices
@@ -80,6 +117,10 @@ devicesRoutes.post('/register',
     summary: 'Register or update device push token and crypto keys',
     responses: {
       204: { description: 'Device registered' },
+      422: {
+        description: 'UnifiedPush endpoint is not on this hotline\'s push relay (codes PUSH_ENDPOINT_UNTRUSTED, PUSH_RELAY_NOT_CONFIGURED)',
+        content: { 'application/json': { schema: resolver(pushEndpointRejectedResponseSchema) } },
+      },
       429: { description: 'Rate limit exceeded (5/hour)' },
       500: { description: 'Failed to register device' },
       ...authErrors,
@@ -92,15 +133,8 @@ devicesRoutes.post('/register',
     const body = c.req.valid('json')
     const services = c.get('services')
 
-    // B-M20: Validate pushToken URL at registration time to prevent SSRF via ntfy.
-    // Only URL-format tokens (UnifiedPush/ntfy) need SSRF validation —
-    // opaque tokens (APNs, FCM) are not URLs and are never fetched by the server.
-    if (body.pushToken && body.pushToken.includes('://')) {
-      const ssrfError = validateExternalUrl(body.pushToken, 'Push token URL')
-      if (ssrfError) {
-        return c.json({ error: ssrfError }, 400)
-      }
-    }
+    const rejected = rejectUntrustedPushEndpoint(c, body.pushToken)
+    if (rejected) return rejected
 
     await services.identity.registerDevice(pubkey, {
       platform: body.platform,
@@ -136,6 +170,10 @@ devicesRoutes.post('/voip-token',
     summary: 'Register VoIP push token',
     responses: {
       204: { description: 'VoIP token registered' },
+      422: {
+        description: 'UnifiedPush endpoint is not on this hotline\'s push relay (codes PUSH_ENDPOINT_UNTRUSTED, PUSH_RELAY_NOT_CONFIGURED)',
+        content: { 'application/json': { schema: resolver(pushEndpointRejectedResponseSchema) } },
+      },
       500: { description: 'Failed to register VoIP token' },
       ...authErrors,
     },
@@ -145,6 +183,10 @@ devicesRoutes.post('/voip-token',
     const pubkey = c.get('pubkey')
     const body = c.req.valid('json')
     const services = c.get('services')
+
+    // On Android the VoIP token is also a UnifiedPush endpoint — same policy.
+    const rejected = rejectUntrustedPushEndpoint(c, body.voipToken)
+    if (rejected) return rejected
 
     await services.identity.registerVoipToken(pubkey, {
       platform: body.platform,

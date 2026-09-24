@@ -16,10 +16,10 @@ vi.mock('@fivesheepco/cloudflare-apns2', () => ({
   Priority: { immediate: 10 },
 }))
 
+const mockNtfySend = vi.hoisted(() => vi.fn())
+
 vi.mock('@worker/lib/ntfy-client', () => ({
-  NtfyClient: vi.fn().mockImplementation(() => ({
-    send: vi.fn().mockResolvedValue(true),
-  })),
+  createNtfyClient: vi.fn(() => ({ send: mockNtfySend })),
 }))
 
 vi.mock('@worker/lib/logger', () => ({
@@ -38,10 +38,11 @@ import { dispatchVoipPushFromService } from '@worker/lib/voip-push'
 // ---------------------------------------------------------------------------
 
 const mockGetVoipTokens = vi.fn()
+const mockCleanupVoipTokens = vi.fn().mockResolvedValue({ removed: 1 })
 
-function makeIdentityService(devices: Array<{ platform: string; voipToken: string }> = []) {
-  mockGetVoipTokens.mockResolvedValue({ devices })
-  return { getVoipTokens: mockGetVoipTokens } as never
+function makeIdentityService(devices: Array<{ platform: string; voipToken: string; pubkey?: string }> = []) {
+  mockGetVoipTokens.mockResolvedValue({ devices: devices.map(d => ({ pubkey: 'pk-1', ...d })) })
+  return { getVoipTokens: mockGetVoipTokens, cleanupVoipTokens: mockCleanupVoipTokens } as never
 }
 
 function makeEnv(overrides: Partial<Env> = {}): Env {
@@ -59,7 +60,10 @@ function makeEnv(overrides: Partial<Env> = {}): Env {
 // ---------------------------------------------------------------------------
 
 describe('dispatchVoipPushFromService', () => {
-  beforeEach(() => vi.clearAllMocks())
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockNtfySend.mockResolvedValue(true)
+  })
 
   it('returns early for empty volunteer list', async () => {
     const identity = makeIdentityService()
@@ -146,5 +150,30 @@ describe('dispatchVoipPushFromService', () => {
         identity,
       ),
     ).resolves.toBeUndefined()
+  })
+
+  // #960 — NtfyClient refuses endpoints off the operator's relay (returns false).
+  // A VoIP token stored before registration-time validation must be dropped
+  // rather than retried on every incoming call.
+  it('drops an Android VoIP token the relay refuses, keeping the rest', async () => {
+    mockNtfySend.mockResolvedValueOnce(false).mockResolvedValueOnce(true)
+    const identity = makeIdentityService([
+      { platform: 'android', voipToken: 'off-origin-endpoint', pubkey: 'pk-1' },
+      { platform: 'android', voipToken: 'on-origin-endpoint', pubkey: 'pk-2' },
+    ])
+
+    await dispatchVoipPushFromService(['pk-1', 'pk-2'], 'call-1', 'Caller', 'hub-1', makeEnv(), identity)
+
+    expect(mockCleanupVoipTokens).toHaveBeenCalledTimes(1)
+    expect(mockCleanupVoipTokens).toHaveBeenCalledWith('pk-1', ['off-origin-endpoint'])
+  })
+
+  it('keeps the VoIP token on a transient send failure', async () => {
+    mockNtfySend.mockRejectedValueOnce(new Error('ECONNREFUSED'))
+    const identity = makeIdentityService([{ platform: 'android', voipToken: 'endpoint', pubkey: 'pk-1' }])
+
+    await dispatchVoipPushFromService(['pk-1'], 'call-1', 'Caller', 'hub-1', makeEnv(), identity)
+
+    expect(mockCleanupVoipTokens).not.toHaveBeenCalled()
   })
 })

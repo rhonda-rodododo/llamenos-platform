@@ -751,6 +751,25 @@ describe('IdentityService.getVoipTokens', () => {
   })
 })
 
+describe('IdentityService.cleanupVoipTokens', () => {
+  it('returns removed: 0 without touching the db for an empty token list', async () => {
+    const { db, service } = setup()
+
+    const result = await service.cleanupVoipTokens('pk-1', [])
+    expect(result.removed).toBe(0)
+    expect(db.update).not.toHaveBeenCalled()
+  })
+
+  it('nulls only the matching voip tokens and returns the count', async () => {
+    const { db, service } = setup()
+    db.$setUpdateResult([{ id: 'device-1' }])
+
+    const result = await service.cleanupVoipTokens('pk-1', ['refused-endpoint'])
+    expect(result.removed).toBe(1)
+    expect(db.update).toHaveBeenCalled()
+  })
+})
+
 describe('IdentityService.deleteVoipToken', () => {
   it('sets voipToken to null for all devices of a pubkey', async () => {
     const { db, service } = setup()

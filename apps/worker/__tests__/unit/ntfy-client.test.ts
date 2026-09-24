@@ -11,13 +11,15 @@ import { NtfyClient } from '@worker/lib/ntfy-client'
 const mockFetch = vi.fn()
 vi.stubGlobal('fetch', mockFetch)
 
+const mockLog = vi.hoisted(() => ({
+  debug: vi.fn(),
+  error: vi.fn(),
+  info: vi.fn(),
+  warn: vi.fn(),
+}))
+
 vi.mock('@worker/lib/logger', () => ({
-  createLogger: () => ({
-    debug: vi.fn(),
-    error: vi.fn(),
-    info: vi.fn(),
-    warn: vi.fn(),
-  }),
+  createLogger: () => mockLog,
 }))
 
 describe('NtfyClient', () => {
@@ -25,6 +27,7 @@ describe('NtfyClient', () => {
 
   beforeEach(() => {
     mockFetch.mockReset()
+    for (const fn of Object.values(mockLog)) fn.mockReset()
   })
 
   afterEach(() => {
@@ -65,18 +68,56 @@ describe('NtfyClient', () => {
     expect(opts.headers['Authorization']).toBe('Bearer my-secret-token')
   })
 
-  it('does not add auth header for external endpoints', async () => {
-    mockFetch.mockResolvedValue({ ok: true, status: 200 })
+  // #960 — the client is the last line of defence: it must never POST a wake
+  // signal to a host other than the operator's own relay, even for a row that
+  // was stored before registration-time validation existed.
+  describe('endpoint origin enforcement (#960)', () => {
+    const trusted = 'https://push.hotline.example.org'
 
-    const client = new NtfyClient(baseUrl, 'my-secret-token')
-    await client.send({
-      endpoint: 'https://external-ntfy.example.com/up-topic',
-      data: 'data',
-      priority: 'default',
+    it('refuses the public ntfy.sh server and never calls fetch', async () => {
+      const client = new NtfyClient(trusted, 'my-secret-token')
+      const result = await client.send({ endpoint: 'https://ntfy.sh/up-topic', data: 'data', priority: 'high' })
+
+      expect(result).toBe(false)
+      expect(mockFetch).not.toHaveBeenCalled()
     })
 
-    const [, opts] = mockFetch.mock.calls[0]
-    expect(opts.headers['Authorization']).toBeUndefined()
+    it.each([
+      ['look-alike suffix host', `${trusted}.evil.example/up-topic`],
+      ['userinfo trick', 'https://push.hotline.example.org@evil.example/up-topic'],
+      ['userinfo on trusted host', 'https://user:pw@push.hotline.example.org/up-topic'],
+      ['http downgrade', 'http://push.hotline.example.org/up-topic'],
+      ['different port', 'https://push.hotline.example.org:8443/up-topic'],
+      ['unparseable token', 'not-a-url'],
+      ['non-http scheme', 'ftp://push.hotline.example.org/up-topic'],
+    ])('refuses %s', async (_label, endpoint) => {
+      const client = new NtfyClient(trusted, 'my-secret-token')
+      expect(await client.send({ endpoint, data: 'data', priority: 'default' })).toBe(false)
+      expect(mockFetch).not.toHaveBeenCalled()
+    })
+
+    it('accepts the public origin when the internal baseUrl differs, and authenticates', async () => {
+      mockFetch.mockResolvedValue({ ok: true, status: 200 })
+      const client = new NtfyClient('http://ntfy:80', 'my-secret-token', trusted)
+
+      expect(await client.send({ endpoint: `${trusted}/up-topic`, data: 'data', priority: 'default' })).toBe(true)
+      expect(mockFetch.mock.calls[0][1].headers['Authorization']).toBe('Bearer my-secret-token')
+    })
+
+    it('normalises default ports when comparing origins', async () => {
+      mockFetch.mockResolvedValue({ ok: true, status: 200 })
+      const client = new NtfyClient(trusted)
+      expect(await client.send({ endpoint: `${trusted}:443/up-topic`, data: 'd', priority: 'default' })).toBe(true)
+    })
+
+    it('does not log the refused endpoint', async () => {
+      const client = new NtfyClient(trusted)
+      await client.send({ endpoint: 'https://ntfy.sh/up-secret-topic-xyz', data: 'd', priority: 'default' })
+
+      const logged = JSON.stringify(Object.values(mockLog).flatMap(fn => fn.mock.calls))
+      expect(logged).not.toContain('up-secret-topic-xyz')
+      expect(logged).not.toContain('ntfy.sh')
+    })
   })
 
   it('returns false on 404 (endpoint gone)', async () => {

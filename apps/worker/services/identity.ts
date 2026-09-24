@@ -1285,6 +1285,28 @@ export class IdentityService {
   }
 
   /**
+   * Clear specific VoIP push tokens (e.g. a UnifiedPush endpoint the relay
+   * refused as off-origin or reported gone). Leaves the device row and any other
+   * token untouched.
+   */
+  async cleanupVoipTokens(pubkey: string, tokens: string[]): Promise<{ removed: number }> {
+    if (tokens.length === 0) return { removed: 0 }
+
+    const cleared = await this.db
+      .update(devices)
+      .set({ voipToken: null })
+      .where(
+        and(
+          eq(devices.pubkey, pubkey),
+          inArray(devices.voipToken, tokens),
+        ),
+      )
+      .returning({ id: devices.id })
+
+    return { removed: cleared.length }
+  }
+
+  /**
    * Remove VoIP push token from all devices for a volunteer.
    */
   async deleteVoipToken(pubkey: string): Promise<void> {

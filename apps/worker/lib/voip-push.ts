@@ -14,7 +14,7 @@
 
 import type { Env } from '../types'
 import type { IdentityService } from '../services/identity'
-import { NtfyClient } from './ntfy-client'
+import { createNtfyClient } from './ntfy-client'
 import { createLogger } from './logger'
 import { getApnsVoipTopic } from './apns-topic'
 
@@ -48,7 +48,13 @@ export async function dispatchVoipPushFromService(
     if (device.platform === 'ios' && hasApns) {
       promises.push(sendApnsVoipPush(device.voipToken, callId, callerDisplay, hubId, env))
     } else if (device.platform === 'android' && hasNtfy) {
-      promises.push(sendNtfyVoipPush(device.voipToken, callId, hubId, env))
+      promises.push(
+        sendNtfyVoipPush(device.voipToken, callId, hubId, env).then(async (delivered) => {
+          // The relay refused the endpoint (off-origin — e.g. registered before #960 —
+          // or gone). Drop it so it is never tried again.
+          if (!delivered) await identityService.cleanupVoipTokens(device.pubkey, [device.voipToken])
+        }),
+      )
     }
   }
 
@@ -109,9 +115,10 @@ async function sendNtfyVoipPush(
   callId: string,
   hubId: string,
   env: Env,
-): Promise<void> {
+): Promise<boolean> {
   try {
-    const ntfyClient = new NtfyClient(env.NTFY_URL!, env.NTFY_AUTH_TOKEN)
+    const ntfyClient = createNtfyClient(env)
+    if (!ntfyClient) return true
 
     const payload = JSON.stringify({
       type: 'incoming_call',
@@ -119,12 +126,14 @@ async function sendNtfyVoipPush(
       'hub-id': hubId,
     })
 
-    await ntfyClient.send({
+    return await ntfyClient.send({
       endpoint: pushEndpoint,
       data: payload,
       priority: 'high',
     })
   } catch (err) {
-    logger.error(`ntfy VoIP push failed for ${pushEndpoint.slice(0, 40)}...`, { error: err })
+    // Transient failure — keep the token. The endpoint URL is identifying: never log it.
+    logger.error('ntfy VoIP push failed', { error: err })
+    return true
   }
 }

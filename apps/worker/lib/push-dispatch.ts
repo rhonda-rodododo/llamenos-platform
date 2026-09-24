@@ -13,7 +13,7 @@ import type { Env, DeviceRecord, WakePayload, FullPushPayload } from '../types'
 import type { IdentityService } from '../services/identity'
 import type { ShiftsService } from '../services/shifts'
 import { encryptWakePayload, encryptFullPayload } from './push-encryption'
-import { NtfyClient } from './ntfy-client'
+import { createNtfyClient, type NtfyClient } from './ntfy-client'
 import { getApnsBundleId } from './apns-topic'
 
 // ── Test Push Log (dev/test environments only) ────────────────────────────────
@@ -139,8 +139,8 @@ class ServicePushDispatcher implements PushDispatcher {
     private hasApns: boolean,
     private hasNtfy: boolean,
   ) {
-    if (hasNtfy && env.NTFY_URL) {
-      this.ntfyClient = new NtfyClient(env.NTFY_URL, env.NTFY_AUTH_TOKEN)
+    if (hasNtfy) {
+      this.ntfyClient = createNtfyClient(env)
     }
   }
 
@@ -243,6 +243,10 @@ class ServicePushDispatcher implements PushDispatcher {
    * The device's pushToken is the full UnifiedPush endpoint URL registered
    * during device setup (e.g. https://ntfy.example.com/up-topic-xxx).
    * ntfy sees only opaque ciphertext — zero plaintext metadata.
+   *
+   * NtfyClient refuses (returns false) any endpoint off the operator's relay
+   * origin (#960), so a token stored before registration-time validation is
+   * reported stale and dropped by sendToVolunteer's cleanup on this dispatch.
    */
   private async sendNtfy(
     pushEndpoint: string,

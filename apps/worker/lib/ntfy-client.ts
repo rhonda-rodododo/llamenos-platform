@@ -7,10 +7,14 @@
  *
  * No plaintext content ever reaches ntfy — only HPKE-encrypted wake signals.
  * The ntfy server sees only opaque binary data and the topic name.
+ *
+ * Even opaque wake signals leak timing metadata (this volunteer was woken, now)
+ * to whoever operates the relay, so this client only ever talks to the
+ * operator's own relay origin (#960) — see push-endpoint-policy.ts.
  */
 
 import { createLogger } from './logger'
-import { validateExternalUrl } from './ssrf-guard'
+import { resolveTrustedPushOrigins, isTrustedPushEndpoint, type PushRelayEnv } from './push-endpoint-policy'
 
 const logger = createLogger('ntfy')
 
@@ -26,11 +30,18 @@ export interface NtfySendOptions {
 export class NtfyClient {
   private baseUrl: string
   private authToken: string | undefined
+  private trustedOrigins: string[]
 
-  constructor(baseUrl: string, authToken?: string) {
+  /**
+   * @param baseUrl   relay address as the backend reaches it (NTFY_URL)
+   * @param authToken bearer token for the relay
+   * @param publicUrl origin devices register, when it differs from baseUrl (NTFY_PUBLIC_URL)
+   */
+  constructor(baseUrl: string, authToken?: string, publicUrl?: string) {
     // Strip trailing slash
     this.baseUrl = baseUrl.replace(/\/+$/, '')
     this.authToken = authToken
+    this.trustedOrigins = resolveTrustedPushOrigins({ NTFY_URL: baseUrl, NTFY_PUBLIC_URL: publicUrl })
   }
 
   /**
@@ -42,18 +53,15 @@ export class NtfyClient {
    * Returns true on success, false if the endpoint is invalid/expired (410/404).
    */
   async send(options: NtfySendOptions): Promise<boolean> {
-    // B-M20: Validate the endpoint URL against SSRF before making the request.
-    // pushToken URLs come from client device registration and could be attacker-controlled.
-    // Allow our own baseUrl (trusted ntfy instance) but block internal/private addresses otherwise.
-    const isOwnInstance = options.endpoint.startsWith(this.baseUrl)
-    if (!isOwnInstance) {
-      const ssrfError = validateExternalUrl(options.endpoint, 'Push endpoint')
-      if (ssrfError) {
-        logger.warn(`Blocked SSRF attempt via pushToken: ${ssrfError}`, {
-          endpoint: options.endpoint.slice(0, 60),
-        })
-        return false
-      }
+    // #960: pushToken URLs come from client device registration. Only deliver to
+    // the operator's own relay origin (exact parsed-origin match, not a prefix
+    // test). Anything else — the ntfy app's default ntfy.sh, an attacker-chosen
+    // host, an internal address — is refused. Returning false makes the
+    // dispatcher drop the stale token.
+    // The endpoint URL is itself identifying, so the refusal is logged WITHOUT it.
+    if (!isTrustedPushEndpoint(options.endpoint, this.trustedOrigins)) {
+      logger.warn('Refused push endpoint outside the configured ntfy origin')
+      return false
     }
 
     const headers: Record<string, string> = {
@@ -66,8 +74,8 @@ export class NtfyClient {
       headers['Priority'] = '5'
     }
 
-    // If the endpoint is on our own ntfy instance, add auth
-    if (this.authToken && isOwnInstance) {
+    // Every endpoint that reaches this point is on the operator's own relay
+    if (this.authToken) {
       headers['Authorization'] = `Bearer ${this.authToken}`
     }
 
@@ -84,7 +92,7 @@ export class NtfyClient {
 
       // 404 or 410 = endpoint no longer valid (device unregistered from ntfy)
       if (response.status === 404 || response.status === 410) {
-        logger.warn(`Endpoint gone (${response.status}): ${options.endpoint.slice(0, 40)}...`)
+        logger.warn(`Endpoint gone (${response.status})`)
         return false
       }
 
@@ -114,4 +122,10 @@ export class NtfyClient {
       priority,
     })
   }
+}
+
+/** Build the client from worker env; null when no relay is configured. */
+export function createNtfyClient(env: PushRelayEnv & { NTFY_AUTH_TOKEN?: string }): NtfyClient | null {
+  if (!env.NTFY_URL) return null
+  return new NtfyClient(env.NTFY_URL, env.NTFY_AUTH_TOKEN, env.NTFY_PUBLIC_URL)
 }

@@ -47,6 +47,30 @@ export const verifyDeviceBodySchema = z.object({
 
 // --- Response schemas ---
 
+/**
+ * Returned (HTTP 422) when POST /api/devices/register is given a UnifiedPush
+ * endpoint that the backend will not deliver wake signals to (#960).
+ *
+ * The backend only accepts endpoints on the operator's own ntfy relay: a push
+ * distributor left on its default public server (ntfy.sh) would otherwise learn
+ * that a specific volunteer is being woken, and when.
+ *
+ * - `PUSH_ENDPOINT_UNTRUSTED`     — endpoint is not on the configured relay origin.
+ *                                   `expectedOrigin` is the origin the client
+ *                                   should point its distributor at.
+ * - `PUSH_RELAY_NOT_CONFIGURED`   — this hotline runs no push relay, so no URL
+ *                                   endpoint can be accepted; `expectedOrigin` is null.
+ *
+ * The rejected endpoint is never echoed back (the URL is itself identifying).
+ * Clients render their own localised message (i18n key `pushSetup.endpointUntrusted`
+ * / `pushSetup.relayNotConfigured`) — `error` is a non-localised fallback only.
+ */
+export const pushEndpointRejectedResponseSchema = z.object({
+  error: z.string(),
+  code: z.enum(['PUSH_ENDPOINT_UNTRUSTED', 'PUSH_RELAY_NOT_CONFIGURED']),
+  expectedOrigin: z.string().nullable(),
+})
+
 export const deviceResponseSchema = z.object({
   id: z.string(),
   platform: z.string(),

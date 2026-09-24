@@ -145,6 +145,115 @@ describe('devices routes', () => {
     })
   })
 
+  // #960 — a UnifiedPush endpoint is fetched by the server with every wake
+  // signal. Off-origin endpoints (ntfy.sh is the ntfy app's default) would leak
+  // who is woken, and when, to a third party.
+  describe('POST /devices/register — UnifiedPush endpoint origin (#960)', () => {
+    const TRUSTED = 'https://push.hotline.example.org'
+
+    async function register(pushToken: string, env: Record<string, string | undefined>) {
+      const { app, services } = createApp()
+      const res = await app.request('/devices/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ platform: 'android', pushToken, wakeKeyPublic: 'wake-pk' }),
+      }, env)
+      return { res, services, body: res.status === 204 ? null : await res.json() }
+    }
+
+    it('accepts an endpoint on the configured origin', async () => {
+      const { res, services } = await register(`${TRUSTED}/up-abc123`, { NTFY_URL: TRUSTED })
+      expect(res.status).toBe(204)
+      expect(services.identity.registerDevice).toHaveBeenCalledOnce()
+    })
+
+    it('accepts an endpoint on NTFY_PUBLIC_URL when NTFY_URL is the internal address', async () => {
+      const { res } = await register(`${TRUSTED}/up-abc123`, {
+        NTFY_URL: 'http://ntfy:80',
+        NTFY_PUBLIC_URL: TRUSTED,
+      })
+      expect(res.status).toBe(204)
+    })
+
+    it('rejects the public ntfy.sh default with a stable code and stores nothing', async () => {
+      const { res, body, services } = await register('https://ntfy.sh/up-abc123', { NTFY_URL: TRUSTED })
+      expect(res.status).toBe(422)
+      expect(body.code).toBe('PUSH_ENDPOINT_UNTRUSTED')
+      expect(body.expectedOrigin).toBe(TRUSTED)
+      expect(services.identity.registerDevice).not.toHaveBeenCalled()
+    })
+
+    it.each([
+      ['look-alike suffix host (prefix match would accept)', `${TRUSTED}.evil.example/up-abc`],
+      ['userinfo trick (host is evil.example)', 'https://push.hotline.example.org@evil.example/up-abc'],
+      ['userinfo on the trusted host', 'https://user:pw@push.hotline.example.org/up-abc'],
+      ['http downgrade', 'http://push.hotline.example.org/up-abc'],
+      ['different port', 'https://push.hotline.example.org:8443/up-abc'],
+      ['sibling subdomain', 'https://evil.push.hotline.example.org/up-abc'],
+      ['scheme without slashes', 'https:evil.example/up-abc'],
+    ])('rejects %s', async (_label, token) => {
+      const { res, body, services } = await register(token, { NTFY_URL: TRUSTED })
+      expect(res.status).toBe(422)
+      expect(body.code).toBe('PUSH_ENDPOINT_UNTRUSTED')
+      expect(services.identity.registerDevice).not.toHaveBeenCalled()
+    })
+
+    it('fails closed when no relay is configured: URL endpoints are rejected', async () => {
+      const { res, body, services } = await register('https://ntfy.sh/up-abc123', {})
+      expect(res.status).toBe(422)
+      expect(body.code).toBe('PUSH_RELAY_NOT_CONFIGURED')
+      expect(services.identity.registerDevice).not.toHaveBeenCalled()
+    })
+
+    it('still accepts opaque (non-URL) tokens such as APNs tokens when no relay is configured', async () => {
+      const { res } = await register('a1b2c3d4e5f6', {})
+      expect(res.status).toBe(204)
+    })
+
+    it('never echoes the offending endpoint in the response', async () => {
+      const { body } = await register('https://ntfy.sh/up-secret-topic-xyz', { NTFY_URL: TRUSTED })
+      expect(JSON.stringify(body)).not.toContain('up-secret-topic-xyz')
+    })
+  })
+
+  describe('POST /devices/voip-token — UnifiedPush endpoint origin (#960)', () => {
+    const TRUSTED = 'https://push.hotline.example.org'
+
+    async function registerVoip(voipToken: string, env: Record<string, string | undefined>, platform = 'android') {
+      const { app, services } = createApp()
+      const res = await app.request('/devices/voip-token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ platform, voipToken }),
+      }, env)
+      return { res, services, body: res.status === 204 ? null : await res.json() }
+    }
+
+    it('accepts an Android VoIP endpoint on the configured origin', async () => {
+      const { res, services } = await registerVoip(`${TRUSTED}/up-voip`, { NTFY_URL: TRUSTED })
+      expect(res.status).toBe(204)
+      expect(services.identity.registerVoipToken).toHaveBeenCalledOnce()
+    })
+
+    it('rejects an Android VoIP endpoint on ntfy.sh', async () => {
+      const { res, body, services } = await registerVoip('https://ntfy.sh/up-voip', { NTFY_URL: TRUSTED })
+      expect(res.status).toBe(422)
+      expect(body.code).toBe('PUSH_ENDPOINT_UNTRUSTED')
+      expect(services.identity.registerVoipToken).not.toHaveBeenCalled()
+    })
+
+    it('rejects a look-alike host', async () => {
+      const { res, services } = await registerVoip(`${TRUSTED}.evil.example/up-voip`, { NTFY_URL: TRUSTED })
+      expect(res.status).toBe(422)
+      expect(services.identity.registerVoipToken).not.toHaveBeenCalled()
+    })
+
+    it('still accepts an opaque PushKit token', async () => {
+      const { res } = await registerVoip('ab12cd34ef56', {}, 'ios')
+      expect(res.status).toBe(204)
+    })
+  })
+
   describe('DELETE /devices/:id', () => {
     it('deletes a device', async () => {
       const { app, services } = createApp()

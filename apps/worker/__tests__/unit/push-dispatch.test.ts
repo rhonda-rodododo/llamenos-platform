@@ -23,7 +23,7 @@ vi.mock('@worker/lib/ntfy-client', () => {
   const NtfyClient = vi.fn()
   NtfyClient.prototype.send = vi.fn().mockResolvedValue(true)
   NtfyClient.prototype.publishToTopic = vi.fn().mockResolvedValue(true)
-  return { NtfyClient }
+  return { NtfyClient, createNtfyClient: vi.fn(() => new NtfyClient()) }
 })
 
 // ---------------------------------------------------------------------------

@@ -101,7 +101,8 @@ export interface Env {
                              // must match PRODUCT_BUNDLE_IDENTIFIER in apps/ios/project.yml.
 
   // Push notifications (Epic 86) — ntfy/UnifiedPush (Android)
-  NTFY_URL?: string           // Self-hosted ntfy instance URL (e.g. http://ntfy:80)
+  NTFY_URL?: string           // Self-hosted ntfy instance URL as the backend reaches it (e.g. http://ntfy:80)
+  NTFY_PUBLIC_URL?: string    // Origin devices register when it differs from NTFY_URL (e.g. https://push.example.org). UnifiedPush endpoints outside NTFY_URL/NTFY_PUBLIC_URL origins are rejected (#960)
   NTFY_AUTH_TOKEN?: string    // Bearer token for ntfy authentication
 
   // Connection manager for WebSocket relay (initialized in server bootstrap)
