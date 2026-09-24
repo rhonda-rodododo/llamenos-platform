@@ -10,7 +10,7 @@
  */
 
 import { createLogger } from './logger'
-import { validateExternalUrl } from './ssrf-guard'
+import { buildNtfyOriginPolicy, classifyNtfyEndpoint, type NtfyOriginPolicy } from './ntfy-origin'
 
 const logger = createLogger('ntfy')
 
@@ -26,11 +26,17 @@ export interface NtfySendOptions {
 export class NtfyClient {
   private baseUrl: string
   private authToken: string | undefined
+  private policy: NtfyOriginPolicy
 
-  constructor(baseUrl: string, authToken?: string) {
+  /**
+   * @param policy Trusted endpoint origins. Defaults to the origin of `baseUrl` only;
+   *   pass the env-derived policy to also trust NTFY_PUBLIC_URL / NTFY_ALLOWED_ORIGINS.
+   */
+  constructor(baseUrl: string, authToken?: string, policy?: NtfyOriginPolicy) {
     // Strip trailing slash
     this.baseUrl = baseUrl.replace(/\/+$/, '')
     this.authToken = authToken
+    this.policy = policy ?? buildNtfyOriginPolicy({ baseUrl: this.baseUrl })
   }
 
   /**
@@ -42,18 +48,14 @@ export class NtfyClient {
    * Returns true on success, false if the endpoint is invalid/expired (410/404).
    */
   async send(options: NtfySendOptions): Promise<boolean> {
-    // B-M20: Validate the endpoint URL against SSRF before making the request.
-    // pushToken URLs come from client device registration and could be attacker-controlled.
-    // Allow our own baseUrl (trusted ntfy instance) but block internal/private addresses otherwise.
-    const isOwnInstance = options.endpoint.startsWith(this.baseUrl)
-    if (!isOwnInstance) {
-      const ssrfError = validateExternalUrl(options.endpoint, 'Push endpoint')
-      if (ssrfError) {
-        logger.warn(`Blocked SSRF attempt via pushToken: ${ssrfError}`, {
-          endpoint: options.endpoint.slice(0, 60),
-        })
-        return false
-      }
+    // #960: only deliver to endpoints on an operator-configured origin. Rows registered
+    // before the registration check existed (or via a since-changed config) are refused
+    // here; returning false makes the dispatcher drop the stale token. The endpoint is
+    // deliberately not logged — its topic path is a per-device identifier.
+    const verdict = classifyNtfyEndpoint(options.endpoint, this.policy)
+    if (verdict === 'rejected') {
+      logger.warn('Refused push to UnifiedPush endpoint outside the configured ntfy origin')
+      return false
     }
 
     const headers: Record<string, string> = {
@@ -66,8 +68,8 @@ export class NtfyClient {
       headers['Priority'] = '5'
     }
 
-    // If the endpoint is on our own ntfy instance, add auth
-    if (this.authToken && isOwnInstance) {
+    // Bearer token only goes to our own broker, never to an additional approved relay
+    if (this.authToken && verdict === 'own') {
       headers['Authorization'] = `Bearer ${this.authToken}`
     }
 
@@ -84,7 +86,7 @@ export class NtfyClient {
 
       // 404 or 410 = endpoint no longer valid (device unregistered from ntfy)
       if (response.status === 404 || response.status === 410) {
-        logger.warn(`Endpoint gone (${response.status}): ${options.endpoint.slice(0, 40)}...`)
+        logger.warn(`Endpoint gone (${response.status})`)
         return false
       }
 

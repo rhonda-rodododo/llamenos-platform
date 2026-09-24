@@ -14,9 +14,33 @@ import { authErrors } from '../openapi/helpers'
 import { registerDeviceBodySchema, voipTokenBodySchema, deviceDetailListResponseSchema, renameDeviceBodySchema, revokeDeviceBodySchema, verifyDeviceBodySchema, clearPushTokenBodySchema, renameDeviceResponseSchema, revokeDeviceResponseSchema, verifyDeviceResponseSchema } from '@protocol/schemas/devices'
 import { requirePermission } from '../middleware/permission-guard'
 import { rateLimit } from '../middleware/rate-limit'
-import { validateExternalUrl } from '../lib/ssrf-guard'
+import { classifyNtfyEndpoint, configuredOrigin, ntfyOriginPolicyFromEnv } from '../lib/ntfy-origin'
+import type { Env } from '../types'
 
 const devicesRoutes = new Hono<AppEnv>()
+
+/**
+ * #960: a UnifiedPush endpoint is later POSTed wake signals by the server. Accept it only
+ * on an origin the operator configured (NTFY_URL / NTFY_PUBLIC_URL / NTFY_ALLOWED_ORIGINS),
+ * otherwise a default ntfy install (public ntfy.sh) would leak who is woken, when and how often.
+ * Returns an ErrorResponse (packages/protocol common.ts) or null when the endpoint is trusted.
+ */
+function pushEndpointRejection(env: Env, endpoint: string): { error: string; code: string } | null {
+  const policy = ntfyOriginPolicyFromEnv(env)
+  if (policy.own.length === 0) {
+    return {
+      error: 'This hotline has no push relay configured, so Android push endpoints are not accepted',
+      code: 'PUSH_RELAY_NOT_CONFIGURED',
+    }
+  }
+  if (classifyNtfyEndpoint(endpoint, policy) !== 'rejected') return null
+  // Point the user at the hotline's own relay: prefer the device-facing URL over the internal one.
+  const relay = configuredOrigin(env.NTFY_PUBLIC_URL) ?? policy.own[0]
+  return {
+    error: `Your push distributor points at a server this hotline does not trust. Set its server to ${relay}`,
+    code: 'PUSH_ENDPOINT_NOT_TRUSTED',
+  }
+}
 
 /**
  * GET /api/devices
@@ -83,6 +107,7 @@ devicesRoutes.post('/register',
       429: { description: 'Rate limit exceeded (5/hour)' },
       500: { description: 'Failed to register device' },
       ...authErrors,
+      400: { description: 'Invalid body, or push endpoint rejected (PUSH_ENDPOINT_NOT_TRUSTED: off the configured ntfy origin; PUSH_RELAY_NOT_CONFIGURED: no ntfy broker configured)' },
     },
   }),
   validator('json', registerDeviceBodySchema),
@@ -92,14 +117,11 @@ devicesRoutes.post('/register',
     const body = c.req.valid('json')
     const services = c.get('services')
 
-    // B-M20: Validate pushToken URL at registration time to prevent SSRF via ntfy.
-    // Only URL-format tokens (UnifiedPush/ntfy) need SSRF validation —
-    // opaque tokens (APNs, FCM) are not URLs and are never fetched by the server.
-    if (body.pushToken && body.pushToken.includes('://')) {
-      const ssrfError = validateExternalUrl(body.pushToken, 'Push token URL')
-      if (ssrfError) {
-        return c.json({ error: ssrfError }, 400)
-      }
+    // Only URL-format tokens (UnifiedPush endpoints) are fetched by the server —
+    // opaque tokens (APNs, FCM) are not URLs and never leave the vendor APIs.
+    if (body.pushToken.includes('://')) {
+      const rejection = pushEndpointRejection(c.env, body.pushToken)
+      if (rejection) return c.json(rejection, 400)
     }
 
     await services.identity.registerDevice(pubkey, {
@@ -138,6 +160,7 @@ devicesRoutes.post('/voip-token',
       204: { description: 'VoIP token registered' },
       500: { description: 'Failed to register VoIP token' },
       ...authErrors,
+      400: { description: 'Invalid body, or push endpoint rejected (PUSH_ENDPOINT_NOT_TRUSTED / PUSH_RELAY_NOT_CONFIGURED)' },
     },
   }),
   validator('json', voipTokenBodySchema),
@@ -145,6 +168,11 @@ devicesRoutes.post('/voip-token',
     const pubkey = c.get('pubkey')
     const body = c.req.valid('json')
     const services = c.get('services')
+
+    if (body.voipToken.includes('://')) {
+      const rejection = pushEndpointRejection(c.env, body.voipToken)
+      if (rejection) return c.json(rejection, 400)
+    }
 
     await services.identity.registerVoipToken(pubkey, {
       platform: body.platform,

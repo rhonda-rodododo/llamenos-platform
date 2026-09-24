@@ -133,7 +133,7 @@ export function validateConfig(env: ConfigInput = process.env): void {
   // --- Optional vars (warn when absent, do not fail) ---
   warnIfAbsent(env, 'WEBHOOK_BASE_URL', 'webhook signature validation uses request Host header (vulnerable to Host header spoofing — set WEBHOOK_BASE_URL in production)')
   // WebSocket relay is in-process — no external relay URL needed
-  warnIfAbsent(env, 'NTFY_URL', 'Android push notifications disabled (ntfy/UnifiedPush)')
+  warnIfAbsent(env, 'NTFY_URL', 'Android push notifications disabled (ntfy/UnifiedPush); also set NTFY_PUBLIC_URL when NTFY_URL is an internal address — device endpoints are only accepted on configured origins')
   warnIfAbsent(env, 'APNS_KEY_P8', 'iOS push notifications disabled')
   warnIfAbsent(env, 'APNS_KEY_ID', 'iOS push notifications disabled')
   warnIfAbsent(env, 'APNS_TEAM_ID', 'iOS push notifications disabled')

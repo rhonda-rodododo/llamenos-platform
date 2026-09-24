@@ -6,6 +6,7 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { NtfyClient } from '@worker/lib/ntfy-client'
+import { buildNtfyOriginPolicy } from '@worker/lib/ntfy-origin'
 
 // Mock global fetch
 const mockFetch = vi.fn()
@@ -65,18 +66,36 @@ describe('NtfyClient', () => {
     expect(opts.headers['Authorization']).toBe('Bearer my-secret-token')
   })
 
-  it('does not add auth header for external endpoints', async () => {
-    mockFetch.mockResolvedValue({ ok: true, status: 200 })
-
+  it('refuses endpoints outside the configured origin without fetching (#960)', async () => {
     const client = new NtfyClient(baseUrl, 'my-secret-token')
-    await client.send({
-      endpoint: 'https://external-ntfy.example.com/up-topic',
-      data: 'data',
-      priority: 'default',
-    })
+    for (const endpoint of [
+      'https://ntfy.sh/up-topic',
+      'https://external-ntfy.example.com/up-topic',
+      'http://ntfy:80.evil.tld/up-topic',
+      'http://ntfy@evil.tld/up-topic',
+      'http://ntfy:8080/up-topic',
+      'https://ntfy:80/up-topic',
+      'not a url',
+    ]) {
+      expect(await client.send({ endpoint, data: 'data', priority: 'high' })).toBe(false)
+    }
+    expect(mockFetch).not.toHaveBeenCalled()
+  })
 
-    const [, opts] = mockFetch.mock.calls[0]
-    expect(opts.headers['Authorization']).toBeUndefined()
+  it('accepts the public origin and sends auth; additional relays get no auth', async () => {
+    mockFetch.mockResolvedValue({ ok: true, status: 200 })
+    const policy = buildNtfyOriginPolicy({
+      baseUrl,
+      publicUrl: 'https://push.example.org',
+      allowedOrigins: 'https://relay.example.net',
+    })
+    const client = new NtfyClient(baseUrl, 'my-secret-token', policy)
+
+    await client.send({ endpoint: 'https://push.example.org/up-abc', data: 'd', priority: 'high' })
+    await client.send({ endpoint: 'https://relay.example.net/up-abc', data: 'd', priority: 'high' })
+
+    expect(mockFetch.mock.calls[0][1].headers['Authorization']).toBe('Bearer my-secret-token')
+    expect(mockFetch.mock.calls[1][1].headers['Authorization']).toBeUndefined()
   })
 
   it('returns false on 404 (endpoint gone)', async () => {

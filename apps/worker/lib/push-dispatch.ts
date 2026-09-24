@@ -14,6 +14,7 @@ import type { IdentityService } from '../services/identity'
 import type { ShiftsService } from '../services/shifts'
 import { encryptWakePayload, encryptFullPayload } from './push-encryption'
 import { NtfyClient } from './ntfy-client'
+import { ntfyOriginPolicyFromEnv } from './ntfy-origin'
 import { getApnsBundleId } from './apns-topic'
 
 // ── Test Push Log (dev/test environments only) ────────────────────────────────
@@ -140,7 +141,7 @@ class ServicePushDispatcher implements PushDispatcher {
     private hasNtfy: boolean,
   ) {
     if (hasNtfy && env.NTFY_URL) {
-      this.ntfyClient = new NtfyClient(env.NTFY_URL, env.NTFY_AUTH_TOKEN)
+      this.ntfyClient = new NtfyClient(env.NTFY_URL, env.NTFY_AUTH_TOKEN, ntfyOriginPolicyFromEnv(env))
     }
   }
 

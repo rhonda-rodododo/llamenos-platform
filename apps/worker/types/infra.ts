@@ -103,6 +103,8 @@ export interface Env {
   // Push notifications (Epic 86) — ntfy/UnifiedPush (Android)
   NTFY_URL?: string           // Self-hosted ntfy instance URL (e.g. http://ntfy:80)
   NTFY_AUTH_TOKEN?: string    // Bearer token for ntfy authentication
+  NTFY_PUBLIC_URL?: string    // Device-facing URL of the same broker (e.g. https://push.example.org) when NTFY_URL is an internal address
+  NTFY_ALLOWED_ORIGINS?: string // Comma-separated extra operator-approved UnifiedPush relay origins (never sent NTFY_AUTH_TOKEN)
 
   // Connection manager for WebSocket relay (initialized in server bootstrap)
   WS_MANAGER?: import('../lib/ws-manager').ConnectionManager
