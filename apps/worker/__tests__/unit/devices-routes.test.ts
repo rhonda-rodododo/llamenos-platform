@@ -145,6 +145,75 @@ describe('devices routes', () => {
     })
   })
 
+  describe('POST /devices/register — UnifiedPush endpoint origin (#960)', () => {
+    const NTFY_ENV = { NTFY_URL: 'https://ntfy.example.com' }
+
+    async function register(pushToken: string, env: Record<string, string> = NTFY_ENV) {
+      const { app, services } = createApp()
+      const res = await app.request('/devices/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ platform: 'android', pushToken, wakeKeyPublic: 'a'.repeat(64) }),
+      }, env)
+      return { res, services }
+    }
+
+    it('accepts an endpoint on the exact configured origin', async () => {
+      const { res, services } = await register('https://ntfy.example.com/up-abc123')
+      expect(res.status).toBe(204)
+      expect(services.identity.registerDevice).toHaveBeenCalled()
+    })
+
+    it('accepts the device-facing NTFY_PUBLIC_URL origin when NTFY_URL is internal', async () => {
+      const { res } = await register('https://push.example.org/up-abc', {
+        NTFY_URL: 'http://ntfy:80',
+        NTFY_PUBLIC_URL: 'https://push.example.org',
+      })
+      expect(res.status).toBe(204)
+    })
+
+    it.each([
+      ['public ntfy.sh default', 'https://ntfy.sh/up-abc'],
+      ['look-alike host', 'https://ntfy.example.com.evil.tld/up-abc'],
+      ['userinfo trick', 'https://ntfy.example.com@evil.tld/up-abc'],
+      ['userinfo on the trusted host', 'https://user:pw@ntfy.example.com/up-abc'],
+      ['http vs https', 'http://ntfy.example.com/up-abc'],
+      ['different port', 'https://ntfy.example.com:8443/up-abc'],
+      ['non-http scheme', 'ftp://ntfy.example.com/up-abc'],
+    ])('rejects %s with PUSH_ENDPOINT_NOT_TRUSTED', async (_name, endpoint) => {
+      const { res, services } = await register(endpoint)
+      expect(res.status).toBe(400)
+      const body = await res.json()
+      expect(body.code).toBe('PUSH_ENDPOINT_NOT_TRUSTED')
+      expect(body.error).toContain('https://ntfy.example.com')
+      expect(services.identity.registerDevice).not.toHaveBeenCalled()
+    })
+
+    it('fails closed with PUSH_RELAY_NOT_CONFIGURED when NTFY_URL is unset', async () => {
+      const { res, services } = await register('https://ntfy.example.com/up-abc', {})
+      expect(res.status).toBe(400)
+      expect((await res.json()).code).toBe('PUSH_RELAY_NOT_CONFIGURED')
+      expect(services.identity.registerDevice).not.toHaveBeenCalled()
+    })
+
+    it('still accepts opaque (non-URL) tokens', async () => {
+      const { res } = await register('opaque-apns-token', {})
+      expect(res.status).toBe(204)
+    })
+
+    it('applies the same policy to POST /devices/voip-token', async () => {
+      const { app, services } = createApp()
+      const res = await app.request('/devices/voip-token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ platform: 'android', voipToken: 'https://ntfy.sh/up-abc' }),
+      }, NTFY_ENV)
+      expect(res.status).toBe(400)
+      expect((await res.json()).code).toBe('PUSH_ENDPOINT_NOT_TRUSTED')
+      expect(services.identity.registerVoipToken).not.toHaveBeenCalled()
+    })
+  })
+
   describe('DELETE /devices/:id', () => {
     it('deletes a device', async () => {
       const { app, services } = createApp()

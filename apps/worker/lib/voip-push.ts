@@ -15,6 +15,7 @@
 import type { Env } from '../types'
 import type { IdentityService } from '../services/identity'
 import { NtfyClient } from './ntfy-client'
+import { ntfyOriginPolicyFromEnv } from './ntfy-origin'
 import { createLogger } from './logger'
 import { getApnsVoipTopic } from './apns-topic'
 
@@ -111,7 +112,7 @@ async function sendNtfyVoipPush(
   env: Env,
 ): Promise<void> {
   try {
-    const ntfyClient = new NtfyClient(env.NTFY_URL!, env.NTFY_AUTH_TOKEN)
+    const ntfyClient = new NtfyClient(env.NTFY_URL!, env.NTFY_AUTH_TOKEN, ntfyOriginPolicyFromEnv(env))
 
     const payload = JSON.stringify({
       type: 'incoming_call',
@@ -125,6 +126,6 @@ async function sendNtfyVoipPush(
       priority: 'high',
     })
   } catch (err) {
-    logger.error(`ntfy VoIP push failed for ${pushEndpoint.slice(0, 40)}...`, { error: err })
+    logger.error('ntfy VoIP push failed', { error: err })
   }
 }
