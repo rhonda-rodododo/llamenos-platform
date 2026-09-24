@@ -27,7 +27,7 @@ if (!import.meta.env.PLAYWRIGHT_TEST) {
 //
 // Set to null/undefined for "no update available".
 
-interface MockUpdateConfig {
+export interface MockUpdateConfig {
   version: string
   body?: string
   date?: string
@@ -96,7 +96,7 @@ export async function check(): Promise<Update | null> {
       onProgress?.({ event: 'Finished' })
     },
 
-    async download(onProgress) {
+    async download(this: Update, onProgress) {
       await this.downloadAndInstall(onProgress)
     },
 

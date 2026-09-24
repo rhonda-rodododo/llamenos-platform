@@ -26,7 +26,73 @@ if (import.meta.env.PLAYWRIGHT_TEST) {
 
 // ── Tauri IPC wrapper (desktop only) ─────────────────────────────────
 
-async function tauriInvoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
+/**
+ * Every `#[tauri::command]` registered in `apps/desktop/src/lib.rs`'s
+ * `generate_handler![...]` list, by exact (snake_case) command name.
+ *
+ * This is the single TS-side source of truth for the IPC surface. Typing
+ * `tauriInvoke`'s `cmd` param against it means a command rename on the Rust
+ * side that isn't mirrored here fails typecheck at the call site instead of
+ * surfacing as a runtime "Unknown Tauri command" — and the same type is
+ * imported by `tests/mocks/tauri-core.ts` to keep its dispatch table
+ * exhaustive against this list (missing or stale mock entries fail to
+ * compile rather than silently mocking the wrong thing).
+ *
+ * Keep in sync with `apps/desktop/src/lib.rs`'s `generate_handler![...]`.
+ */
+export type TauriIpcCommand =
+  | 'device_generate_and_load'
+  | 'unlock_with_pin'
+  | 'lock_crypto'
+  | 'is_crypto_unlocked'
+  | 'get_device_pubkeys'
+  | 'create_auth_token_from_state'
+  | 'ed25519_sign_from_state'
+  | 'ed25519_verify'
+  | 'hpke_seal'
+  | 'hpke_open_from_state'
+  | 'hpke_seal_key'
+  | 'hpke_open_key_from_state'
+  | 'puk_create_from_state'
+  | 'puk_rotate_from_state'
+  | 'puk_unwrap_seed_from_state'
+  | 'sigchain_create_link_from_state'
+  | 'sigchain_verify'
+  | 'sigchain_verify_link'
+  | 'sframe_derive_key'
+  | 'hpke_unwrap_and_set_hub_key'
+  | 'generate_hub_key_in_state'
+  | 'wrap_hub_key_for_member'
+  | 'set_server_event_keys'
+  | 'decrypt_hub_event'
+  | 'decrypt_server_event'
+  | 'encrypt_hub_field'
+  | 'decrypt_hub_field'
+  | 'derive_sas'
+  | 'shamir_commit'
+  | 'shamir_verify'
+  | 'recovery_group_create'
+  | 'recovery_group_reconstruct_from_shares'
+  | 'recovery_group_decrypt'
+  | 'device_import_and_load'
+  | 'generate_ephemeral_ed25519'
+  | 'generate_backup_from_state'
+  | 'wipe_keys'
+  | 'provision_encrypt_for_device'
+  | 'provision_create_session'
+  | 'provision_compute_sas'
+  | 'provision_decrypt_and_import'
+  | 'api_config_get'
+  | 'api_config_set'
+  | 'api_config_request_clear'
+  | 'api_config_clear'
+  | 'net_fetch'
+  | 'net_probe_health'
+  | 'net_ws_connect'
+  | 'net_ws_send'
+  | 'net_ws_close'
+
+async function tauriInvoke<T>(cmd: TauriIpcCommand, args?: Record<string, unknown>): Promise<T> {
   const { invoke } = await import('@tauri-apps/api/core')
   return invoke<T>(cmd, args)
 }
@@ -806,14 +872,14 @@ function base64urlToHex(b64url: string): string {
 }
 
 function hexToBase64url(hex: string): string {
-  const bytes = hex.match(/.{2}/g)!.map(b => String.fromCharCode(parseInt(b, 16))).join('')
+  const bytes = (hex.match(/.{2}/g) ?? []).map(b => String.fromCharCode(parseInt(b, 16))).join('')
   return btoa(bytes).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
 }
 
 // ── AES-256-GCM content encryption (WebCrypto) ─────────────────────
 
 export async function aesGcmEncrypt(plaintext: string, keyHex: string): Promise<string> {
-  const keyBytes = new Uint8Array(keyHex.match(/.{2}/g)!.map(b => parseInt(b, 16)))
+  const keyBytes = new Uint8Array((keyHex.match(/.{2}/g) ?? []).map(b => parseInt(b, 16)))
   const iv = crypto.getRandomValues(new Uint8Array(12))
   const cryptoKey = await crypto.subtle.importKey('raw', keyBytes, 'AES-GCM', false, ['encrypt'])
   const ct = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, cryptoKey, new TextEncoder().encode(plaintext)))
@@ -824,10 +890,10 @@ export async function aesGcmEncrypt(plaintext: string, keyHex: string): Promise<
 }
 
 export async function aesGcmDecrypt(ciphertextHex: string, keyHex: string): Promise<string> {
-  const data = new Uint8Array(ciphertextHex.match(/.{2}/g)!.map(b => parseInt(b, 16)))
+  const data = new Uint8Array((ciphertextHex.match(/.{2}/g) ?? []).map(b => parseInt(b, 16)))
   const iv = data.slice(0, 12)
   const ct = data.slice(12)
-  const keyBytes = new Uint8Array(keyHex.match(/.{2}/g)!.map(b => parseInt(b, 16)))
+  const keyBytes = new Uint8Array((keyHex.match(/.{2}/g) ?? []).map(b => parseInt(b, 16)))
   const cryptoKey = await crypto.subtle.importKey('raw', keyBytes, 'AES-GCM', false, ['decrypt'])
   const plaintext = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, cryptoKey, ct)
   return new TextDecoder().decode(plaintext)

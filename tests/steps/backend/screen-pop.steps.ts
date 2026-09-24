@@ -134,8 +134,9 @@ When('the admin lists records for the contact', async ({ request, world }) => {
 Then('the contact identification should return the matching contact', async ({ world }) => {
   expect(getScreenPopState(world).identificationResult).toBeTruthy()
   expect(getScreenPopState(world).identificationResult!.contact).not.toBeNull()
-  if (getScreenPopState(world).lastContact) {
-    expect(getScreenPopState(world).identificationResult!.contact!.id).toBe(getScreenPopState(world).lastContact.id)
+  const lastContact = getScreenPopState(world).lastContact
+  if (lastContact) {
+    expect(getScreenPopState(world).identificationResult!.contact!.id).toBe(lastContact.id)
   }
 })
 

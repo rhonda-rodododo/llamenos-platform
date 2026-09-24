@@ -273,7 +273,7 @@ Then('the hub-admin role should include permission {string}', async ({ request }
   const roles = await listRolesViaApi(request)
   const hubAdmin = roles.find((r) => r.id === 'role-hub-admin' || r.slug === 'hub-admin')
   expect(hubAdmin).toBeTruthy()
-  const perms = hubAdmin!.permissions as string[]
+  const perms = hubAdmin!.permissions
   const domain = permission.split(':')[0]
   const hasIt = perms.includes(permission) || perms.includes(`${domain}:*`) || perms.includes('*')
   expect(hasIt).toBe(true)
@@ -283,7 +283,7 @@ Then('the volunteer role should include permission {string}', async ({ request }
   const roles = await listRolesViaApi(request)
   const volunteer = roles.find((r) => r.id === 'role-volunteer' || r.slug === 'volunteer')
   expect(volunteer).toBeTruthy()
-  const perms = volunteer!.permissions as string[]
+  const perms = volunteer!.permissions
   const domain = permission.split(':')[0]
   const hasIt = perms.includes(permission) || perms.includes(`${domain}:*`) || perms.includes('*')
   expect(hasIt).toBe(true)

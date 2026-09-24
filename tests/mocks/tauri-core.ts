@@ -13,6 +13,8 @@ if (!import.meta.env.PLAYWRIGHT_TEST) {
 }
 
 import { Store } from './tauri-store'
+import { hpkeSealMock, hpkeOpenMock } from './hpke-mock'
+import type { TauriIpcCommand } from '@/lib/platform'
 import { ed25519 } from '@noble/curves/ed25519.js'
 import { x25519 } from '@noble/curves/ed25519.js'
 import { hkdf } from '@noble/hashes/hkdf.js'
@@ -24,51 +26,6 @@ import { argon2id } from '@noble/hashes/argon2.js'
 import { utf8ToBytes, bytesToHex, hexToBytes } from '@noble/hashes/utils.js'
 
 // ── Helpers ──────────────────────────────────────────────────────────
-
-function base64urlEncode(bytes: Uint8Array): string {
-  const b64 = btoa(String.fromCharCode(...bytes))
-  return b64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
-}
-
-function base64urlDecode(str: string): Uint8Array {
-  const padded = str.replace(/-/g, '+').replace(/_/g, '/') + '=='.slice(0, (4 - (str.length % 4)) % 4)
-  const binary = atob(padded)
-  return Uint8Array.from(binary, c => c.charCodeAt(0))
-}
-
-// ── Label registry (matches Rust labels.rs) ─────────────────────────
-
-// Labels must match packages/protocol/crypto-labels.json exactly.
-// Index order matches LABEL_REGISTRY in packages/crypto/src/labels.rs.
-const LABEL_MAP: Record<string, number> = {
-  'llamenos:note-key': 0,
-  'llamenos:file-key': 1,
-  'llamenos:file-metadata': 2,
-  'llamenos:hub-key-wrap': 3,
-  'llamenos:transcription': 4,
-  'llamenos:message': 5,
-  'llamenos:call-meta': 6,
-  'llamenos:shift-schedule': 7,
-  'llamenos:puk:sign:v1': 41,
-  'llamenos:puk:dh:v1': 42,
-  'llamenos:puk:secretbox:v1': 43,
-  'llamenos:puk:wrap:device:v1': 44,
-  'llamenos:device-auth:v1': 46,
-  'llamenos:sframe-call-secret:v1': 50,
-  'llamenos:sframe-base-key:v1': 51,
-  'llamenos:mls-provision:v1': 52,
-  'llamenos:recovery-group:share-wrap:v1': 60,
-  'llamenos:recovery-group:puk-seed-wrap:v1': 61,
-  'llamenos:recovery-group:share-contribute:v1': 62,
-  'llamenos:recovery-group:liveness-proof:v1': 63,
-  'llamenos:sas-derive:v1': 80,
-}
-
-function labelToId(label: string): number {
-  const id = LABEL_MAP[label]
-  if (id === undefined) throw new Error(`Unknown label: ${label}`)
-  return id
-}
 
 // ── Mock device key state ───────────────────────────────────────────
 
@@ -92,6 +49,13 @@ let mockProvisioningEphemeral: Uint8Array | null = null
 
 // ── Hub key mock state ───────────────────────────────────────────────
 let mockHubKey: Uint8Array | null = null
+
+// ── Server event key(s) mock state (epoch-scoped relay event decryption) ──
+// Matches Rust `hub-event` (hub-key-encrypted) vs `hub-event-epoch` (relay
+// epoch-keyed) label split — see packages/crypto/src/labels.rs.
+const LABEL_HUB_EVENT = 'llamenos:hub-event'
+const LABEL_HUB_EVENT_EPOCH = 'llamenos:hub-event-epoch:v1'
+let mockServerEventKeys: Array<[number, Uint8Array]> = []
 
 // ── PUK seed mock state ─────────────────────────────────────────────
 let mockPukSeed: Uint8Array | null = null
@@ -261,74 +225,6 @@ async function decryptWithPin(
     signingSeed: plaintext.slice(0, 32),
     encryptionSeed: plaintext.slice(32),
   }
-}
-
-// ── HPKE mock (X25519 + HKDF-SHA256 + AES-256-GCM) ─────────────────
-
-function hpkeSealMock(
-  plaintext: Uint8Array,
-  recipientPubkeyHex: string,
-  label: string,
-  aad: Uint8Array,
-): { v: number; labelId: number; enc: string; ct: string } {
-  const labelId = labelToId(label)
-
-  // Generate ephemeral X25519 keypair
-  const ephSeed = randomBytes(32)
-  const ephPub = x25519.getPublicKey(ephSeed)
-  const recipientPub = hexToBytes(recipientPubkeyHex)
-
-  // ECDH shared secret
-  const sharedSecret = x25519.getSharedSecret(ephSeed, recipientPub)
-
-  // HKDF extract + expand
-  const info = utf8ToBytes(`hpke-v3:${label}`)
-  const derived = hkdf(sha256, sharedSecret, new Uint8Array(0), info, 44)
-
-  const aesKey = derived.slice(0, 32)
-  const nonce = derived.slice(32, 44)
-
-  // AES-256-GCM encrypt with AAD
-  const cipher = gcm(aesKey, nonce, aad)
-  const ct = cipher.encrypt(plaintext)
-
-  return {
-    v: 3,
-    labelId,
-    enc: base64urlEncode(ephPub),
-    ct: base64urlEncode(ct),
-  }
-}
-
-function hpkeOpenMock(
-  envelope: { v: number; labelId: number; enc: string; ct: string },
-  recipientSecretHex: string,
-  expectedLabel: string,
-  aad: Uint8Array,
-): Uint8Array {
-  if (envelope.v !== 3) throw new Error(`Unsupported HPKE version: ${envelope.v}`)
-  const expectedId = labelToId(expectedLabel)
-  if (envelope.labelId !== expectedId) {
-    throw new Error(`Label mismatch: expected ${expectedId}, got ${envelope.labelId}`)
-  }
-
-  const ephPub = base64urlDecode(envelope.enc)
-  const ct = base64urlDecode(envelope.ct)
-  const recipientSecret = hexToBytes(recipientSecretHex)
-
-  // ECDH shared secret
-  const sharedSecret = x25519.getSharedSecret(recipientSecret, ephPub)
-
-  // HKDF extract + expand
-  const info = utf8ToBytes(`hpke-v3:${expectedLabel}`)
-  const derived = hkdf(sha256, sharedSecret, new Uint8Array(0), info, 44)
-
-  const aesKey = derived.slice(0, 32)
-  const nonce = derived.slice(32, 44)
-
-  // AES-256-GCM decrypt with AAD
-  const cipher = gcm(aesKey, nonce, aad)
-  return cipher.decrypt(ct)
 }
 
 // ── GF(2^8) helpers for Shamir SSS mock ──────────────────────────────
@@ -588,9 +484,27 @@ const mockWsConnections = new Map<string, WebSocket>()
 type Args = Record<string, unknown>
 type CommandHandler = (a: Args) => unknown | Promise<unknown>
 
+/**
+ * Test-only introspection/control commands with no Rust-side counterpart
+ * (never in `apps/desktop/src/lib.rs`'s `generate_handler![...]`) — invoked
+ * only from `tests/steps/auth/pin-lockout-steps.ts` via the `__TEST_INVOKE_SYMBOL`
+ * bridge to control the mock's in-memory PIN lockout state directly.
+ */
+type MockOnlyCommand =
+  | 'set_pin_failed_attempts'
+  | 'get_pin_lockout_state'
+  | 'reset_pin_lockout'
+  | 'expire_pin_lockout'
+
 // ── Command handlers ──────────────────────────────────────────────────
 
-const commands: Record<string, CommandHandler> = {
+// Typed against TauriIpcCommand (the exact set of #[tauri::command]s the Rust
+// side registers) plus MockOnlyCommand (test-only extras): a renamed,
+// added, or removed Rust command now fails typecheck here — either a missing
+// key (new/renamed command not yet mocked) or an excess key (stale mock for a
+// command Rust no longer registers) — instead of surfacing only as a runtime
+// "Unknown Tauri command" the first time a test happens to exercise it.
+const commands: Record<TauriIpcCommand | MockOnlyCommand, CommandHandler> = {
   // --- Device key management ---
 
   device_generate_and_load: async (a) => {
@@ -1121,6 +1035,7 @@ const commands: Record<string, CommandHandler> = {
     mockDeviceState = null
     mockEncryptedKeys = null
     mockHubKey = null
+    mockServerEventKeys = []
     mockPukSeed = null
     mockRecoveryGroupKey = null
     mockProvisioningEphemeral = null
@@ -1399,6 +1314,52 @@ const commands: Record<string, CommandHandler> = {
     return new TextDecoder().decode(plaintext)
   },
 
+  // --- Hub event decryption (hub-key-encrypted broadcasts) ---
+  // Mirrors apps/desktop/src/crypto.rs decrypt_hub_event: AES-256-GCM with
+  // the hub key from CryptoState, AAD = LABEL_HUB_EVENT (not validated
+  // against LABEL_REGISTRY — this is a fixed AAD, not a wrappable label).
+
+  decrypt_hub_event: (a) => {
+    if (!mockHubKey) throw new Error('Hub key not loaded')
+    const ciphertextHex = a.ciphertextHex as string
+    const data = hexToBytes(ciphertextHex)
+    if (data.length < 28) throw new Error('Ciphertext too short (need at least 12-byte nonce + 16-byte tag)')
+    const nonce = data.slice(0, 12)
+    const ciphertext = data.slice(12)
+    const aad = utf8ToBytes(LABEL_HUB_EVENT)
+    const cipher = gcm(mockHubKey, nonce, aad)
+    const plaintext = cipher.decrypt(ciphertext)
+    return new TextDecoder().decode(plaintext)
+  },
+
+  // --- Server (relay) event keys — epoch-scoped, decoupled from the hub key ---
+  // Mirrors apps/desktop/src/crypto.rs set_server_event_keys / decrypt_server_event.
+
+  set_server_event_keys: (a) => {
+    const keys = a.keys as Array<[number, string]>
+    mockServerEventKeys = keys.map(([epoch, hexKey]) => {
+      const keyBytes = hexToBytes(hexKey)
+      if (keyBytes.length !== 32) throw new Error(`Event key must be 32 bytes, got ${keyBytes.length}`)
+      return [epoch, keyBytes] as [number, Uint8Array]
+    })
+  },
+
+  decrypt_server_event: (a) => {
+    const ciphertextHex = a.ciphertextHex as string
+    const epoch = a.epoch as number
+    const entry = mockServerEventKeys.find(([e]) => e === epoch)
+    if (!entry) throw new Error(`No server event key for epoch ${epoch}`)
+    const key = entry[1]
+    const data = hexToBytes(ciphertextHex)
+    if (data.length < 28) throw new Error('Ciphertext too short (need at least 12-byte nonce + 16-byte tag)')
+    const nonce = data.slice(0, 12)
+    const ciphertext = data.slice(12)
+    const aad = utf8ToBytes(`${LABEL_HUB_EVENT_EPOCH}:${epoch}`)
+    const cipher = gcm(key, nonce, aad)
+    const plaintext = cipher.decrypt(ciphertext)
+    return new TextDecoder().decode(plaintext)
+  },
+
   // --- Backend address (#738) — mirrors apps/desktop/src/api_config.rs ---
   //
   // Does NOT simulate TLS certificate pinning (#775): that's a real-TLS-only
@@ -1553,7 +1514,11 @@ const commands: Record<string, CommandHandler> = {
 // ── Public API ────────────────────────────────────────────────────────
 
 export async function invoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
-  const handler = commands[cmd]
+  // `commands` is keyed by the closed TauriIpcCommand | MockOnlyCommand union
+  // (see its declaration) for exhaustiveness checking at the object-literal
+  // site; runtime dispatch still needs to look up an arbitrary string cmd, so
+  // widen the lookup type here rather than on the object itself.
+  const handler = (commands as Record<string, CommandHandler | undefined>)[cmd]
   if (!handler) throw new Error(`Unknown Tauri command: ${cmd}`)
   return await handler(args || {}) as T
 }

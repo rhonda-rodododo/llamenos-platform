@@ -9,6 +9,10 @@
 import { CipherSuite, KemId, KdfId, AeadId } from 'hpke-js'
 import { gcm } from '@noble/ciphers/aes.js'
 import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js'
+import { hkdf } from '@noble/hashes/hkdf.js'
+import { sha256 } from '@noble/hashes/sha2.js'
+import { LABEL_DEVICE_ENCRYPTION_SEED, LABEL_MESSAGE } from '@shared/crypto-labels'
+import { hpkeSealMock, base64urlDecode } from './mocks/hpke-mock'
 import { utf8ToBytes } from '@noble/ciphers/utils.js'
 import { x25519 } from '@noble/curves/ed25519.js'
 
@@ -28,6 +32,64 @@ const hpkeSuite = new CipherSuite({
  */
 export function x25519PubkeyFromSeed(seedHex: string): string {
   return bytesToHex(x25519.getPublicKey(hexToBytes(seedHex)))
+}
+
+/**
+ * The X25519 encryption public key the desktop client derives for a device it
+ * imports from a known Ed25519 signing seed (`device_import_and_load`): the
+ * encryption seed is HKDF-SHA256(signingSeed, salt="", info=LABEL_DEVICE_ENCRYPTION_SEED),
+ * NOT the signing seed itself — so this differs from `x25519PubkeyFromSeed`.
+ * A reader envelope is only found by the client when its `pubkey` equals this.
+ */
+export function deviceEncryptionPubkeyFromSigningSeed(signingSeedHex: string): string {
+  const encryptionSeed = hkdf(
+    sha256,
+    hexToBytes(signingSeedHex),
+    new Uint8Array(0),
+    utf8ToBytes(LABEL_DEVICE_ENCRYPTION_SEED),
+    32,
+  )
+  return bytesToHex(x25519.getPublicKey(encryptionSeed))
+}
+
+/** Reader envelope in the wire shape the desktop client's `decryptMessage` consumes. */
+export interface DesktopReaderEnvelope {
+  pubkey: string
+  /** Hex-encoded HPKE encapsulated key. */
+  enc: string
+  /** Base64url-encoded wrapped content key. */
+  ct: string
+}
+
+/**
+ * Encrypt `plaintext` exactly as the desktop client's `encryptMessage` does, so
+ * the UI can decrypt what a test seeds through the API:
+ *   - content: hex(iv(12) || AES-256-GCM(ct || tag)), no AAD
+ *   - key wrap: HPKE seal under LABEL_MESSAGE with empty AAD, one envelope per reader
+ *
+ * The seal primitive is the one the Playwright Tauri IPC mock opens with
+ * (`tests/mocks/hpke-mock.ts`); it is not the RFC 9180 suite, so this output is
+ * only meaningful to the mocked desktop client, never to a real device.
+ * Readers are given as Ed25519 signing seeds (the identity a test logs in with).
+ */
+export function encryptMessageForDesktop(
+  plaintext: string,
+  readerSigningSeedHexes: string[],
+): { encryptedContent: string; readerEnvelopes: DesktopReaderEnvelope[] } {
+  const contentKey = generateContentKey()
+  const iv = new Uint8Array(12)
+  crypto.getRandomValues(iv)
+  const sealed = gcm(contentKey, iv).encrypt(utf8ToBytes(plaintext))
+  const packed = new Uint8Array(iv.length + sealed.length)
+  packed.set(iv)
+  packed.set(sealed, iv.length)
+
+  const readerEnvelopes = readerSigningSeedHexes.map((seedHex) => {
+    const pubkey = deviceEncryptionPubkeyFromSigningSeed(seedHex)
+    const envelope = hpkeSealMock(contentKey, pubkey, LABEL_MESSAGE, new Uint8Array(0))
+    return { pubkey, enc: bytesToHex(base64urlDecode(envelope.enc)), ct: envelope.ct }
+  })
+  return { encryptedContent: bytesToHex(packed), readerEnvelopes }
 }
 
 /**
@@ -109,7 +171,7 @@ export async function wrapKeyForRecipient(
   _senderSkHex: string,
   label: string,
 ): Promise<{ ct: string; enc: string }> {
-  const recipientPub = await hpkeSuite.importKey('raw', hexToBytes(recipientPubkeyHex), true)
+  const recipientPub = await hpkeSuite.importKey('raw', Uint8Array.from(hexToBytes(recipientPubkeyHex)).buffer, true)
   const info = utf8ToBytes(label)
   const aad = utf8ToBytes(`${label}:key-wrap`)
 
@@ -137,7 +199,7 @@ export async function unwrapKey(
   recipientSkHex: string,
   label: string,
 ): Promise<Uint8Array> {
-  const recipientSk = await hpkeSuite.importKey('raw', hexToBytes(recipientSkHex), false)
+  const recipientSk = await hpkeSuite.importKey('raw', Uint8Array.from(hexToBytes(recipientSkHex)).buffer, false)
   const enc = hexToBytes(encHex)
   const ct = hexToBytes(ctHex)
   const info = utf8ToBytes(label)

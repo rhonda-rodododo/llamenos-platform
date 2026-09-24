@@ -1,0 +1,3 @@
+# Vendored Ruby gems (bundler cache from `bundle install`, BUNDLE_PATH in .bundle/config).
+# Gemfile + Gemfile.lock already pin dependencies reproducibly — do not commit the vendored copy.
+vendor/bundle/

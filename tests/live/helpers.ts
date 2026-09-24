@@ -33,12 +33,12 @@ export function createTwilioClient() {
 
 /**
  * Login as the staging admin using the raw Ed25519 signing seed hex from
- * STAGING_ADMIN_SEED (the same "admin logs in with the IDENTITY seed hex"
- * material `scripts/bootstrap-admin.ts` prints). Device keys live behind
- * Tauri Stronghold (see src/client/lib/platform.ts getSecureStore()), so
- * there is no localStorage blob to hand-roll — import through the same
- * window.__TEST_PLATFORM bridge the desktop E2E suite uses in
- * tests/helpers.ts loginAsAdmin's key-import path.
+ * STAGING_ADMIN_SEED (the same identity seed hex `bun run bootstrap-admin`
+ * prints — see scripts/bootstrap-admin.ts). Device keys live behind Tauri
+ * Stronghold (src/client/lib/platform.ts getSecureStore()), so there is no
+ * localStorage blob to hand-roll (that was the pre-per-device-key nsec/ECIES
+ * model) — import through the same `window.__TEST_PLATFORM` bridge the
+ * desktop E2E suite uses in tests/helpers.ts loginAsAdmin's key-import path.
  */
 export async function loginAsAdmin(page: Page) {
   const { adminSeed } = getLiveConfig()
@@ -50,7 +50,10 @@ export async function loginAsAdmin(page: Page) {
   await page.reload()
   await page.waitForLoadState('domcontentloaded')
 
-  await page.waitForFunction(() => !!(window as unknown as Record<string, unknown>).__TEST_PLATFORM, { timeout: 15000 })
+  await page.waitForFunction(
+    () => !!(window as unknown as Record<string, unknown>).__TEST_PLATFORM,
+    { timeout: 15000 },
+  )
 
   await page.evaluate(async ({ adminSeed, pin }) => {
     const platform = (window as unknown as Record<string, unknown>).__TEST_PLATFORM as {

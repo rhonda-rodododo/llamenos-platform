@@ -6,7 +6,7 @@ import { listUsers, listShifts } from '@/lib/api'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import {
-  CheckCircle2, Circle, Rocket, Users, Clock, Phone, FileText,
+  CheckCircle2, Circle, Rocket,
   ChevronDown, X,
 } from 'lucide-react'
 

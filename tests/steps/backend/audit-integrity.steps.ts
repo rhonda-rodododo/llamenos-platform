@@ -89,9 +89,9 @@ Given(
         await createBanViaApi(request, { phone: detail, reason: 'audit test', hubId })
       } else if (operation === 'update volunteer') {
         // Remove from hub to generate a hub-scoped userRemoved audit entry
-        const latestId = getAuditTestState(world).latestEntry?.id
-        if (latestId && hubId) {
-          await apiDelete(request, `/hubs/${hubId}/members/${latestId}`)
+        const latestEntryId = getAuditTestState(world).latestEntry?.id
+        if (latestEntryId && hubId) {
+          await apiDelete(request, `/hubs/${hubId}/members/${latestEntryId}`)
         }
       }
     }

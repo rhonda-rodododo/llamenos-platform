@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { CHANNEL_LABELS, CHANNEL_SECURITY, type ChannelType, type TransportSecurity } from '@shared/types'
+import { CHANNEL_LABELS, type ChannelType } from '@shared/types'
 import { LANGUAGE_MAP } from '@shared/languages'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'

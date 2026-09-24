@@ -17,8 +17,7 @@ export type WebRtcState = 'idle' | 'initializing' | 'ready' | 'ringing' | 'conne
 type StateChangeHandler = (state: WebRtcState, error?: string) => void
 
 let currentState: WebRtcState = 'idle'
-let stateHandlers = new Set<StateChangeHandler>()
-let currentProvider: string | null = null
+const stateHandlers = new Set<StateChangeHandler>()
 let twilioDevice: TwilioDevice | null = null
 let activeConnection: TwilioConnection | null = null
 
@@ -66,8 +65,7 @@ export async function initWebRtc(): Promise<void> {
   setState('initializing')
 
   try {
-    const { token, provider, identity } = await getWebRtcToken()
-    currentProvider = provider
+    const { token, provider } = await getWebRtcToken()
 
     switch (provider) {
       case 'twilio':
@@ -216,7 +214,6 @@ export function destroyWebRtc(): void {
     twilioDevice.destroy()
     twilioDevice = null
   }
-  currentProvider = null
   setState('idle')
 }
 

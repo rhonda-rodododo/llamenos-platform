@@ -213,11 +213,12 @@ Then(
 
 Given('an affinity group exists', async ({ request, world }) => {
   const seed = await ensureNamedContact(request, world, `_group_seed_${Date.now()}`)
-  getRelState(world).lastGroup = await createAffinityGroupViaApi(request, `Test Group ${Date.now()}`, [
+  const group = await createAffinityGroupViaApi(request, `Test Group ${Date.now()}`, [
     { contactId: seed.id as string },
   ])
+  getRelState(world).lastGroup = group
   // Remove the seed member so the group starts with known state
-  await removeGroupMemberViaApi(request, getRelState(world).lastGroup.id, seed.id as string)
+  await removeGroupMemberViaApi(request, group.id, seed.id as string)
 })
 
 When(

@@ -21,6 +21,8 @@ import {
   encryptContent,
   wrapKeyForRecipient,
   x25519PubkeyFromSeed,
+  encryptMessageForDesktop,
+  type DesktopReaderEnvelope,
 } from './crypto-helpers'
 
 // Admin Ed25519 seed (32 bytes hex) — deterministic test credential.
@@ -1334,21 +1336,17 @@ export async function createContactByNameViaApi(
   }
   const nameHash = bytesToHex(utf8ToBytes(normalized)).slice(0, 32)
 
-  // Encrypt the summary with real AES-256-GCM
-  const contentKey = generateContentKey()
-  const encryptedSummary = encryptContent(
+  // Encrypt the summary the way the desktop client's encryptMessage does, for
+  // the admin reader, so the directory renders the contact instead of the
+  // "Restricted" placeholder (issue #796).
+  const { encryptedContent: encryptedSummary, readerEnvelopes } = encryptMessageForDesktop(
     JSON.stringify({ displayName, contactType, tags: [] }),
-    contentKey,
-    LABEL_NOTE_KEY,
+    [seedHex],
   )
 
   return createContactViaApi(request, {
     encryptedSummary,
-    // Pass the SAME contentKey used to encrypt encryptedSummary above, so
-    // createContactViaApi wraps this key in the reader envelope instead of
-    // generating an unrelated one — otherwise the admin device can never
-    // decrypt this contact (issue #796).
-    contentKey,
+    summaryEnvelopes: readerEnvelopes,
     identifierHashes: [`name_${Date.now()}_${Math.random().toString(36).slice(2)}`],
     contactTypeHash: contactType,
     nameHash,
@@ -1397,27 +1395,25 @@ export async function createContactViaApi(
     trigramTokens?: string[]
     encryptedSummary?: string
     /**
-     * The content key `encryptedSummary` was encrypted under, when the caller
-     * pre-encrypted the summary themselves (e.g. createContactByNameViaApi).
-     * Required whenever `encryptedSummary` is supplied by the caller — without
-     * it, the envelope below would wrap an unrelated, freshly generated key,
-     * making the contact permanently undecryptable (the ciphertext and the
-     * wrapped key would never match). See issue #796.
+     * Reader envelopes for `encryptedSummary`, when the caller encrypted it
+     * itself (e.g. createContactByNameViaApi via encryptMessageForDesktop, so
+     * the desktop UI can decrypt it — issue #796). When omitted, the envelope
+     * wraps an unrelated fresh key: fine for backend-only scenarios that never
+     * decrypt the summary, but the contact is then permanently undecryptable.
      */
-    contentKey?: Uint8Array
+    summaryEnvelopes?: DesktopReaderEnvelope[]
     contactTypeHash?: string
     hubId?: string
   },
   seedHex = ADMIN_SEED,
 ): Promise<Record<string, unknown>> {
-  // Use the caller's content key (when they pre-encrypted encryptedSummary
-  // themselves) so the envelope wraps the SAME key the ciphertext requires.
-  // Only fall back to a fresh key when nothing was pre-encrypted.
-  const contentKey = options?.contentKey ?? generateContentKey()
-  const summaryText = options?.encryptedSummary ?? 'test contact summary'
-  const encryptedSummary = options?.encryptedSummary
-    ?? encryptContent(summaryText, contentKey, LABEL_NOTE_KEY)
-  const envelope = await realEnvelope(contentKey, seedHex)
+  let encryptedSummary = options?.encryptedSummary
+  let summaryEnvelopes = options?.summaryEnvelopes
+  if (!summaryEnvelopes) {
+    const contentKey = generateContentKey()
+    encryptedSummary ??= encryptContent('test contact summary', contentKey, LABEL_NOTE_KEY)
+    summaryEnvelopes = [await realEnvelope(contentKey, seedHex)]
+  }
   const { status, data } = await apiPost<Record<string, unknown>>(
     request,
     hubPath('/directory', options?.hubId),
@@ -1427,7 +1423,7 @@ export async function createContactViaApi(
       nameHash: options?.nameHash,
       trigramTokens: options?.trigramTokens,
       encryptedSummary,
-      summaryEnvelopes: [envelope],
+      summaryEnvelopes,
       contactTypeHash: options?.contactTypeHash,
       tagHashes: [],
       blindIndexes: {},
