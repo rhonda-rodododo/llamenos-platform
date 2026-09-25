@@ -215,8 +215,11 @@ services:
     restart: unless-stopped
     volumes:
       - ./asterisk-config:/etc/asterisk:ro
-    environment:
-      - ARI_PASSWORD=${ARI_PASSWORD:-changeme}
+    # ari.conf #includes this file for the ARI user's password — Asterisk
+    # cannot read ARI_PASSWORD from its environment itself.
+    configs:
+      - source: ari_credentials
+        target: /run/llamenos/ari-credentials.conf
     networks:
       - internal
     healthcheck:
@@ -432,6 +435,12 @@ services:
       timeout: 5s
       retries: 3
       start_period: 10s
+
+configs:
+  # Rendered from ARI_PASSWORD so asterisk and sip-bridge share one credential.
+  ari_credentials:
+    content: |
+      password = ${ARI_PASSWORD:-changeme}
 
 volumes:
   postgres-data:
