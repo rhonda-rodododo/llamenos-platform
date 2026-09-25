@@ -126,7 +126,7 @@ export function validateConfig(env: ConfigInput = process.env): void {
     throw new Error(
       '[llamenos] WEBHOOK_BASE_URL is required in production. ' +
       'Without it, webhook signature validation falls back to the spoofable Host header. ' +
-      'Set WEBHOOK_BASE_URL to your public base URL (e.g. https://api.llamenos.org).'
+      'Set WEBHOOK_BASE_URL to your public base URL (e.g. https://api.llamenos-hotline.org).'
     )
   }
 

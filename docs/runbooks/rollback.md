@@ -71,10 +71,10 @@ docker compose -f /opt/llamenos/services/watchtower/docker-compose.yml stop
 
 ```bash
 # Health check
-curl https://api.llamenos.org/api/health/ready
+curl https://api.llamenos-hotline.org/api/health/ready
 
 # Check running version
-curl https://api.llamenos.org/api/health/ready | jq .version
+curl https://api.llamenos-hotline.org/api/health/ready | jq .version
 
 # Check logs for errors
 ssh deploy@<server> docker logs --tail 50 $(docker ps -q -f name=app)

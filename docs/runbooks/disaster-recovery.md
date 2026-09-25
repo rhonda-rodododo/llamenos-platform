@@ -69,8 +69,8 @@ rsync -avz /tmp/restore/rustfs-data/ deploy@<new_ip>:/opt/llamenos/data/rustfs/
 ### 7. Verify
 
 ```bash
-curl https://api.llamenos.org/api/health/ready
-curl https://updates.llamenos.org/health
+curl https://api.llamenos-hotline.org/api/health/ready
+curl https://updates.llamenos-hotline.org/health
 
 # Run smoke check
 cd deploy/ansible

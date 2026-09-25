@@ -51,10 +51,10 @@ async function preflight(
 // ---------------------------------------------------------------------------
 
 describe('CORS production defaults', () => {
-  it('allows https://app.llamenos.org', async () => {
+  it('allows https://app.llamenos-hotline.org', async () => {
     const { app, env } = makeApp()
-    const res = await req(app, env, 'https://app.llamenos.org')
-    expect(res.headers.get('Access-Control-Allow-Origin')).toBe('https://app.llamenos.org')
+    const res = await req(app, env, 'https://app.llamenos-hotline.org')
+    expect(res.headers.get('Access-Control-Allow-Origin')).toBe('https://app.llamenos-hotline.org')
     expect(res.headers.get('Access-Control-Allow-Credentials')).toBe('true')
   })
 
@@ -100,7 +100,7 @@ describe('CORS production defaults', () => {
 
   it('rejects http downgrade of allowed origin', async () => {
     const { app, env } = makeApp()
-    const res = await req(app, env, 'http://app.llamenos.org')
+    const res = await req(app, env, 'http://app.llamenos-hotline.org')
     expect(res.headers.get('Access-Control-Allow-Origin')).toBeNull()
   })
 
@@ -124,7 +124,7 @@ describe('CORS production defaults', () => {
 describe('CORS credentials mode', () => {
   it('includes Access-Control-Allow-Credentials on allowed origin', async () => {
     const { app, env } = makeApp()
-    const res = await req(app, env, 'https://app.llamenos.org')
+    const res = await req(app, env, 'https://app.llamenos-hotline.org')
     expect(res.headers.get('Access-Control-Allow-Credentials')).toBe('true')
   })
 
@@ -142,9 +142,9 @@ describe('CORS credentials mode', () => {
 describe('CORS preflight', () => {
   it('returns 204 for allowed origin', async () => {
     const { app, env } = makeApp()
-    const res = await preflight(app, env, 'https://app.llamenos.org')
+    const res = await preflight(app, env, 'https://app.llamenos-hotline.org')
     expect(res.status).toBe(204)
-    expect(res.headers.get('Access-Control-Allow-Origin')).toBe('https://app.llamenos.org')
+    expect(res.headers.get('Access-Control-Allow-Origin')).toBe('https://app.llamenos-hotline.org')
     expect(res.headers.get('Access-Control-Allow-Methods')).toContain('POST')
     expect(res.headers.get('Access-Control-Allow-Headers')).toContain('Authorization')
     expect(res.headers.get('Access-Control-Allow-Credentials')).toBe('true')
@@ -181,7 +181,7 @@ describe('CORS_ALLOWED_ORIGINS env override', () => {
   it('excludes production defaults when CORS_ALLOWED_ORIGINS is set', async () => {
     // When an explicit list is provided, production defaults are NOT auto-added
     const { app, env } = makeApp({ CORS_ALLOWED_ORIGINS: 'https://custom.example.com' })
-    const res = await req(app, env, 'https://app.llamenos.org')
+    const res = await req(app, env, 'https://app.llamenos-hotline.org')
     expect(res.headers.get('Access-Control-Allow-Origin')).toBeNull()
   })
 

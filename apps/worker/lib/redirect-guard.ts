@@ -32,7 +32,7 @@ export function isAllowedOAuthRedirectUrl(
       if (trimmed) allowed.add(trimmed)
     }
   } else {
-    allowed.add('https://app.llamenos.org')
+    allowed.add('https://app.llamenos-hotline.org')
     allowed.add('https://demo.llamenos-platform.com')
   }
   if (env.ENVIRONMENT === 'development' && !env.CORS_ALLOWED_ORIGINS) {

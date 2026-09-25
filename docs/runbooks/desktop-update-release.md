@@ -12,7 +12,7 @@ When a GitHub Release is published, `tauri-release.yml` automatically:
 2. Signs artifacts with Ed25519 (`TAURI_SIGNING_PRIVATE_KEY`)
 3. Generates `latest.json` manifest via `scripts/generate-update-manifest.ts`
 4. Uploads artifacts + manifest to RustFS S3 bucket via AWS CLI
-5. Desktop clients poll `https://updates.llamenos.org/desktop/latest.json` for new versions
+5. Desktop clients poll `https://updates.llamenos-hotline.org/desktop/latest.json` for new versions
 6. Tauri updater verifies Ed25519 signature before applying
 
 ## Manifest Format
@@ -25,15 +25,15 @@ When a GitHub Release is published, `tauri-release.yml` automatically:
   "platforms": {
     "darwin-aarch64": {
       "signature": "<ed25519_sig>",
-      "url": "https://releases.llamenos.org/desktop/llamenos_1.2.3_aarch64.app.tar.gz"
+      "url": "https://releases.llamenos-hotline.org/desktop/llamenos_1.2.3_aarch64.app.tar.gz"
     },
     "linux-x86_64": {
       "signature": "<ed25519_sig>",
-      "url": "https://releases.llamenos.org/desktop/llamenos_1.2.3_amd64.AppImage.tar.gz"
+      "url": "https://releases.llamenos-hotline.org/desktop/llamenos_1.2.3_amd64.AppImage.tar.gz"
     },
     "windows-x86_64": {
       "signature": "<ed25519_sig>",
-      "url": "https://releases.llamenos.org/desktop/llamenos_1.2.3_x64-setup.nsis.zip"
+      "url": "https://releases.llamenos-hotline.org/desktop/llamenos_1.2.3_x64-setup.nsis.zip"
     }
   }
 }
@@ -64,7 +64,7 @@ rsync -avz dist/artifacts/ deploy@<1984_VPS_IP>:/opt/llamenos/services/update-se
 ### 4. Verify
 
 ```bash
-curl https://updates.llamenos.org/desktop/latest.json | jq .version
+curl https://updates.llamenos-hotline.org/desktop/latest.json | jq .version
 # Should show the new version
 ```
 

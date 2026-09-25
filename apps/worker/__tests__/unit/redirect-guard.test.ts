@@ -23,8 +23,8 @@ describe('isAllowedOAuthRedirectUrl', () => {
   })
 
   describe('allowed: production default origins', () => {
-    it('accepts https://app.llamenos.org', () => {
-      expect(isAllowedOAuthRedirectUrl('https://app.llamenos.org/oauth/callback', prodEnv)).toBe(true)
+    it('accepts https://app.llamenos-hotline.org', () => {
+      expect(isAllowedOAuthRedirectUrl('https://app.llamenos-hotline.org/oauth/callback', prodEnv)).toBe(true)
     })
 
     it('accepts https://demo.llamenos-platform.com', () => {
@@ -56,7 +56,7 @@ describe('isAllowedOAuthRedirectUrl', () => {
     })
 
     it('blocks default prod origins when custom origins override them', () => {
-      expect(isAllowedOAuthRedirectUrl('https://app.llamenos.org/oauth/callback', customEnv)).toBe(false)
+      expect(isAllowedOAuthRedirectUrl('https://app.llamenos-hotline.org/oauth/callback', customEnv)).toBe(false)
     })
 
     it('blocks localhost even in dev when CORS_ALLOWED_ORIGINS is set', () => {
@@ -91,11 +91,11 @@ describe('isAllowedOAuthRedirectUrl', () => {
     })
 
     it('blocks subdomain of allowed origin', () => {
-      expect(isAllowedOAuthRedirectUrl('https://evil.app.llamenos.org/callback', prodEnv)).toBe(false)
+      expect(isAllowedOAuthRedirectUrl('https://evil.app.llamenos-hotline.org/callback', prodEnv)).toBe(false)
     })
 
     it('blocks allowed origin with different port', () => {
-      expect(isAllowedOAuthRedirectUrl('https://app.llamenos.org:8443/callback', prodEnv)).toBe(false)
+      expect(isAllowedOAuthRedirectUrl('https://app.llamenos-hotline.org:8443/callback', prodEnv)).toBe(false)
     })
 
     it('blocks URL with credentials (user:pass@evil.com)', () => {

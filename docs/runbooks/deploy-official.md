@@ -7,7 +7,7 @@ Deploy the Llamenos project's production server on 1984 Hosting (Iceland). Inclu
 ## Prerequisites
 
 - **1984 VPS:** Provisioned with Debian 13, SSH key added, FDE configured (see OpenTofu module docs)
-- **DNS:** A/AAAA records for `api.llamenos.org`, `updates.llamenos.org`, `releases.llamenos.org` pointing to VPS IP
+- **DNS:** A/AAAA records for `api.llamenos-hotline.org`, `updates.llamenos-hotline.org`, `releases.llamenos-hotline.org` pointing to VPS IP
 - **Ansible Vault:** Password shared among maintainers via secure channel
 - **GitHub Environment:** `production` environment configured with required secrets
 
@@ -34,9 +34,9 @@ ansible-vault create vars-production.yml
 
 Include all variables from `vars.yml` template plus official-profile vars:
 - `deployment_profile: "official"`
-- `domain: "llamenos.org"`
-- `updates_domain: "updates.llamenos.org"`
-- `releases_domain: "releases.llamenos.org"`
+- `domain: "llamenos-hotline.org"`
+- `updates_domain: "updates.llamenos-hotline.org"`
+- `releases_domain: "releases.llamenos-hotline.org"`
 - All passwords and secrets (generate with `openssl rand -hex 32`)
 
 #### 2. Create production inventory
@@ -84,13 +84,13 @@ Single service: `./deploy/scripts/deploy-official.sh --tags app`
 
 ```bash
 # API health
-curl https://api.llamenos.org/api/health/ready
+curl https://api.llamenos-hotline.org/api/health/ready
 
 # Update server
-curl https://updates.llamenos.org/health
+curl https://updates.llamenos-hotline.org/health
 
 # Desktop update manifest
-curl https://updates.llamenos.org/desktop/latest.json
+curl https://updates.llamenos-hotline.org/desktop/latest.json
 ```
 
 ## Troubleshooting
@@ -98,5 +98,5 @@ curl https://updates.llamenos.org/desktop/latest.json
 | Symptom | Cause | Fix |
 |---|---|---|
 | Vault password error | Wrong password | Verify with `ansible-vault view vars-production.yml` |
-| DNS preflight fails | Records not propagated | `dig +short api.llamenos.org` — wait for propagation |
+| DNS preflight fails | Records not propagated | `dig +short api.llamenos-hotline.org` — wait for propagation |
 | Update server 502 | Caddy not running | `ssh deploy@<ip> docker compose -f /opt/llamenos/services/update-server/docker-compose.yml up -d` |

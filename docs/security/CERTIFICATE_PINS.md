@@ -4,7 +4,7 @@
 
 Extract with:
 ```bash
-openssl s_client -connect app.llamenos.org:443 </dev/null 2>/dev/null \
+openssl s_client -connect app.llamenos-hotline.org:443 </dev/null 2>/dev/null \
   | openssl x509 -pubkey -noout \
   | openssl pkey -pubin -outform der \
   | openssl dgst -sha256 -binary \
@@ -13,7 +13,7 @@ openssl s_client -connect app.llamenos.org:443 </dev/null 2>/dev/null \
 
 For intermediate CA (pin this as backup, rotate leaf pin independently):
 ```bash
-openssl s_client -connect app.llamenos.org:443 -showcerts </dev/null 2>/dev/null \
+openssl s_client -connect app.llamenos-hotline.org:443 -showcerts </dev/null 2>/dev/null \
   | awk '/BEGIN CERT/{c++} c==2{print}' \
   | openssl x509 -pubkey -noout \
   | openssl pkey -pubin -outform der \
@@ -28,8 +28,8 @@ renewal never breaks the app. Two independent CA roots for backup (RFC 7469 §2.
 
 | Domain | Type | Hash (base64 SHA-256 SPKI) | Expires |
 |--------|------|---------------------------|---------|
-| *.llamenos.org | ISRG Root X1 (RSA 4096) | `C5+lpZ7tcVwmwQIMcRtPbsQtWLABXhQzejna0wHFr8M=` | 2035-06-04 |
-| *.llamenos.org | ISRG Root X2 (ECDSA P-384) | `diGVwiVYbubAI3RW4hB9xU8e/CH2GGvrTcuvhPy/MzA=` | 2040-09-17 |
+| *.llamenos-hotline.org | ISRG Root X1 (RSA 4096) | `C5+lpZ7tcVwmwQIMcRtPbsQtWLABXhQzejna0wHFr8M=` | 2035-06-04 |
+| *.llamenos-hotline.org | ISRG Root X2 (ECDSA P-384) | `diGVwiVYbubAI3RW4hB9xU8e/CH2GGvrTcuvhPy/MzA=` | 2040-09-17 |
 
 These hashes are identical in both enforcement layers:
 - `apps/android/app/src/main/java/org/llamenos/hotline/api/ApiService.kt`
@@ -37,7 +37,7 @@ These hashes are identical in both enforcement layers:
 - `apps/android/app/src/main/res/xml/network_security_config.xml`
   (`<pin-set expiration="2027-01-01">`)
 
-**Self-hosters**: If your hub is not hosted under `llamenos.org`, you must update the
+**Self-hosters**: If your hub is not hosted under `llamenos-hotline.org`, you must update the
 `<domain>` in `network_security_config.xml` and ensure your TLS chain leads back to these
 root CAs (or update the pin hashes accordingly).
 
