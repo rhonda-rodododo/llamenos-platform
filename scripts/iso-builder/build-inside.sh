@@ -14,8 +14,8 @@
 #   /cache    — upstream ISO cache (read-write)
 #
 # Outputs (placed in /out):
-#   llamenos-fde-debian13-${UNLOCK_MODE}.iso
-#   llamenos-fde-debian13-${UNLOCK_MODE}.iso.sha256
+#   debian${DEBIAN_MAJOR}-fde-${UNLOCK_MODE}.iso   (DEBIAN_MAJOR = major of DEBIAN_VERSION)
+#   debian${DEBIAN_MAJOR}-fde-${UNLOCK_MODE}.iso.sha256
 set -euo pipefail
 umask 022
 
@@ -251,7 +251,8 @@ find "${WORK_DIR}/iso-root" -print0 \
 echo "==> Extracting isohybrid MBR template"
 dd if="$CACHED_ISO" bs=1 count=432 of="${WORK_DIR}/isohdpfx.bin" status=none
 
-OUT_ISO="${OUT_DIR}/llamenos-fde-debian13-${UNLOCK_MODE}.iso"
+DEBIAN_MAJOR="${DEBIAN_VERSION%%.*}"
+OUT_ISO="${OUT_DIR}/debian${DEBIAN_MAJOR}-fde-${UNLOCK_MODE}.iso"
 echo "==> Repacking ISO -> ${OUT_ISO}"
 xorriso -as mkisofs \
   -r -V 'Llamenos Debian 13' \
