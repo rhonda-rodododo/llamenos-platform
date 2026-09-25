@@ -19,6 +19,13 @@
     # Derive the API base URL from deployment config (matches Caddyfile logic)
     _api_host: "{{ api_subdomain + '.' + domain if (api_subdomain | default('') | length > 0) else domain }}"
     _api_base_url: "https://{{ _api_host }}"
+    # Each probe runs only where its service is placed (same rule as the
+    # service roles: an empty group means every llamenos_servers host). In the
+    # two-tier layout the relay host runs ntfy + Caddy and nothing else.
+    _smoke_serves_app: "{{ groups.get('llamenos_app', []) | length == 0 or inventory_hostname in groups.get('llamenos_app', []) }}"
+    _smoke_serves_db: "{{ groups.get('llamenos_db', []) | length == 0 or inventory_hostname in groups.get('llamenos_db', []) }}"
+    _smoke_serves_storage: "{{ groups.get('llamenos_storage', []) | length == 0 or inventory_hostname in groups.get('llamenos_storage', []) }}"
+    _smoke_serves_ntfy: "{{ groups.get('llamenos_ntfy', []) | length == 0 or inventory_hostname in groups.get('llamenos_ntfy', []) }}"
 
   tasks:
     - name: Initialize smoke-check results
@@ -151,11 +158,13 @@
       retries: 3
       delay: 5
       ignore_errors: true
+      when: _smoke_serves_app | bool
       tags: always
 
     - name: Record app liveness result
       ansible.builtin.set_fact:
         smoke_results: "{{ smoke_results + [{'check': 'App liveness probe /api/health/live (200)', 'status': 'PASS' if app_live is succeeded else 'FAIL'}] }}"
+      when: _smoke_serves_app | bool
       tags: always
 
     - name: Check app readiness probe (all dependencies reachable)
@@ -168,12 +177,14 @@
       retries: 5
       delay: 5
       ignore_errors: true
+      when: _smoke_serves_app | bool
       tags: always
 
     - name: Record app readiness result
       ansible.builtin.set_fact:
         smoke_results: "{{ smoke_results + [{'check': 'App readiness probe /api/health/ready (200)', 'status': 'PASS' if app_ready is succeeded else 'FAIL (postgres/storage/relay
           dependency check failed)'}] }}"
+      when: _smoke_serves_app | bool
       tags: always
 
     - name: Check app full health endpoint
@@ -186,11 +197,13 @@
       retries: 3
       delay: 5
       ignore_errors: true
+      when: _smoke_serves_app | bool
       tags: always
 
     - name: Record app health result
       ansible.builtin.set_fact:
         smoke_results: "{{ smoke_results + [{'check': 'App health endpoint /api/health (200)', 'status': 'PASS' if app_health is succeeded else 'FAIL'}] }}"
+      when: _smoke_serves_app | bool
       tags: always
 
     # ─── Database ────────────────────────────────────────────────────────────
@@ -205,14 +218,18 @@
       changed_when: false
       register: postgres_check
       ignore_errors: true
-      when: llamenos_postgres_enabled | default(true) | bool
+      when:
+        - llamenos_postgres_enabled | default(true) | bool
+        - _smoke_serves_db | bool
       tags: always
 
     - name: Record PostgreSQL result
       ansible.builtin.set_fact:
         smoke_results: "{{ smoke_results + [{'check': 'PostgreSQL accepting connections', 'status': 'PASS' if postgres_check is succeeded else 'FAIL' if postgres_check
           is failed else 'SKIP'}] }}"
-      when: llamenos_postgres_enabled | default(true) | bool
+      when:
+        - llamenos_postgres_enabled | default(true) | bool
+        - _smoke_serves_db | bool
       tags: always
 
     # ─── Object storage ──────────────────────────────────────────────────────
@@ -228,14 +245,18 @@
       retries: 3
       delay: 5
       ignore_errors: true
-      when: llamenos_rustfs_enabled | default(true) | bool
+      when:
+        - llamenos_rustfs_enabled | default(true) | bool
+        - _smoke_serves_storage | bool
       tags: always
 
     - name: Record RustFS result
       ansible.builtin.set_fact:
         smoke_results: "{{ smoke_results + [{'check': 'RustFS object storage reachable (port 9000)', 'status': 'PASS' if rustfs_check is succeeded else 'FAIL' if
           rustfs_check is failed else 'SKIP'}] }}"
-      when: llamenos_rustfs_enabled | default(true) | bool
+      when:
+        - llamenos_rustfs_enabled | default(true) | bool
+        - _smoke_serves_storage | bool
       tags: always
 
     # ─── Optional sidecars ───────────────────────────────────────────────────
@@ -250,14 +271,45 @@
       retries: 2
       delay: 3
       ignore_errors: true
-      when: llamenos_ntfy_enabled | default(false) | bool
+      when:
+        - llamenos_ntfy_enabled | default(false) | bool
+        - _smoke_serves_ntfy | bool
       tags: always
 
     - name: Record ntfy result
       ansible.builtin.set_fact:
         smoke_results: "{{ smoke_results + [{'check': 'ntfy health endpoint (200)', 'status': 'PASS' if ntfy_check is succeeded else 'FAIL' if ntfy_check is failed
           else 'SKIP'}] }}"
-      when: llamenos_ntfy_enabled | default(false) | bool
+      when:
+        - llamenos_ntfy_enabled | default(false) | bool
+        - _smoke_serves_ntfy | bool
+      tags: always
+
+    # The app publishes wake-ups through the relay's PUBLIC vhost (on another
+    # host in the two-tier layout), and Android devices subscribe through it:
+    # probe it over real DNS + TLS from both ends.
+    - name: Check the ntfy relay's public vhost
+      ansible.builtin.uri:
+        url: "https://{{ ntfy_domain }}/v1/health"
+        method: GET
+        status_code: 200
+        return_content: true
+        validate_certs: true
+      register: ntfy_public_check
+      retries: 3
+      delay: 5
+      ignore_errors: true
+      when:
+        - llamenos_ntfy_enabled | default(false) | bool
+        - (_smoke_serves_app | bool) or (_smoke_serves_ntfy | bool)
+      tags: always
+
+    - name: Record ntfy public vhost result
+      ansible.builtin.set_fact:
+        smoke_results: "{{ smoke_results + [{'check': 'ntfy public vhost https://' + ntfy_domain + '/v1/health (200)', 'status': 'PASS' if ntfy_public_check is succeeded else 'FAIL'}] }}"
+      when:
+        - llamenos_ntfy_enabled | default(false) | bool
+        - (_smoke_serves_app | bool) or (_smoke_serves_ntfy | bool)
       tags: always
 
     - name: Check Signal Notifier sidecar health
@@ -288,14 +340,18 @@
       register: update_health
       failed_when: update_health.content != "ok"
       ignore_errors: true
-      when: llamenos_update_server_enabled | default(false) | bool
+      when:
+        - llamenos_update_server_enabled | default(false) | bool
+        - _smoke_serves_app | bool
       tags: always
 
     - name: Record update server result
       ansible.builtin.set_fact:
         smoke_results: "{{ smoke_results + [{'check': 'Update server health', 'status': 'PASS' if update_health is succeeded else 'FAIL' if update_health is failed
           else 'SKIP'}] }}"
-      when: llamenos_update_server_enabled | default(false) | bool
+      when:
+        - llamenos_update_server_enabled | default(false) | bool
+        - _smoke_serves_app | bool
       tags: always
 
     # ─── TLS / Caddy ─────────────────────────────────────────────────────────
@@ -310,14 +366,18 @@
       retries: 3
       delay: 5
       ignore_errors: true
-      when: llamenos_caddy_enabled | default(true) | bool
+      when:
+        - llamenos_caddy_enabled | default(true) | bool
+        - _smoke_serves_app | bool
       tags: always
 
     - name: Record Caddy HTTPS result
       ansible.builtin.set_fact:
         smoke_results: "{{ smoke_results + [{'check': 'Caddy HTTPS serving ' + _api_base_url, 'status': 'PASS' if caddy_check is succeeded else 'FAIL' if caddy_check
           is failed else 'SKIP'}] }}"
-      when: llamenos_caddy_enabled | default(true) | bool
+      when:
+        - llamenos_caddy_enabled | default(true) | bool
+        - _smoke_serves_app | bool
       tags: always
 
     - name: Check HSTS and security headers are present in Caddy response
@@ -328,7 +388,9 @@
         return_content: false
       register: caddy_headers
       ignore_errors: true
-      when: llamenos_caddy_enabled | default(true) | bool
+      when:
+        - llamenos_caddy_enabled | default(true) | bool
+        - _smoke_serves_app | bool
       tags: always
 
     - name: Assert HSTS header is present
@@ -344,14 +406,18 @@
         success_msg: "HSTS header present: {{ caddy_headers.strict_transport_security | default('') }}"
       ignore_errors: true
       register: hsts_check
-      when: llamenos_caddy_enabled | default(true) | bool and caddy_headers is succeeded
+      when:
+        - llamenos_caddy_enabled | default(true) | bool and caddy_headers is succeeded
+        - _smoke_serves_app | bool
       tags: always
 
     - name: Record HSTS header result
       ansible.builtin.set_fact:
         smoke_results: "{{ smoke_results + [{'check': 'HSTS header present (Caddy security_headers)', 'status': 'PASS' if hsts_check is succeeded else 'FAIL' if hsts_check
           is defined and hsts_check is failed else 'SKIP'}] }}"
-      when: llamenos_caddy_enabled | default(true) | bool
+      when:
+        - llamenos_caddy_enabled | default(true) | bool
+        - _smoke_serves_app | bool
       tags: always
 
     - name: Assert X-Frame-Options header is present
@@ -366,14 +432,18 @@
         success_msg: "X-Frame-Options: {{ caddy_headers.x_frame_options | default('') }}"
       ignore_errors: true
       register: xframe_check
-      when: llamenos_caddy_enabled | default(true) | bool and caddy_headers is succeeded
+      when:
+        - llamenos_caddy_enabled | default(true) | bool and caddy_headers is succeeded
+        - _smoke_serves_app | bool
       tags: always
 
     - name: Record X-Frame-Options result
       ansible.builtin.set_fact:
         smoke_results: "{{ smoke_results + [{'check': 'X-Frame-Options: DENY header present', 'status': 'PASS' if xframe_check is succeeded else 'FAIL' if xframe_check
           is defined and xframe_check is failed else 'SKIP'}] }}"
-      when: llamenos_caddy_enabled | default(true) | bool
+      when:
+        - llamenos_caddy_enabled | default(true) | bool
+        - _smoke_serves_app | bool
       tags: always
 
     # ─── Disk space ──────────────────────────────────────────────────────────

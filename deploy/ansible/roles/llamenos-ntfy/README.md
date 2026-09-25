@@ -35,6 +35,62 @@ Add hosts to the `llamenos_ntfy` inventory group if you're splitting
 services across machines; an empty/absent group means "every
 `llamenos_servers` host," matching every other service role here.
 
+## Running the relay on its own, unencrypted host
+
+The reference deployment puts the relay on a separate host with **no
+full-disk encryption** (`llamenos_disk_encrypted: false`; see
+[`docs/deployment/first-deploy.md`](../../../../docs/deployment/first-deploy.md),
+"Two hosts, two tiers"). The relay is a good fit for that tier — it needs
+reachability, and its payloads are HPKE ciphertext — but its *metadata* is
+not safe to accumulate: topic + timestamp is a record of which volunteer
+device was woken and when, and a client address next to it is a volunteer's
+IP. So on such a host:
+
+- **No message cache at rest.** `NTFY_CACHE_FILE` is never set, so ntfy
+  caches in memory only. `tasks/guard-no-persistence.yml` fails the play if
+  the rendered compose body sets a cache file, attachment cache, web-push
+  file, log file or mounts a `server.yml`; after start, the role lists
+  `/var/lib/ntfy` and fails unless it holds only `auth.db` (plus its SQLite
+  `-wal`/`-shm`).
+- **Minimal logs.** `NTFY_LOG_LEVEL=warn` (at INFO ntfy writes a per-minute
+  activity counter) and a single 1 MB `json-file` log. Caddy in front of it
+  has no access log, and its error log drops client IP/port, `X-Forwarded-For`
+  and the URI (the topic) — asserted by `roles/llamenos-caddy` against the
+  config Caddy itself adapts.
+- **Cross-host publishing.** `roles/service-discovery` points the app
+  host's `NTFY_URL` at `https://<ntfy_domain>`, and this role hands the
+  minted publish token to the app host(s) (`delegate_facts`), so one
+  `deploy.yml` run wires both ends. Ordering still matters: this role runs in
+  the infrastructure play, before the app play.
+
+### What this role leaves on disk
+
+| Path | Contents | Why it is acceptable on an unencrypted disk |
+|---|---|---|
+| `ntfy-data` volume: `auth.db` | the `llamenos-app` user, its token (with last-use time and address — the app host's), the ACL (`llamenos-app` write-only, `everyone` read-only) and a publish counter | A disk holder learns a credential that can only **publish**, until it is rotated. It cannot address anyone with it: publishing needs a device's topic, and no topic, message or subscriber is stored (the cache is in memory; topics are random, high-entropy strings). |
+| `{{ app_dir }}/services/ntfy/.publish-token` | the same token, for idempotent re-runs | Same credential as in `auth.db`; no additional exposure. |
+| `{{ app_dir }}/services/ntfy/docker-compose.yml` | image, hostname, ACL defaults — no secrets | Public configuration. |
+
+## Rotating the publish token
+
+Devices never hold an ntfy credential (they subscribe anonymously to their
+unguessable topic), so rotating the backend's token does not touch them —
+no re-registration. Verified against v2.11.0: after rotation the old token
+gets `401`, the new one publishes, subscribers are unaffected.
+
+```bash
+# on the relay host
+docker exec llamenos-ntfy-ntfy-1 ntfy token list llamenos-app   # note the current token
+sudo rm /opt/llamenos/services/ntfy/.publish-token
+
+# from deploy/ansible: mints a new token, re-renders the app .env, restarts the app
+ansible-playbook playbooks/deploy.yml -i inventory-production.yml \
+  -e @vars-production.yml --ask-vault-pass --tags ntfy,app
+
+# on the relay host, once the app publishes with the new token
+docker exec llamenos-ntfy-ntfy-1 ntfy token remove llamenos-app <old token>
+```
+
 ## Auth model
 
 ntfy's server-side access control is a deny-by-default allow-list
@@ -96,9 +152,10 @@ is itself HPKE-encrypted ciphertext (see `apps/worker/lib/ntfy-client.ts`)
 
 ## Networking
 
-- `ntfy` joins `llamenos-internal` (so the app container can reach it at
-  `http://ntfy:80`, matching `ntfy_url`'s default) and `llamenos-web` (so
-  `roles/llamenos-caddy` can reverse-proxy `ntfy_domain` to it).
+- `ntfy` joins `llamenos-internal` (so an app container on the same host
+  can reach it at `http://ntfy:80`, matching `ntfy_url`'s default) and
+  `llamenos-web` (so `roles/llamenos-caddy` can reverse-proxy `ntfy_domain`
+  to it). An app on another host publishes through `https://<ntfy_domain>`.
 - A `127.0.0.1`-only port (`llamenos_ntfy_local_port`, default `2586` —
   matching the port `docker-compose.dev.yml` already uses for the same
   image) exists solely for this role's own health check and CLI

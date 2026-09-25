@@ -27,6 +27,14 @@ environment:
   # No browser topic UI. This is a private push relay for our own
   # Android client and backend, not a public ntfy.sh-style instance.
   - NTFY_WEB_ROOT=disable
+{% if not (llamenos_disk_encrypted | default(false) | bool) %}
+  # Unencrypted disk: WARN and above only. At INFO ntfy writes a per-minute
+  # "Server stats" line (messages_published, visitors, ...) — no topics or
+  # IPs, but over days it is a minute-by-minute timeline of hotline activity.
+  # Measured against v2.11.0: at WARN, normal publish/subscribe/rejected-token
+  # traffic and the stats ticker log nothing.
+  - NTFY_LOG_LEVEL=warn
+{% endif %}
 volumes:
   - ntfy-data:/var/lib/ntfy
 healthcheck:
@@ -42,9 +50,8 @@ logging:
     max-size: "10m"
     max-file: "3"
 {% else %}
-    # Unencrypted disk: keep one small file, not 30MB of history. At INFO ntfy
-    # logs no per-request line (measured against v2.11.0: publish, subscribe
-    # and a rejected token all log nothing), so this holds startup/error lines.
+    # Unencrypted disk: keep one small file, not 30MB of history (with
+    # NTFY_LOG_LEVEL=warn above it holds warnings and errors only).
     max-size: "1m"
     max-file: "1"
 {% endif %}
