@@ -7,13 +7,21 @@
   -exportArchive resolves a provisioningProfiles value by the profile's
   INTERNAL Name (as shown by `security cms -D -i <file> | plutil -extract Name
   raw -`), not by its filename. Keep this in sync with fastlane/Fastfile.
+
+  `destination` MUST stay `export`: it makes `xcodebuild -exportArchive` write a
+  local .ipa into the export path, which mobile-release.yml attaches to the
+  `ios-v<version>` GitHub Release. `upload` would instead send the build straight
+  to App Store Connect and leave no .ipa behind — CI never submits to a store
+  (#969); submission is done locally with fastlane. The operator has chosen
+  TestFlight, for which `method = app-store-connect` is correct; `destination =
+  export` is correct under every candidate method.
 -->
 <plist version="1.0">
 <dict>
     <key>method</key>
     <string>app-store-connect</string>
     <key>destination</key>
-    <string>upload</string>
+    <string>export</string>
     <key>signingStyle</key>
     <string>manual</string>
     <key>uploadSymbols</key>
