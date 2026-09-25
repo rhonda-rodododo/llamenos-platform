@@ -62,6 +62,42 @@
     group: root
     mode: "0755"
 
+# ORDERING INVARIANT — do not reorder.
+# daemon.json sets "userns-remap": "default", which dockerd resolves to the
+# `dockremap` user. dockerd refuses to start ("no subuid ranges found for user
+# dockremap") unless that user AND its /etc/subuid + /etc/subgid ranges already
+# exist. So: create the user, write the ranges, THEN render daemon.json and let
+# the `Restart docker` handler (flushed below) bring dockerd up in remap mode.
+# Restarting inline before the ranges exist aborts the play on a fresh host,
+# and the range tasks after it never run.
+- name: Create dockremap user for userns-remap
+  ansible.builtin.user:
+    name: dockremap
+    system: true
+    home: /nonexistent
+    shell: /usr/sbin/nologin
+    create_home: false
+  when: docker_userns_remap
+
+# lineinfile (not copy) so unrelated entries in /etc/subuid + /etc/subgid are
+# preserved. The regexp anchors on the user name, so a re-run replaces the
+# existing line in place instead of appending a duplicate.
+- name: Set userns-remap subordinate ID ranges
+  ansible.builtin.lineinfile:
+    path: "{{ item.file }}"
+    regexp: "^{{ item.user }}:"
+    line: "{{ item.user }}:{{ item.start }}:65536"
+    create: true
+    owner: root
+    group: root
+    mode: "0644"
+  loop:
+    - { file: /etc/subuid, user: dockremap, start: 100000 }
+    - { file: /etc/subgid, user: dockremap, start: 100000 }
+    - { file: /etc/subuid, user: "{{ deploy_user }}", start: 200000 }
+    - { file: /etc/subgid, user: "{{ deploy_user }}", start: 200000 }
+  when: docker_userns_remap
+
 - name: Configure Docker daemon for production
   ansible.builtin.template:
     src: docker-daemon.json.j2
@@ -70,6 +106,12 @@
     group: root
     mode: "0644"
   notify: Restart docker
+
+# Apply the daemon.json change (and with it userns-remap) now, not at end of play:
+# the checks and network creation below must run against the final daemon, since
+# userns-remap switches dockerd to a different data root.
+- name: Apply Docker daemon configuration
+  ansible.builtin.meta: flush_handlers
 
 - name: Verify Docker restart policies on all containers
   ansible.builtin.shell: |
@@ -83,43 +125,6 @@
   register: restart_policy_check
   changed_when: false
   failed_when: false
-
-- name: Create dockremap user for userns-remap
-  ansible.builtin.user:
-    name: dockremap
-    system: true
-    home: /nonexistent
-    shell: /usr/sbin/nologin
-    create_home: false
-  when: docker_userns_remap
-
-- name: Restart Docker to enable userns-remap
-  ansible.builtin.systemd:
-    name: docker
-    state: restarted
-  when: docker_userns_remap
-
-- name: Create userns-remap subordinate UID mapping
-  ansible.builtin.copy:
-    dest: /etc/subuid
-    owner: root
-    group: root
-    mode: "0644"
-    content: |
-      dockremap:100000:65536
-      {{ deploy_user }}:200000:65536
-  when: docker_userns_remap
-
-- name: Create userns-remap subordinate GID mapping
-  ansible.builtin.copy:
-    dest: /etc/subgid
-    owner: root
-    group: root
-    mode: "0644"
-    content: |
-      dockremap:100000:65536
-      {{ deploy_user }}:200000:65536
-  when: docker_userns_remap
 
 - name: Add deploy user to docker group
   ansible.builtin.user:
