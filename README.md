@@ -190,6 +190,8 @@ bun run dev:tunnel
 
 ## Deployment
 
+For the full list of supported server and client deployment paths (Ansible, encrypted-ISO install, published releases, local builds, iOS/TestFlight), see [`docs/deployment/README.md`](docs/deployment/README.md).
+
 The API backend supports two deployment targets. Desktop clients download the app separately and connect to the API.
 
 ### Option A: Cloudflare Workers (managed)
