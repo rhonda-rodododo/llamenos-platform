@@ -1,7 +1,8 @@
+import ignore, { type Ignore } from 'ignore'
 import { checkHalt } from './killswitch.js'
 import { isQuotaHaltReason } from './circuit.js'
-import { REPO, ghJson } from './gh.js'
-import { VERIFY_JOB, REVIEW_JOB } from './ci.js'
+import { REPO, gh, ghJson, describeGhFailure } from './gh.js'
+import { REVIEW_JOB } from './ci.js'
 
 /**
  * `llamenos-fleet board` — the deterministic gate decision table.
@@ -82,15 +83,34 @@ export interface PrFact {
   createdAt: string
   headRefOid: string
   headRefName: string
+  /** The branch the PR merges INTO — the ruleset that gates it is the one
+   *  for this branch (see `BoardFacts.gates`). */
+  baseRefName: string
+  /** GitHub's own verdict on whether the merge button works right now —
+   *  `CLEAN` | `UNSTABLE` | `HAS_HOOKS` | `BLOCKED` | `BEHIND` | `DIRTY` |
+   *  `UNKNOWN` | `DRAFT`. Read as the final word on MERGE (see
+   *  `classifyPr`), never as a substitute for deriving WHY. */
   mergeStateStatus: string
   labels: string[]
-  /** `APPROVED` | `CHANGES_REQUESTED` | `REVIEW_REQUIRED` | `null` — GitHub's
-   *  own `reviewDecision`, straight through. */
-  reviewDecision: string | null
+  /** `latestOpinionatedReviews(writersOnly: true)` — each writer's latest
+   *  APPROVED / CHANGES_REQUESTED / DISMISSED review. Deliberately NOT
+   *  `reviewDecision`: under a repository ruleset GitHub reports
+   *  `reviewDecision: null` even on a PR the ruleset's code-owner rule is
+   *  blocking (verified live 2026-09-25 on #970, which touches the owned
+   *  `apps/worker/middleware/`), so it cannot answer "is review satisfied". */
+  reviews: PrReview[]
+  /** Changed paths, as far as the query's page reached — compare against
+   *  `changedFiles` before treating it as the whole diff. */
+  files: string[]
+  /** GitHub's own count of changed files; `> files.length` means `files` was
+   *  truncated and cannot prove the PR touches no code-owned path. */
+  changedFiles: number
   /** Every context off `commits(last:1)`'s rollup — CheckRun and
    *  StatusContext both, unfiltered by SHA (see `PrCheckContext.sha`). */
   checks: PrCheckContext[]
 }
+
+export interface PrReview { login: string; state: string }
 
 export interface FleetStateFact {
   halted: boolean
@@ -102,18 +122,68 @@ export interface FleetStateFact {
   isQuotaHalt: boolean
 }
 
+/**
+ * What the base branch's live repository ruleset demands of a PR —
+ * `GET /repos/{owner}/{repo}/rules/branches/{branch}`, reduced by
+ * `deriveBranchRuleset`. This repo gates `main` with a ruleset and nothing
+ * else: `GET .../branches/main/protection` answers 404 "Branch not
+ * protected", so anything that learns the required set from classic branch
+ * protection learns nothing and falls back to a guess.
+ */
+export interface BranchRuleset {
+  branch: string
+  /** Union of every `required_status_checks` rule's contexts, in first-seen order. */
+  requiredContexts: string[]
+  requireCodeOwnerReview: boolean
+  requiredApprovingReviewCount: number
+  requireExtraApprovalForUnattributedChanges: boolean
+}
+
+/** `ok: false` is "could not learn the ruleset" — never "no rules". A board
+ *  that cannot read the required set says so (CANNOT_DECIDE) instead of
+ *  substituting one. */
+export type RulesetFact = { ok: true; rules: BranchRuleset } | { ok: false; reason: string }
+
+/** One CODEOWNERS line. `owners` are logins/team slugs without the `@`; an
+ *  empty list is a line that un-owns what it matches (last match wins). */
+export interface CodeOwnerRule { pattern: string; owners: string[] }
+
+export type CodeOwnersFact = { ok: true; rules: CodeOwnerRule[] } | { ok: false; reason: string }
+
+/** Everything about a base branch that gates merges into it. `codeOwners`
+ *  is only gathered when the ruleset requires code-owner review, and is
+ *  `undefined` otherwise. */
+export interface BranchGate {
+  ruleset: RulesetFact
+  codeOwners?: CodeOwnersFact
+}
+
 export interface BoardFacts {
   fleet: FleetStateFact
   prs: PrFact[]
+  /** Keyed by base branch name, gathered once per invocation (see
+   *  `fetchBoardFactsWith`). A PR whose base has no entry is CANNOT_DECIDE. */
+  gates: Record<string, BranchGate>
 }
 
 // ---------------------------------------------------------------------------
 // Classification — every open PR lands in exactly one of these.
 // ---------------------------------------------------------------------------
 
+/**
+ * `REVIEW_BLOCKED`: every required check passes but the ruleset's
+ * `pull_request` rule does not — a code-owned path with no code-owner
+ * approval (including the case where the author is the only owner, and
+ * self-approval is impossible), too few approvals, or changes requested.
+ *
+ * `CANNOT_DECIDE`: the facts the decision needs (the ruleset, or CODEOWNERS
+ * when the ruleset requires code-owner review) could not be read. Never
+ * collapsed into a guess: a decision table that guesses is worse than one
+ * that says it cannot decide.
+ */
 export type BoardAction =
   | 'MERGE' | 'APPROVE_THEN_MERGE' | 'LABEL_FOR_REVIEW' | 'RERUN_REVIEW'
-  | 'NEEDS_FIX' | 'WAITING' | 'STALE_LABEL' | 'OPERATOR'
+  | 'NEEDS_FIX' | 'REVIEW_BLOCKED' | 'WAITING' | 'STALE_LABEL' | 'OPERATOR' | 'CANNOT_DECIDE'
 
 export interface BoardRow {
   number: number
@@ -163,16 +233,108 @@ export function isBotAuthor(login: string): boolean {
 }
 
 /**
- * The "cheap", mechanical required contexts — everything the ruleset demands
- * OTHER than the non-author model review, which gets its own richer
- * classification tree below (ABSENT / PASS / FAIL, and FAIL split into
- * infrastructure vs substantive). Kept as a literal list, not derived from
- * the ruleset itself — this repo's branch-protection ruleset lives in
- * GitHub's own UI/API configuration, not a file this command can read — and
- * mirrors the comment above `enableAutoMerge` in cli.ts, which names the
- * same three contexts (`ci-status`, `fleet/verify`, `fleet/review`).
+ * Pure. Reduces the raw `rules/branches/{branch}` body to the requirements
+ * the board gates on. Every rule that applies to the branch is folded in —
+ * `required_status_checks` contexts are UNIONED across rules (two rulesets
+ * each requiring different checks means a PR needs all of them), and the
+ * `pull_request` requirements take the strictest value any rule sets.
+ *
+ * Refuses (`ok: false`) rather than returning a thin ruleset when the body
+ * is not a rule list, a `required_status_checks` entry is malformed, or no
+ * rule requires any status check at all: every one of those means the board
+ * does not know what GitHub will demand, and an empty required set would
+ * make every PR look mergeable on checks.
+ *
+ * A required check's `integration_id` (a check that must come from one
+ * specific GitHub App) is not modelled — only the context name is matched.
+ * `mergeStateStatus` (see `classifyPr`) still refuses MERGE if GitHub
+ * disagrees, and so do `require_last_push_approval` and
+ * `required_review_thread_resolution`.
  */
-export const REQUIRED_CHEAP_CONTEXTS: readonly string[] = ['ci-status', VERIFY_JOB]
+export function deriveBranchRuleset(branch: string, raw: unknown): RulesetFact {
+  if (!Array.isArray(raw)) {
+    return { ok: false, reason: `rules/branches/${branch} did not return a rule list` }
+  }
+  if (raw.length === 0) {
+    return { ok: false, reason: `no active ruleset applies to ${branch}` }
+  }
+  const contexts = new Set<string>()
+  let requireCodeOwnerReview = false
+  let requiredApprovingReviewCount = 0
+  let requireExtraApprovalForUnattributedChanges = false
+
+  for (const rule of raw as { type?: unknown; parameters?: Record<string, unknown> }[]) {
+    const params = rule.parameters ?? {}
+    if (rule.type === 'required_status_checks') {
+      const checks = params.required_status_checks
+      if (!Array.isArray(checks)) {
+        return { ok: false, reason: `a required_status_checks rule on ${branch} carries no check list` }
+      }
+      for (const check of checks as { context?: unknown }[]) {
+        if (typeof check.context !== 'string' || check.context.length === 0) {
+          return { ok: false, reason: `a required_status_checks rule on ${branch} has an entry with no context name` }
+        }
+        contexts.add(check.context)
+      }
+    } else if (rule.type === 'pull_request') {
+      requireCodeOwnerReview ||= params.require_code_owner_review === true
+      requireExtraApprovalForUnattributedChanges ||= params.require_extra_approval_for_unattributed_changes === true
+      const count = params.required_approving_review_count
+      if (typeof count === 'number') requiredApprovingReviewCount = Math.max(requiredApprovingReviewCount, count)
+    }
+  }
+
+  if (contexts.size === 0) {
+    return { ok: false, reason: `the rules for ${branch} require no status checks — refusing to treat an empty required set as "all green"` }
+  }
+  return {
+    ok: true,
+    rules: {
+      branch,
+      requiredContexts: [...contexts],
+      requireCodeOwnerReview,
+      requiredApprovingReviewCount,
+      requireExtraApprovalForUnattributedChanges,
+    },
+  }
+}
+
+/** Pure. CODEOWNERS text → rules, in file order. Comments and blank lines
+ *  are dropped; the `@` is stripped from each owner. */
+export function parseCodeOwners(text: string): CodeOwnerRule[] {
+  const rules: CodeOwnerRule[] = []
+  for (const rawLine of text.split('\n')) {
+    const line = rawLine.replace(/(^|\s)#.*$/, '').trim()
+    if (line.length === 0) continue
+    const [pattern, ...owners] = line.split(/\s+/)
+    if (pattern === undefined) continue
+    rules.push({ pattern, owners: owners.map((o) => o.replace(/^@/, '')) })
+  }
+  return rules
+}
+
+const compiledPatterns = new WeakMap<CodeOwnerRule, Ignore>()
+
+/**
+ * Pure. The owners of `path`: the LAST matching rule's owners, the way GitHub
+ * resolves CODEOWNERS. Matched with the `ignore` package's gitignore
+ * semantics — the same syntax GitHub parses CODEOWNERS with, and the same
+ * matcher `tests/orchestrator/codeowners.ts` holds the real file to — never a
+ * prefix comparison (`apps/worker/lib/auth` does not own `auth.ts`).
+ */
+export function codeOwnersOf(rules: CodeOwnerRule[], path: string): string[] {
+  for (let i = rules.length - 1; i >= 0; i--) {
+    const rule = rules[i]
+    if (rule === undefined) continue
+    let matcher = compiledPatterns.get(rule)
+    if (matcher === undefined) {
+      matcher = ignore().add(rule.pattern)
+      compiledPatterns.set(rule, matcher)
+    }
+    if (matcher.ignores(path)) return rule.owners
+  }
+  return []
+}
 
 /**
  * THE head-binding rule (see the module docstring and `PrCheckContext.sha`'s
@@ -187,8 +349,16 @@ function checksOnHead(pr: PrFact): PrCheckContext[] {
   return pr.checks.filter((c) => c.sha === pr.headRefOid)
 }
 
-function findCheapContext(onHead: PrCheckContext[], name: string): PrCheckContext | undefined {
-  return onHead.find((c) => c.name === name)
+/** The state of a required context on the head, or `undefined` if nothing
+ *  by that name posted. Several same-named contexts (two workflows both
+ *  naming a job `CodeQL`) resolve to the WORST of them — a red one is never
+ *  hidden behind a green one that happened to be listed first. */
+function requiredContextState(onHead: PrCheckContext[], name: string): CheckState | undefined {
+  const states = onHead.filter((c) => c.name === name).map((c) => c.state)
+  if (states.length === 0) return undefined
+  if (states.includes('FAIL')) return 'FAIL'
+  if (states.includes('PENDING')) return 'PENDING'
+  return 'PASS'
 }
 
 /**
@@ -241,11 +411,87 @@ export interface PrClassification {
 }
 
 /**
+ * Pure. What the ruleset's `pull_request` rule still demands of this PR, as
+ * human-readable blockers — empty means review is satisfied. Approvals are
+ * each writer's LATEST opinionated review, the author's own never counted
+ * (GitHub never lets a PR author approve their own PR).
+ *
+ * `needsApprovalOnly` is `true` when every blocker is a missing approval
+ * that some OTHER person could give — the distinction between
+ * `APPROVE_THEN_MERGE` (a bot PR the operator can approve) and a PR that is
+ * stuck regardless (changes requested).
+ *
+ * Code-owner review is checked per changed path against the base branch's
+ * CODEOWNERS: each owned path needs an approval from one of its owners. A
+ * team owner (`org/team`) is never assumed satisfied — the board cannot see
+ * team membership, so it refuses rather than guesses. A truncated file list
+ * cannot prove the PR touches no owned path, so it blocks too.
+ */
+export function reviewBlockers(
+  pr: PrFact, rules: BranchRuleset, codeOwners: CodeOwnerRule[] | undefined,
+): { blockers: string[]; needsApprovalOnly: boolean } {
+  const blockers: string[] = []
+  let needsApprovalOnly = true
+  const approvers = new Set(
+    pr.reviews.filter((r) => r.state === 'APPROVED' && r.login !== pr.authorLogin).map((r) => r.login),
+  )
+
+  const changesRequestedBy = pr.reviews.filter((r) => r.state === 'CHANGES_REQUESTED').map((r) => `@${r.login}`)
+  if (changesRequestedBy.length > 0) {
+    blockers.push(`changes requested by ${changesRequestedBy.join(', ')}`)
+    needsApprovalOnly = false
+  }
+
+  if (approvers.size < rules.requiredApprovingReviewCount) {
+    blockers.push(`${approvers.size}/${rules.requiredApprovingReviewCount} required approving reviews`)
+  }
+
+  if (rules.requireCodeOwnerReview && codeOwners !== undefined) {
+    if (pr.changedFiles > pr.files.length) {
+      blockers.push(`only ${pr.files.length} of ${pr.changedFiles} changed files were read — cannot prove no code-owned path is touched`)
+    }
+    const unapproved = pr.files.filter((path) => {
+      const owners = codeOwnersOf(codeOwners, path)
+      return owners.length > 0 && !owners.some((o) => !o.includes('/') && approvers.has(o))
+    })
+    if (unapproved.length > 0) {
+      const shown = unapproved.slice(0, 3).join(', ') + (unapproved.length > 3 ? ` (+${unapproved.length - 3} more)` : '')
+      blockers.push(`code-owner review required (require_code_owner_review) for ${shown}`)
+      const onlyOwnerIsAuthor = unapproved.some((path) => {
+        const owners = codeOwnersOf(codeOwners, path)
+        return owners.every((o) => o === pr.authorLogin)
+      })
+      if (onlyOwnerIsAuthor) needsApprovalOnly = false
+    }
+  }
+
+  if (rules.requireExtraApprovalForUnattributedChanges && isBotAuthor(pr.authorLogin) && approvers.size === 0) {
+    blockers.push('bot-authored PR needs an approval (require_extra_approval_for_unattributed_changes)')
+  }
+
+  return { blockers, needsApprovalOnly }
+}
+
+/** `mergeStateStatus` values under which GitHub's merge button works:
+ *  `UNSTABLE` is a failing NON-required check, `HAS_HOOKS` is a clean merge
+ *  with pre-receive hooks. Every other value refuses MERGE. */
+const MERGEABLE_STATES: ReadonlySet<string> = new Set(['CLEAN', 'UNSTABLE', 'HAS_HOOKS'])
+
+function cannotDecide(reason: string): PrClassification {
+  return { action: 'CANNOT_DECIDE', reason, failingContexts: [] }
+}
+
+/**
  * The one, total function every open PR passes through. Every branch below
  * returns — there is no fallthrough default, so a PR can never silently miss
  * the board the way #862's stale-SHA read did.
+ *
+ * The required set is `gate.ruleset` — the live ruleset for the PR's base
+ * branch — and nothing else. It used to be a hardcoded
+ * `['ci-status', 'fleet/verify']`, which is how #961 (`gitleaks=fail`, every
+ * hardcoded context green) was classified MERGE and then refused by GitHub.
  */
-export function classifyPr(pr: PrFact): PrClassification {
+export function classifyPr(pr: PrFact, gate: BranchGate): PrClassification {
   if (pr.isDraft) {
     return { action: 'OPERATOR', reason: 'draft PR — never auto-actionable', failingContexts: [] }
   }
@@ -257,10 +503,27 @@ export function classifyPr(pr: PrFact): PrClassification {
     }
   }
 
+  if (!gate.ruleset.ok) {
+    return cannotDecide(`the required set for ${pr.baseRefName} is unknown: ${gate.ruleset.reason}`)
+  }
+  const rules = gate.ruleset.rules
+  let codeOwners: CodeOwnerRule[] | undefined
+  if (rules.requireCodeOwnerReview) {
+    if (gate.codeOwners === undefined) return cannotDecide(`the ${pr.baseRefName} ruleset requires code-owner review but CODEOWNERS was not read`)
+    if (!gate.codeOwners.ok) return cannotDecide(`the ${pr.baseRefName} ruleset requires code-owner review but CODEOWNERS is unreadable: ${gate.codeOwners.reason}`)
+    codeOwners = gate.codeOwners.rules
+  }
+
+  // Every required context except `fleet/review`, which gets its own richer
+  // tree below. `fleet/review` is required by the fleet's own policy even if
+  // the ruleset stopped requiring it — the board only ever gets stricter
+  // than the ruleset, never looser.
   const onHead = checksOnHead(pr)
-  const cheap = REQUIRED_CHEAP_CONTEXTS.map((name) => ({ name, ctx: findCheapContext(onHead, name) }))
-  const cheapFailing = cheap.filter((c) => c.ctx !== undefined && c.ctx.state === 'FAIL')
-  const cheapPendingOrMissing = cheap.filter((c) => c.ctx === undefined || c.ctx.state === 'PENDING')
+  const cheap = rules.requiredContexts
+    .filter((name) => name !== REVIEW_JOB)
+    .map((name) => ({ name, state: requiredContextState(onHead, name) }))
+  const cheapFailing = cheap.filter((c) => c.state === 'FAIL')
+  const cheapPendingOrMissing = cheap.filter((c) => c.state === undefined || c.state === 'PENDING')
 
   if (cheapFailing.length > 0) {
     return {
@@ -303,21 +566,38 @@ export function classifyPr(pr: PrFact): PrClassification {
   }
 
   if (review.state === 'PASS') {
-    if (isBotAuthor(pr.authorLogin)) {
-      if (pr.reviewDecision === 'APPROVED') {
+    const { blockers, needsApprovalOnly } = reviewBlockers(pr, rules, codeOwners)
+    if (blockers.length > 0) {
+      if (isBotAuthor(pr.authorLogin) && needsApprovalOnly) {
         return {
-          action: 'MERGE',
-          reason: 'bot-authored PR already carries a code-owner approval; every required context is green',
+          action: 'APPROVE_THEN_MERGE',
+          reason: `every required check is green; bot-authored PR needs an approval before GitHub will merge: ${blockers.join('; ')}`,
           failingContexts: [],
         }
       }
       return {
-        action: 'APPROVE_THEN_MERGE',
-        reason: 'bot-authored PR needs a code-owner approval (require_extra_approval_for_unattributed_changes) before GitHub will merge',
+        action: 'REVIEW_BLOCKED',
+        reason: `every required check is green, but the ${pr.baseRefName} ruleset's review requirements are not met: ${blockers.join('; ')}`,
         failingContexts: [],
       }
     }
-    return { action: 'MERGE', reason: 'every required context is pass-or-skip on the current head', failingContexts: [] }
+    // Everything the board derives from the ruleset is satisfied. GitHub's
+    // own mergeStateStatus is still the last word — it is what `gh pr merge`
+    // obeys, and it sees requirements the board does not model.
+    if (pr.mergeStateStatus === 'DIRTY') {
+      return { action: 'NEEDS_FIX', reason: 'merge conflict with the base branch (mergeStateStatus=DIRTY)', failingContexts: [] }
+    }
+    if (pr.mergeStateStatus === 'UNKNOWN') {
+      return { action: 'WAITING', reason: 'GitHub has not computed mergeability yet (mergeStateStatus=UNKNOWN)', failingContexts: [] }
+    }
+    if (!MERGEABLE_STATES.has(pr.mergeStateStatus)) {
+      return {
+        action: 'OPERATOR',
+        reason: `every ruleset requirement the board models is met, yet GitHub reports mergeStateStatus=${pr.mergeStateStatus} — a requirement the board does not model; investigate before merging`,
+        failingContexts: [],
+      }
+    }
+    return { action: 'MERGE', reason: 'every ruleset-required context is pass-or-skip on the current head and its review requirements are met', failingContexts: [] }
   }
 
   // review.state === 'FAIL'
@@ -345,8 +625,8 @@ export function classifyPr(pr: PrFact): PrClassification {
 /** Most-actionable first — see `renderBoard`'s own comment for why this
  *  ordering, not alphabetical or PR-number order, is the default grouping. */
 const ACTION_ORDER: readonly BoardAction[] = [
-  'MERGE', 'APPROVE_THEN_MERGE', 'RERUN_REVIEW', 'NEEDS_FIX',
-  'LABEL_FOR_REVIEW', 'STALE_LABEL', 'WAITING', 'OPERATOR',
+  'CANNOT_DECIDE', 'MERGE', 'APPROVE_THEN_MERGE', 'RERUN_REVIEW', 'NEEDS_FIX',
+  'REVIEW_BLOCKED', 'LABEL_FOR_REVIEW', 'STALE_LABEL', 'WAITING', 'OPERATOR',
 ]
 
 /**
@@ -359,7 +639,11 @@ const ACTION_ORDER: readonly BoardAction[] = [
  * `createdAt` or list order).
  */
 export function buildBoard(facts: BoardFacts): BoardView {
-  const classified = facts.prs.map((pr) => ({ pr, result: classifyPr(pr) }))
+  const classified = facts.prs.map((pr) => {
+    const gate: BranchGate = facts.gates[pr.baseRefName]
+      ?? { ruleset: { ok: false, reason: `no ruleset was gathered for base branch ${pr.baseRefName}` } }
+    return { pr, result: classifyPr(pr, gate) }
+  })
 
   const candidates = classified
     .filter((c) => c.result.action === 'LABEL_FOR_REVIEW_CANDIDATE')
@@ -477,9 +761,12 @@ query($owner: String!, $repo: String!, $count: Int!) {
         createdAt
         headRefOid
         headRefName
+        baseRefName
         mergeStateStatus
-        reviewDecision
         labels(first: 50) { nodes { name } }
+        changedFiles
+        files(first: 100) { nodes { path } }
+        latestOpinionatedReviews(first: 50, writersOnly: true) { nodes { author { login } state } }
         commits(last: 1) {
           nodes {
             commit {
@@ -531,9 +818,12 @@ interface GqlPrNode {
   createdAt: string
   headRefOid: string
   headRefName: string
+  baseRefName: string
   mergeStateStatus: string
-  reviewDecision: string | null
   labels: { nodes: { name: string }[] }
+  changedFiles: number
+  files: { nodes: { path: string }[] } | null
+  latestOpinionatedReviews: { nodes: { author: { login: string } | null; state: string }[] } | null
   commits: { nodes: { commit: { oid: string; statusCheckRollup: { contexts: { nodes: GqlContextNode[] } } | null } }[] }
 }
 
@@ -573,6 +863,14 @@ export interface BoardFetchDeps {
    *  comment on `classifyReviewFailure`). */
   fetchRunJobs(runId: number): Promise<{ steps: WorkflowStep[]; runAttempt: number } | undefined>
   checkFleetHalt(): Promise<{ halted: boolean; reason?: string }>
+  /** `gh api repos/{REPO}/rules/branches/{branch}` — the raw rule list,
+   *  every page. THROWS on failure (with the `gh` detail as the message) so
+   *  a failed read can never be mistaken for an empty rule list. */
+  fetchBranchRules(branch: string): Promise<unknown>
+  /** The base branch's CODEOWNERS text, from the first of `.github/`, the
+   *  root, and `docs/` that has one — GitHub's own lookup order. `null` when
+   *  none exists; THROWS when it could not be read. */
+  fetchCodeOwners(branch: string): Promise<string | null>
 }
 
 function toCheckState(node: GqlContextNode): { name: string; kind: 'CheckRun' | 'StatusContext'; state: CheckState; workflowRunId?: number } {
@@ -594,6 +892,26 @@ function toCheckState(node: GqlContextNode): { name: string; kind: 'CheckRun' | 
  * brief asks for; the per-run jobs lookup only ever fires for a PR whose
  * `fleet/review` is red, which is expected to be rare.
  */
+async function gatherGate(deps: BoardFetchDeps, branch: string): Promise<BranchGate> {
+  let ruleset: RulesetFact
+  try {
+    ruleset = deriveBranchRuleset(branch, await deps.fetchBranchRules(branch))
+  } catch (e) {
+    return { ruleset: { ok: false, reason: `GET repos/${REPO}/rules/branches/${branch} failed: ${describeError(e)}` } }
+  }
+  if (!ruleset.ok || !ruleset.rules.requireCodeOwnerReview) return { ruleset }
+  try {
+    const text = await deps.fetchCodeOwners(branch)
+    return { ruleset, codeOwners: { ok: true, rules: text === null ? [] : parseCodeOwners(text) } }
+  } catch (e) {
+    return { ruleset, codeOwners: { ok: false, reason: `reading CODEOWNERS on ${branch} failed: ${describeError(e)}` } }
+  }
+}
+
+function describeError(e: unknown): string {
+  return e instanceof Error && !('stderr' in e) ? e.message : describeGhFailure(e)
+}
+
 export async function fetchBoardFactsWith(deps: BoardFetchDeps): Promise<BoardFacts> {
   const halt = await deps.checkFleetHalt()
   const fleet: FleetStateFact = { halted: halt.halted, haltReason: halt.reason, isQuotaHalt: isQuotaHaltReason(halt.reason) }
@@ -636,14 +954,27 @@ export async function fetchBoardFactsWith(deps: BoardFetchDeps): Promise<BoardFa
       createdAt: node.createdAt,
       headRefOid: node.headRefOid,
       headRefName: node.headRefName,
+      baseRefName: node.baseRefName,
       mergeStateStatus: node.mergeStateStatus,
       labels: node.labels.nodes.map((l) => l.name),
-      reviewDecision: node.reviewDecision,
+      reviews: (node.latestOpinionatedReviews?.nodes ?? [])
+        .map((r) => ({ login: r.author?.login ?? '(unknown)', state: r.state })),
+      files: (node.files?.nodes ?? []).map((f) => f.path),
+      changedFiles: node.changedFiles,
       checks,
     }
   }))
 
-  return { fleet, prs }
+  // One ruleset read (and at most one CODEOWNERS read) per distinct base
+  // branch, per invocation — in practice exactly one, for `main`. Held only
+  // in this call's locals: the next `board` run re-reads the live ruleset,
+  // because a cached ruleset is a claim about GitHub that drifts the moment
+  // the operator edits it.
+  const bases = [...new Set(prs.map((p) => p.baseRefName))].sort()
+  const gates: Record<string, BranchGate> = {}
+  for (const branch of bases) gates[branch] = await gatherGate(deps, branch)
+
+  return { fleet, prs, gates }
 }
 
 interface ActionsRunJob { name: string; run_attempt: number; steps: { name: string; conclusion: string | null }[] }
@@ -668,7 +999,47 @@ function defaultBoardFetchDeps(): BoardFetchDeps {
       return { steps: job.steps.map((s) => ({ name: s.name, conclusion: s.conclusion })), runAttempt: job.run_attempt }
     },
     checkFleetHalt: checkHalt,
+    fetchBranchRules: async (branch) => {
+      const pages = JSON.parse(await gh([
+        'api', '--paginate', '--slurp', `repos/${REPO}/rules/branches/${encodeURIComponent(branch)}?per_page=100`,
+      ])) as unknown
+      return Array.isArray(pages) ? pages.flat() : pages
+    },
+    fetchCodeOwners: async (branch) => {
+      const [owner, repoName] = REPO.split('/')
+      const out = JSON.parse(await gh([
+        'api', 'graphql',
+        '-f', `query=${CODEOWNERS_QUERY}`,
+        '-f', `owner=${owner ?? ''}`,
+        '-f', `repo=${repoName ?? ''}`,
+        '-f', `github=${branch}:.github/CODEOWNERS`,
+        '-f', `root=${branch}:CODEOWNERS`,
+        '-f', `docs=${branch}:docs/CODEOWNERS`,
+      ])) as CodeOwnersResponse
+      const repo = out.data?.repository
+      if (repo === undefined || repo === null) throw new Error(`CODEOWNERS query returned no repository${out.errors ? `: ${JSON.stringify(out.errors)}` : ''}`)
+      return repo.github?.text ?? repo.root?.text ?? repo.docs?.text ?? null
+    },
   }
+}
+
+/** GitHub's CODEOWNERS lookup order — `.github/`, root, `docs/` — as three
+ *  aliased blob reads in one query. A missing file is a `null` object, not
+ *  an error, which is what lets `fetchCodeOwners` tell "no CODEOWNERS" from
+ *  "could not read it". */
+const CODEOWNERS_QUERY = `
+query($owner: String!, $repo: String!, $github: String!, $root: String!, $docs: String!) {
+  repository(owner: $owner, name: $repo) {
+    github: object(expression: $github) { ... on Blob { text } }
+    root: object(expression: $root) { ... on Blob { text } }
+    docs: object(expression: $docs) { ... on Blob { text } }
+  }
+}
+`.trim()
+
+interface CodeOwnersResponse {
+  data?: { repository?: { github: { text?: string } | null; root: { text?: string } | null; docs: { text?: string } | null } | null } | null
+  errors?: unknown
 }
 
 export async function fetchBoardFacts(): Promise<BoardFacts> {

@@ -2,21 +2,50 @@ import { describe, it, expect, vi } from 'vitest'
 import {
   buildBoard, classifyPr, classifyReviewFailure, isBotAuthor,
   normalizeCheckRunState, normalizeStatusContextState, renderBoard, renderBoardPorcelain,
-  fetchBoardFactsWith,
-  REQUIRED_CHEAP_CONTEXTS,
+  fetchBoardFactsWith, deriveBranchRuleset, parseCodeOwners, codeOwnersOf,
   type BoardFacts, type PrFact, type PrCheckContext, type FleetStateFact, type BoardFetchDeps,
+  type BranchGate, type BranchRuleset, type CheckState,
 } from '../../orchestrator/src/board.js'
 import { VERIFY_JOB, REVIEW_JOB } from '../../orchestrator/src/ci.js'
 
 const HEAD = 'head-sha-111'
 const OTHER_SHA = 'stale-sha-999'
+const OWNER = 'rhonda-rodododo'
 
 const FLEET_OK: FleetStateFact = { halted: false, isQuotaHalt: false }
 
-/** Every cheap required context PASSing on the current head — the baseline
- *  every classification test starts from and overrides away from. */
+/** `main`'s live ruleset, verbatim from `gh api repos/:owner/:repo/rules/
+ *  branches/main` on 2026-09-25 (the #961 incident): five required contexts,
+ *  code-owner review required, zero approving reviews otherwise. */
+const MAIN_RULES: BranchRuleset = {
+  branch: 'main',
+  requiredContexts: ['ci-status', 'gitleaks', 'CodeQL', VERIFY_JOB, REVIEW_JOB],
+  requireCodeOwnerReview: true,
+  requiredApprovingReviewCount: 0,
+  requireExtraApprovalForUnattributedChanges: true,
+}
+
+const GATE: BranchGate = {
+  ruleset: { ok: true, rules: MAIN_RULES },
+  codeOwners: {
+    ok: true,
+    rules: [
+      { pattern: 'packages/crypto/', owners: [OWNER] },
+      { pattern: 'apps/worker/lib/auth.ts', owners: [OWNER, 'second-owner'] },
+    ],
+  },
+}
+
+/** Every required context OTHER than fleet/review PASSing on the current
+ *  head — the baseline every classification test starts from and overrides
+ *  away from. Derived from the ruleset fixture, exactly as the board derives
+ *  its own required set from the live ruleset. */
 function cheapPassChecks(sha = HEAD): PrCheckContext[] {
-  return REQUIRED_CHEAP_CONTEXTS.map((name) => ({ name, kind: 'CheckRun', sha, state: 'PASS' }))
+  return MAIN_RULES.requiredContexts.filter((n) => n !== REVIEW_JOB).map((name) => ({ name, kind: 'CheckRun', sha, state: 'PASS' }))
+}
+
+function ctx(name: string, state: CheckState, sha = HEAD): PrCheckContext {
+  return { name, kind: 'CheckRun', sha, state }
 }
 
 function pr(overrides: Partial<PrFact> = {}): PrFact {
@@ -27,9 +56,12 @@ function pr(overrides: Partial<PrFact> = {}): PrFact {
     createdAt: '2026-01-01T00:00:00Z',
     headRefOid: HEAD,
     headRefName: 'fleet/backend/1',
+    baseRefName: 'main',
     mergeStateStatus: 'CLEAN',
     labels: [],
-    reviewDecision: null,
+    reviews: [],
+    files: ['docs/notes.md'],
+    changedFiles: 1,
     checks: cheapPassChecks(),
     ...overrides,
   }
@@ -39,7 +71,59 @@ function reviewCheck(overrides: Partial<PrCheckContext> = {}): PrCheckContext {
   return { name: REVIEW_JOB, kind: 'CheckRun', sha: HEAD, state: 'PASS', ...overrides }
 }
 
-const facts = (prs: PrFact[], fleet: FleetStateFact = FLEET_OK): BoardFacts => ({ fleet, prs })
+const classify = (p: PrFact, gate: BranchGate = GATE) => classifyPr(p, gate)
+
+const facts = (prs: PrFact[], fleet: FleetStateFact = FLEET_OK): BoardFacts => ({ fleet, prs, gates: { main: GATE } })
+
+/** `gh api repos/:owner/:repo/rules/branches/main` on 2026-09-25, verbatim
+ *  (the #961 incident) — the raw body `fetchBranchRules` returns. */
+const LIVE_MAIN_RULES = [
+  { type: 'deletion', ruleset_id: 15885614 },
+  { type: 'non_fast_forward', ruleset_id: 15885614 },
+  {
+    type: 'pull_request', ruleset_id: 15885614,
+    parameters: {
+      required_approving_review_count: 0, dismiss_stale_reviews_on_push: false, required_reviewers: [],
+      require_code_owner_review: true, require_last_push_approval: false, required_review_thread_resolution: false,
+      require_extra_approval_for_unattributed_changes: true, allowed_merge_methods: ['squash'],
+    },
+  },
+  {
+    type: 'required_status_checks', ruleset_id: 15885614,
+    parameters: {
+      strict_required_status_checks_policy: false, do_not_enforce_on_create: true,
+      required_status_checks: [
+        { context: 'ci-status' }, { context: 'gitleaks' }, { context: 'CodeQL' }, { context: VERIFY_JOB }, { context: REVIEW_JOB },
+      ],
+    },
+  },
+]
+
+type GqlPrNodeFixture = Awaited<ReturnType<BoardFetchDeps['queryOpenPrs']>> extends infer R
+  ? R extends { data?: { repository?: { pullRequests?: { nodes: (infer N)[] } } | null } | null } ? N : never
+  : never
+type GqlContextFixture = GqlPrNodeFixture['commits']['nodes'][number]['commit'] extends infer C
+  ? C extends { statusCheckRollup: { contexts: { nodes: (infer X)[] } } | null } ? X : never
+  : never
+
+/** One open-PR node exactly as `PR_QUERY` returns it. */
+function gqlPr(number: number, contexts: GqlContextFixture[] = []): GqlPrNodeFixture {
+  return {
+    number,
+    author: { login: 'a-human' },
+    isDraft: false,
+    createdAt: '2026-01-01T00:00:00Z',
+    headRefOid: HEAD,
+    headRefName: `fleet/backend/${number}`,
+    baseRefName: 'main',
+    mergeStateStatus: 'CLEAN',
+    labels: { nodes: [] },
+    changedFiles: 1,
+    files: { nodes: [{ path: 'docs/notes.md' }] },
+    latestOpinionatedReviews: { nodes: [] },
+    commits: { nodes: [{ commit: { oid: HEAD, statusCheckRollup: { contexts: { nodes: contexts } } } }] },
+  }
+}
 
 describe('classifyReviewFailure', () => {
   it('is substantive when the step literally named "Review" failed', () => {
@@ -93,71 +177,71 @@ describe('normalizeStatusContextState', () => {
 
 describe('classifyPr — OPERATOR', () => {
   it('a draft is OPERATOR regardless of everything else', () => {
-    expect(classifyPr(pr({ isDraft: true, checks: [] })).action).toBe('OPERATOR')
+    expect(classify(pr({ isDraft: true, checks: [] })).action).toBe('OPERATOR')
   })
 
   it('the knope release PR (branch "release", bot author) is OPERATOR', () => {
-    expect(classifyPr(pr({ headRefName: 'release', authorLogin: 'app/github-actions' })).action).toBe('OPERATOR')
+    expect(classify(pr({ headRefName: 'release', authorLogin: 'app/github-actions' })).action).toBe('OPERATOR')
   })
 
   it('a human PR on a branch literally named "release" is NOT auto-classified OPERATOR by branch alone', () => {
-    expect(classifyPr(pr({ headRefName: 'release', authorLogin: 'a-human', checks: [...cheapPassChecks(), reviewCheck()] })).action)
+    expect(classify(pr({ headRefName: 'release', authorLogin: 'a-human', checks: [...cheapPassChecks(), reviewCheck()] })).action)
       .toBe('MERGE')
   })
 })
 
 describe('classifyPr — cheap required contexts', () => {
   it('NEEDS_FIX when a cheap context failed, and names it', () => {
-    const result = classifyPr(pr({ checks: [{ name: VERIFY_JOB, kind: 'CheckRun', sha: HEAD, state: 'FAIL' }, { name: 'ci-status', kind: 'CheckRun', sha: HEAD, state: 'PASS' }] }))
+    const result = classify(pr({ checks: [{ name: VERIFY_JOB, kind: 'CheckRun', sha: HEAD, state: 'FAIL' }, { name: 'ci-status', kind: 'CheckRun', sha: HEAD, state: 'PASS' }] }))
     expect(result.action).toBe('NEEDS_FIX')
     expect(result.failingContexts).toContain(VERIFY_JOB)
   })
 
   it('WAITING when a cheap context is still pending', () => {
-    const result = classifyPr(pr({ checks: [{ name: VERIFY_JOB, kind: 'CheckRun', sha: HEAD, state: 'PENDING' }, { name: 'ci-status', kind: 'CheckRun', sha: HEAD, state: 'PASS' }] }))
+    const result = classify(pr({ checks: [{ name: VERIFY_JOB, kind: 'CheckRun', sha: HEAD, state: 'PENDING' }, { name: 'ci-status', kind: 'CheckRun', sha: HEAD, state: 'PASS' }] }))
     expect(result.action).toBe('WAITING')
   })
 
   it('WAITING when a cheap context has not posted on this head at all', () => {
-    const result = classifyPr(pr({ checks: [{ name: 'ci-status', kind: 'CheckRun', sha: HEAD, state: 'PASS' }] }))
+    const result = classify(pr({ checks: [{ name: 'ci-status', kind: 'CheckRun', sha: HEAD, state: 'PASS' }] }))
     expect(result.action).toBe('WAITING')
   })
 })
 
 describe('classifyPr — fleet/review tree', () => {
   it('MERGE when review PASSes and author is not a bot', () => {
-    expect(classifyPr(pr({ authorLogin: 'a-human', checks: [...cheapPassChecks(), reviewCheck()] })).action).toBe('MERGE')
+    expect(classify(pr({ authorLogin: 'a-human', checks: [...cheapPassChecks(), reviewCheck()] })).action).toBe('MERGE')
   })
 
   it('APPROVE_THEN_MERGE for a bot author with no code-owner approval yet', () => {
-    expect(classifyPr(pr({ authorLogin: 'app/dependabot', checks: [...cheapPassChecks(), reviewCheck()] })).action)
+    expect(classify(pr({ authorLogin: 'app/dependabot', checks: [...cheapPassChecks(), reviewCheck()] })).action)
       .toBe('APPROVE_THEN_MERGE')
   })
 
-  it('MERGE for a bot author that already carries a code-owner APPROVED decision', () => {
-    expect(classifyPr(pr({
-      authorLogin: 'app/dependabot', reviewDecision: 'APPROVED', checks: [...cheapPassChecks(), reviewCheck()],
+  it('MERGE for a bot author that already carries a code-owner approval', () => {
+    expect(classify(pr({
+      authorLogin: 'app/dependabot', reviews: [{ login: OWNER, state: 'APPROVED' }], checks: [...cheapPassChecks(), reviewCheck()],
     })).action).toBe('MERGE')
   })
 
   it('WAITING while fleet/review is in flight', () => {
-    expect(classifyPr(pr({ checks: [...cheapPassChecks(), reviewCheck({ state: 'PENDING' })] })).action).toBe('WAITING')
+    expect(classify(pr({ checks: [...cheapPassChecks(), reviewCheck({ state: 'PENDING' })] })).action).toBe('WAITING')
   })
 
   it('STALE_LABEL when the "review" label is present but there is no verdict on this head', () => {
-    const result = classifyPr(pr({ labels: ['review'], checks: cheapPassChecks() }))
+    const result = classify(pr({ labels: ['review'], checks: cheapPassChecks() }))
     expect(result.action).toBe('STALE_LABEL')
   })
 
   it('RERUN_REVIEW for an infrastructure failure not yet retried', () => {
-    const result = classifyPr(pr({
+    const result = classify(pr({
       checks: [...cheapPassChecks(), reviewCheck({ state: 'FAIL', reviewFailureKind: 'infrastructure', runAttempt: 1 })],
     }))
     expect(result.action).toBe('RERUN_REVIEW')
   })
 
   it('NEEDS_FIX for an infrastructure failure already retried once', () => {
-    const result = classifyPr(pr({
+    const result = classify(pr({
       checks: [...cheapPassChecks(), reviewCheck({ state: 'FAIL', reviewFailureKind: 'infrastructure', runAttempt: 2 })],
     }))
     expect(result.action).toBe('NEEDS_FIX')
@@ -167,7 +251,7 @@ describe('classifyPr — fleet/review tree', () => {
   // RERUN_REVIEW, regardless of run_attempt — auto-retrying a real verdict
   // would silently re-roll it instead of surfacing it to a human.
   it('NEEDS_FIX for a substantive review failure, never RERUN_REVIEW, even on the first attempt', () => {
-    const result = classifyPr(pr({
+    const result = classify(pr({
       checks: [...cheapPassChecks(), reviewCheck({ state: 'FAIL', reviewFailureKind: 'substantive', runAttempt: 1 })],
     }))
     expect(result.action).toBe('NEEDS_FIX')
@@ -184,7 +268,7 @@ describe('classifyPr — the head-binding rule (mandatory rail #1, per the brief
   // sole open PR a LABEL_FOR_REVIEW candidate, not a merge.
   it('a fleet/review PASS on a stale SHA is treated as ABSENT, not as a live PASS', () => {
     const staleReview = reviewCheck({ sha: OTHER_SHA, state: 'PASS' })
-    const result = classifyPr(pr({ checks: [...cheapPassChecks(), staleReview] }))
+    const result = classify(pr({ checks: [...cheapPassChecks(), staleReview] }))
     expect(result.action).not.toBe('MERGE')
     expect(result.action).not.toBe('APPROVE_THEN_MERGE')
     expect(result.action).toBe('LABEL_FOR_REVIEW_CANDIDATE')
@@ -200,7 +284,7 @@ describe('classifyPr — the head-binding rule (mandatory rail #1, per the brief
   it('a cheap context (ci-status) on a stale SHA is treated as missing, not as a live PASS', () => {
     const staleCiStatus: PrCheckContext = { name: 'ci-status', kind: 'CheckRun', sha: OTHER_SHA, state: 'PASS' }
     const verifyOnHead: PrCheckContext = { name: VERIFY_JOB, kind: 'CheckRun', sha: HEAD, state: 'PASS' }
-    const result = classifyPr(pr({ checks: [staleCiStatus, verifyOnHead] }))
+    const result = classify(pr({ checks: [staleCiStatus, verifyOnHead] }))
     expect(result.action).toBe('WAITING')
   })
 })
@@ -281,8 +365,11 @@ describe('fetchBoardFactsWith', () => {
     queryOpenPrs: vi.fn(async () => ({ data: { repository: { pullRequests: { nodes: [] } } } })),
     fetchRunJobs: vi.fn(async () => undefined),
     checkFleetHalt: vi.fn(async () => ({ halted: false })),
+    fetchBranchRules: vi.fn(async () => LIVE_MAIN_RULES),
+    fetchCodeOwners: vi.fn(async () => null),
     ...over,
   })
+  const onePr = (node: GqlPrNodeFixture) => async () => ({ data: { repository: { pullRequests: { nodes: [node] } } } })
 
   it('reads the fleet halt state through checkFleetHalt, not a re-implemented file read', async () => {
     const result = await fetchBoardFactsWith(deps({ checkFleetHalt: async () => ({ halted: true, reason: 'halted by hand' }) }))
@@ -296,46 +383,20 @@ describe('fetchBoardFactsWith', () => {
   })
 
   it('maps a GraphQL PR node into a PrFact, with both CheckRun and StatusContext contexts normalized', async () => {
-    const gqlDeps = deps({
-      queryOpenPrs: async () => ({
-        data: {
-          repository: {
-            pullRequests: {
-              nodes: [{
-                number: 41,
-                author: { login: 'a-human' },
-                isDraft: false,
-                createdAt: '2026-01-01T00:00:00Z',
-                headRefOid: HEAD,
-                headRefName: 'fleet/backend/41',
-                mergeStateStatus: 'CLEAN',
-                reviewDecision: null,
-                labels: { nodes: [{ name: 'agent-dispatchable' }] },
-                commits: {
-                  nodes: [{
-                    commit: {
-                      oid: HEAD,
-                      statusCheckRollup: {
-                        contexts: {
-                          nodes: [
-                            { __typename: 'CheckRun', name: 'ci-status', status: 'COMPLETED', conclusion: 'SUCCESS' },
-                            { __typename: 'StatusContext', context: VERIFY_JOB, state: 'SUCCESS' },
-                          ],
-                        },
-                      },
-                    },
-                  }],
-                },
-              }],
-            },
-          },
-        },
-      }),
-    })
-    const result = await fetchBoardFactsWith(gqlDeps)
+    const node = gqlPr(41, [
+      { __typename: 'CheckRun', name: 'ci-status', status: 'COMPLETED', conclusion: 'SUCCESS' },
+      { __typename: 'StatusContext', context: VERIFY_JOB, state: 'SUCCESS' },
+    ])
+    node.labels = { nodes: [{ name: 'agent-dispatchable' }] }
+    node.latestOpinionatedReviews = { nodes: [{ author: { login: OWNER }, state: 'APPROVED' }] }
+    const result = await fetchBoardFactsWith(deps({ queryOpenPrs: onePr(node) }))
     expect(result.prs).toHaveLength(1)
     const [pr0] = result.prs
     expect(pr0?.labels).toEqual(['agent-dispatchable'])
+    expect(pr0?.baseRefName).toBe('main')
+    expect(pr0?.files).toEqual(['docs/notes.md'])
+    expect(pr0?.changedFiles).toBe(1)
+    expect(pr0?.reviews).toEqual([{ login: OWNER, state: 'APPROVED' }])
     expect(pr0?.checks).toEqual(expect.arrayContaining([
       expect.objectContaining({ name: 'ci-status', kind: 'CheckRun', state: 'PASS' }),
       expect.objectContaining({ name: VERIFY_JOB, kind: 'StatusContext', state: 'PASS' }),
@@ -344,47 +405,11 @@ describe('fetchBoardFactsWith', () => {
 
   it('only calls fetchRunJobs for a FAILed fleet/review CheckRun, never for a passing or unrelated one', async () => {
     const fetchRunJobs = vi.fn(async () => ({ steps: [{ name: 'Review', conclusion: 'failure' as const }], runAttempt: 1 }))
-    const gqlDeps = deps({
-      fetchRunJobs,
-      queryOpenPrs: async () => ({
-        data: {
-          repository: {
-            pullRequests: {
-              nodes: [{
-                number: 1,
-                author: { login: 'a-human' },
-                isDraft: false,
-                createdAt: '2026-01-01T00:00:00Z',
-                headRefOid: HEAD,
-                headRefName: 'fleet/backend/1',
-                mergeStateStatus: 'CLEAN',
-                reviewDecision: null,
-                labels: { nodes: [] },
-                commits: {
-                  nodes: [{
-                    commit: {
-                      oid: HEAD,
-                      statusCheckRollup: {
-                        contexts: {
-                          nodes: [
-                            { __typename: 'CheckRun', name: 'ci-status', status: 'COMPLETED', conclusion: 'SUCCESS' },
-                            {
-                              __typename: 'CheckRun', name: REVIEW_JOB, status: 'COMPLETED', conclusion: 'FAILURE',
-                              checkSuite: { workflowRun: { databaseId: 555 } },
-                            },
-                          ],
-                        },
-                      },
-                    },
-                  }],
-                },
-              }],
-            },
-          },
-        },
-      }),
-    })
-    const result = await fetchBoardFactsWith(gqlDeps)
+    const node = gqlPr(1, [
+      { __typename: 'CheckRun', name: 'ci-status', status: 'COMPLETED', conclusion: 'SUCCESS' },
+      { __typename: 'CheckRun', name: REVIEW_JOB, status: 'COMPLETED', conclusion: 'FAILURE', checkSuite: { workflowRun: { databaseId: 555 } } },
+    ])
+    const result = await fetchBoardFactsWith(deps({ fetchRunJobs, queryOpenPrs: onePr(node) }))
     expect(fetchRunJobs).toHaveBeenCalledTimes(1)
     expect(fetchRunJobs).toHaveBeenCalledWith(555)
     const review = result.prs[0]?.checks.find((c) => c.name === REVIEW_JOB)
@@ -393,45 +418,301 @@ describe('fetchBoardFactsWith', () => {
   })
 
   it('an unreadable run is treated as an infrastructure failure, fail-safe toward "worth a retry"', async () => {
-    const gqlDeps = deps({
-      fetchRunJobs: async () => undefined,
-      queryOpenPrs: async () => ({
-        data: {
-          repository: {
-            pullRequests: {
-              nodes: [{
-                number: 2,
-                author: { login: 'a-human' },
-                isDraft: false,
-                createdAt: '2026-01-01T00:00:00Z',
-                headRefOid: HEAD,
-                headRefName: 'fleet/backend/2',
-                mergeStateStatus: 'CLEAN',
-                reviewDecision: null,
-                labels: { nodes: [] },
-                commits: {
-                  nodes: [{
-                    commit: {
-                      oid: HEAD,
-                      statusCheckRollup: {
-                        contexts: {
-                          nodes: [{
-                            __typename: 'CheckRun', name: REVIEW_JOB, status: 'COMPLETED', conclusion: 'FAILURE',
-                            checkSuite: { workflowRun: { databaseId: 777 } },
-                          }],
-                        },
-                      },
-                    },
-                  }],
-                },
-              }],
-            },
-          },
-        },
-      }),
-    })
-    const result = await fetchBoardFactsWith(gqlDeps)
+    const node = gqlPr(2, [
+      { __typename: 'CheckRun', name: REVIEW_JOB, status: 'COMPLETED', conclusion: 'FAILURE', checkSuite: { workflowRun: { databaseId: 777 } } },
+    ])
+    const result = await fetchBoardFactsWith(deps({ fetchRunJobs: async () => undefined, queryOpenPrs: onePr(node) }))
     const review = result.prs[0]?.checks.find((c) => c.name === REVIEW_JOB)
     expect(review?.reviewFailureKind).toBe('infrastructure')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// The #961 incident: the board said MERGE on a PR GitHub refused, because it
+// gated on a hardcoded ['ci-status', 'fleet/verify'] and never saw the
+// ruleset's `gitleaks`. Every test below is built from the ruleset, and each
+// one fails against the hardcoded list.
+// ---------------------------------------------------------------------------
+
+/** PR #961's own rollup, verbatim: every context green except `gitleaks`. */
+const SHAPE_961 = (): PrCheckContext[] => [
+  ctx('ci-status', 'PASS'), ctx('CodeQL', 'PASS'), ctx(VERIFY_JOB, 'PASS'), ctx(REVIEW_JOB, 'PASS'), ctx('gitleaks', 'FAIL'),
+]
+
+describe('the #961 incident — the required set is derived from the ruleset', () => {
+  it('ci-status/CodeQL/fleet/verify/fleet/review pass but gitleaks fails → NEEDS_FIX naming gitleaks, never MERGE', () => {
+    const result = classify(pr({ number: 961, authorLogin: OWNER, checks: SHAPE_961() }))
+    expect(result.action).not.toBe('MERGE')
+    expect(result.action).toBe('NEEDS_FIX')
+    expect(result.failingContexts).toEqual(['gitleaks'])
+  })
+
+  it('the same PR through buildBoard never lands in the MERGE bucket', () => {
+    const view = buildBoard(facts([pr({ number: 961, authorLogin: OWNER, checks: SHAPE_961() })]))
+    expect(view.rows.map((r) => r.action)).toEqual(['NEEDS_FIX'])
+    expect(renderBoard(view)).not.toContain('## MERGE')
+  })
+
+  it('a ruleset-required context that never posted on the head is WAITING, never MERGE', () => {
+    const withoutCodeQl = [ctx('ci-status', 'PASS'), ctx('gitleaks', 'PASS'), ctx(VERIFY_JOB, 'PASS'), reviewCheck()]
+    const result = classify(pr({ authorLogin: OWNER, checks: withoutCodeQl }))
+    expect(result.action).toBe('WAITING')
+    expect(result.reason).toContain('CodeQL')
+  })
+
+  it('a context the operator adds to the ruleset later is enforced with no code change', () => {
+    const rules: BranchRuleset = { ...MAIN_RULES, requiredContexts: [...MAIN_RULES.requiredContexts, 'sbom'] }
+    const gate: BranchGate = { ...GATE, ruleset: { ok: true, rules } }
+    const allFiveGreen = [...cheapPassChecks(), reviewCheck()]
+    expect(classify(pr({ authorLogin: OWNER, checks: allFiveGreen }), gate).action).toBe('WAITING')
+    expect(classify(pr({ authorLogin: OWNER, checks: [...allFiveGreen, ctx('sbom', 'FAIL')] }), gate).action).toBe('NEEDS_FIX')
+    expect(classify(pr({ authorLogin: OWNER, checks: [...allFiveGreen, ctx('sbom', 'PASS')] }), gate).action).toBe('MERGE')
+  })
+
+  it('a failing context the ruleset does NOT require does not block', () => {
+    const result = classify(pr({ authorLogin: OWNER, checks: [...cheapPassChecks(), reviewCheck(), ctx('lint-advisory', 'FAIL')] }))
+    expect(result.action).toBe('MERGE')
+  })
+
+  it('a same-named context that failed alongside a passing one is not read as a pass', () => {
+    const result = classify(pr({ authorLogin: OWNER, checks: [...cheapPassChecks(), ctx('gitleaks', 'FAIL'), reviewCheck()] }))
+    expect(result.action).toBe('NEEDS_FIX')
+    expect(result.failingContexts).toEqual(['gitleaks'])
+  })
+})
+
+describe('ruleset unavailable → CANNOT_DECIDE, never a guessed MERGE', () => {
+  it('a failed ruleset read makes an otherwise all-green PR CANNOT_DECIDE', () => {
+    const gate: BranchGate = { ruleset: { ok: false, reason: 'GET rules/branches/main failed: exit 1: HTTP 502' } }
+    const result = classify(pr({ authorLogin: OWNER, checks: [...cheapPassChecks(), reviewCheck()] }), gate)
+    expect(result.action).toBe('CANNOT_DECIDE')
+    expect(result.reason).toContain('HTTP 502')
+  })
+
+  it('a PR whose base branch has no gathered gate is CANNOT_DECIDE', () => {
+    const view = buildBoard(facts([pr({ baseRefName: 'release-1.x', authorLogin: OWNER, checks: [...cheapPassChecks(), reviewCheck()] })]))
+    expect(view.rows.map((r) => r.action)).toEqual(['CANNOT_DECIDE'])
+  })
+
+  it('code-owner review required but CODEOWNERS unreadable → CANNOT_DECIDE', () => {
+    const gate: BranchGate = { ruleset: GATE.ruleset, codeOwners: { ok: false, reason: 'graphql: timeout' } }
+    const result = classify(pr({ authorLogin: OWNER, checks: [...cheapPassChecks(), reviewCheck()] }), gate)
+    expect(result.action).toBe('CANNOT_DECIDE')
+  })
+
+  it('drafts and the knope release PR stay OPERATOR — those never depended on the ruleset', () => {
+    const gate: BranchGate = { ruleset: { ok: false, reason: 'down' } }
+    expect(classify(pr({ isDraft: true }), gate).action).toBe('OPERATOR')
+  })
+})
+
+describe('deriveBranchRuleset', () => {
+  it('reads the live main ruleset shape into the required set and review requirements', () => {
+    const live = [
+      { type: 'deletion' },
+      { type: 'non_fast_forward' },
+      { type: 'pull_request', parameters: { required_approving_review_count: 0, require_code_owner_review: true, require_extra_approval_for_unattributed_changes: true } },
+      { type: 'required_status_checks', parameters: { required_status_checks: [
+        { context: 'ci-status' }, { context: 'gitleaks' }, { context: 'CodeQL' }, { context: VERIFY_JOB }, { context: REVIEW_JOB },
+      ] } },
+    ]
+    expect(deriveBranchRuleset('main', live)).toEqual({ ok: true, rules: MAIN_RULES })
+  })
+
+  it('unions required contexts across every rule, and takes the strictest review requirement', () => {
+    const result = deriveBranchRuleset('main', [
+      { type: 'required_status_checks', parameters: { required_status_checks: [{ context: 'a' }, { context: 'b' }] } },
+      { type: 'required_status_checks', parameters: { required_status_checks: [{ context: 'b' }, { context: 'c', integration_id: 15368 }] } },
+      { type: 'pull_request', parameters: { required_approving_review_count: 1, require_code_owner_review: false } },
+      { type: 'pull_request', parameters: { required_approving_review_count: 2, require_code_owner_review: true } },
+    ])
+    expect(result).toEqual({
+      ok: true,
+      rules: {
+        branch: 'main', requiredContexts: ['a', 'b', 'c'],
+        requireCodeOwnerReview: true, requiredApprovingReviewCount: 2, requireExtraApprovalForUnattributedChanges: false,
+      },
+    })
+  })
+
+  it.each([
+    ['an empty rule list', []],
+    ['rules with no required status checks', [{ type: 'deletion' }, { type: 'pull_request', parameters: { require_code_owner_review: true } }]],
+    ['a non-array body', { message: 'Not Found' }],
+    ['a required_status_checks rule with a malformed entry', [{ type: 'required_status_checks', parameters: { required_status_checks: [{ ctx: 'x' }] } }]],
+  ])('refuses %s instead of guessing a required set', (_label, raw) => {
+    const result = deriveBranchRuleset('main', raw)
+    expect(result.ok).toBe(false)
+  })
+})
+
+describe('fetchBoardFactsWith — ruleset acquisition', () => {
+  const baseDeps = (over: Partial<BoardFetchDeps> = {}): BoardFetchDeps => ({
+    queryOpenPrs: async () => ({ data: { repository: { pullRequests: { nodes: [gqlPr(1), gqlPr(2), gqlPr(3)] } } } }),
+    fetchRunJobs: async () => undefined,
+    checkFleetHalt: async () => ({ halted: false }),
+    fetchBranchRules: async () => LIVE_MAIN_RULES,
+    fetchCodeOwners: async () => `packages/crypto/ @${OWNER}\n`,
+    ...over,
+  })
+
+  it('fetches the ruleset and CODEOWNERS once per invocation, not once per PR', async () => {
+    const fetchBranchRules = vi.fn(async () => LIVE_MAIN_RULES)
+    const fetchCodeOwners = vi.fn(async () => `packages/crypto/ @${OWNER}\n`)
+    const result = await fetchBoardFactsWith(baseDeps({ fetchBranchRules, fetchCodeOwners }))
+    expect(fetchBranchRules).toHaveBeenCalledTimes(1)
+    expect(fetchBranchRules).toHaveBeenCalledWith('main')
+    expect(fetchCodeOwners).toHaveBeenCalledTimes(1)
+    expect(result.gates.main?.ruleset).toEqual({ ok: true, rules: MAIN_RULES })
+  })
+
+  it('never caches across invocations — a second board run re-reads the ruleset', async () => {
+    const fetchBranchRules = vi.fn(async () => LIVE_MAIN_RULES)
+    await fetchBoardFactsWith(baseDeps({ fetchBranchRules }))
+    await fetchBoardFactsWith(baseDeps({ fetchBranchRules }))
+    expect(fetchBranchRules).toHaveBeenCalledTimes(2)
+  })
+
+  it('a thrown ruleset read becomes an explicit failure carrying the gh detail, and the board says CANNOT_DECIDE', async () => {
+    const result = await fetchBoardFactsWith(baseDeps({
+      fetchBranchRules: async () => { throw new Error('exit 1: HTTP 404: Not Found') },
+    }))
+    expect(result.gates.main?.ruleset.ok).toBe(false)
+    const view = buildBoard(result)
+    expect(view.rows.every((r) => r.action === 'CANNOT_DECIDE')).toBe(true)
+    expect(renderBoard(view)).toContain('HTTP 404')
+    expect(renderBoard(view)).not.toContain('## MERGE')
+  })
+
+  it('a repository with no CODEOWNERS file on the base branch has no owned paths', async () => {
+    const result = await fetchBoardFactsWith(baseDeps({ fetchCodeOwners: async () => null }))
+    expect(result.gates.main?.codeOwners).toEqual({ ok: true, rules: [] })
+  })
+
+  it('CODEOWNERS is not read at all when the ruleset does not require code-owner review', async () => {
+    const fetchCodeOwners = vi.fn(async () => '')
+    const noOwners = LIVE_MAIN_RULES.map((r) => r.type === 'pull_request'
+      ? { ...r, parameters: { ...r.parameters, require_code_owner_review: false } } : r)
+    const result = await fetchBoardFactsWith(baseDeps({ fetchBranchRules: async () => noOwners, fetchCodeOwners }))
+    expect(fetchCodeOwners).not.toHaveBeenCalled()
+    expect(result.gates.main?.codeOwners).toBeUndefined()
+  })
+})
+
+describe('the ruleset pull_request requirements', () => {
+  const green = (): PrCheckContext[] => [...cheapPassChecks(), reviewCheck()]
+
+  it('a human PR touching a code-owned file with no code-owner approval is REVIEW_BLOCKED, never MERGE', () => {
+    const result = classify(pr({ authorLogin: 'a-human', files: ['packages/crypto/src/lib.rs'], checks: green() }))
+    expect(result.action).toBe('REVIEW_BLOCKED')
+    expect(result.reason).toContain('packages/crypto/src/lib.rs')
+  })
+
+  it('a code-owned file whose ONLY owner is the author can never be approved — REVIEW_BLOCKED', () => {
+    const result = classify(pr({ authorLogin: OWNER, files: ['packages/crypto/src/lib.rs'], checks: green() }))
+    expect(result.action).toBe('REVIEW_BLOCKED')
+  })
+
+  it('an approval from a listed code owner satisfies the requirement', () => {
+    const result = classify(pr({
+      authorLogin: OWNER, files: ['apps/worker/lib/auth.ts'], reviews: [{ login: 'second-owner', state: 'APPROVED' }], checks: green(),
+    }))
+    expect(result.action).toBe('MERGE')
+  })
+
+  it('an approval from someone who is NOT a code owner of that file does not satisfy it', () => {
+    const result = classify(pr({
+      authorLogin: 'a-human', files: ['packages/crypto/src/lib.rs'], reviews: [{ login: 'second-owner', state: 'APPROVED' }], checks: green(),
+    }))
+    expect(result.action).toBe('REVIEW_BLOCKED')
+  })
+
+  it('a PR touching only unowned files needs no code-owner approval', () => {
+    expect(classify(pr({ authorLogin: OWNER, files: ['docs/x.md'], checks: green() })).action).toBe('MERGE')
+  })
+
+  it('a PR whose file list was truncated cannot be proven free of owned files — REVIEW_BLOCKED', () => {
+    const result = classify(pr({ authorLogin: OWNER, files: ['docs/x.md'], changedFiles: 250, checks: green() }))
+    expect(result.action).toBe('REVIEW_BLOCKED')
+  })
+
+  it('required_approving_review_count is enforced', () => {
+    const gate: BranchGate = { ...GATE, ruleset: { ok: true, rules: { ...MAIN_RULES, requiredApprovingReviewCount: 1 } } }
+    expect(classify(pr({ authorLogin: OWNER, checks: green() }), gate).action).toBe('REVIEW_BLOCKED')
+    expect(classify(pr({ authorLogin: OWNER, checks: green(), reviews: [{ login: 'x', state: 'APPROVED' }] }), gate).action).toBe('MERGE')
+  })
+
+  it('a self-approval never counts toward required approvals', () => {
+    const gate: BranchGate = { ...GATE, ruleset: { ok: true, rules: { ...MAIN_RULES, requiredApprovingReviewCount: 1 } } }
+    expect(classify(pr({ authorLogin: OWNER, checks: green(), reviews: [{ login: OWNER, state: 'APPROVED' }] }), gate).action)
+      .toBe('REVIEW_BLOCKED')
+  })
+
+  it('an outstanding CHANGES_REQUESTED review is REVIEW_BLOCKED even when nothing else requires review', () => {
+    const result = classify(pr({ authorLogin: OWNER, checks: green(), reviews: [{ login: 'x', state: 'CHANGES_REQUESTED' }] }))
+    expect(result.action).toBe('REVIEW_BLOCKED')
+  })
+
+  it('a bot PR touching a code-owned file with no approval is APPROVE_THEN_MERGE', () => {
+    expect(classify(pr({ authorLogin: 'app/dependabot', files: ['packages/crypto/Cargo.toml'], checks: green() })).action)
+      .toBe('APPROVE_THEN_MERGE')
+  })
+
+  it('the bot extra-approval requirement is read from the ruleset, not assumed', () => {
+    const gate: BranchGate = { ...GATE, ruleset: { ok: true, rules: { ...MAIN_RULES, requireExtraApprovalForUnattributedChanges: false } } }
+    expect(classify(pr({ authorLogin: 'app/dependabot', checks: green() }), gate).action).toBe('MERGE')
+  })
+})
+
+describe('GitHub\'s own mergeStateStatus is the final word on MERGE', () => {
+  const green = (): PrCheckContext[] => [...cheapPassChecks(), reviewCheck()]
+
+  it('BLOCKED with every derived requirement met is OPERATOR (an unmodelled requirement), never MERGE', () => {
+    const result = classify(pr({ authorLogin: OWNER, mergeStateStatus: 'BLOCKED', checks: green() }))
+    expect(result.action).toBe('OPERATOR')
+    expect(result.reason).toContain('BLOCKED')
+  })
+
+  it('DIRTY is NEEDS_FIX (merge conflict)', () => {
+    expect(classify(pr({ authorLogin: OWNER, mergeStateStatus: 'DIRTY', checks: green() })).action).toBe('NEEDS_FIX')
+  })
+
+  it('UNKNOWN is WAITING (GitHub has not computed mergeability yet)', () => {
+    expect(classify(pr({ authorLogin: OWNER, mergeStateStatus: 'UNKNOWN', checks: green() })).action).toBe('WAITING')
+  })
+
+  it.each(['CLEAN', 'UNSTABLE', 'HAS_HOOKS'])('%s permits MERGE', (state) => {
+    expect(classify(pr({ authorLogin: OWNER, mergeStateStatus: state, checks: green() })).action).toBe('MERGE')
+  })
+})
+
+describe('CODEOWNERS parsing and matching', () => {
+  const rules = () => parseCodeOwners([
+    '# comment line',
+    '',
+    'apps/worker/lib/auth.ts  @a',
+    'packages/crypto/          @b @org/team',
+    '**/*.pem                  @c',
+    'packages/crypto/README.md',
+  ].join('\n'))
+
+  it('matches with gitignore semantics — the syntax GitHub parses CODEOWNERS with', () => {
+    expect(codeOwnersOf(rules(), 'apps/worker/lib/auth.ts')).toEqual(['a'])
+    expect(codeOwnersOf(rules(), 'apps/worker/lib/auth.tsx')).toEqual([])
+    expect(codeOwnersOf(rules(), 'packages/crypto/src/lib.rs')).toEqual(['b', 'org/team'])
+    expect(codeOwnersOf(rules(), 'deploy/certs/server.pem')).toEqual(['c'])
+  })
+
+  it('the last matching line wins, including a line with no owners (which un-owns the path)', () => {
+    expect(codeOwnersOf(rules(), 'packages/crypto/README.md')).toEqual([])
+  })
+
+  it('a team owner is never assumed satisfied by an individual approval the board cannot verify', () => {
+    const gate: BranchGate = { ...GATE, codeOwners: { ok: true, rules: parseCodeOwners('packages/crypto/ @org/team\n') } }
+    const result = classify(pr({
+      authorLogin: OWNER, files: ['packages/crypto/x.rs'], reviews: [{ login: 'someone', state: 'APPROVED' }],
+      checks: [...cheapPassChecks(), reviewCheck()],
+    }), gate)
+    expect(result.action).toBe('REVIEW_BLOCKED')
   })
 })
