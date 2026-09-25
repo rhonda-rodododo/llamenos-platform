@@ -96,7 +96,10 @@ describe('agent-identity', () => {
     it('fails with tampered ciphertext', () => {
       const { encryptedNsec } = generateAgentKeypair('agent-1', SEAL_KEY, SEAL_LABEL)
       // Flip a byte in the middle of the ciphertext (after the 48 char nonce)
-      const tampered = encryptedNsec.slice(0, 60) + 'ff' + encryptedNsec.slice(62)
+      // Substitute a byte guaranteed to differ from the original (a fixed 'ff' is a no-op ~1/256 runs)
+      const original = encryptedNsec.slice(60, 62)
+      const tampered = encryptedNsec.slice(0, 60) + (original === 'ff' ? '00' : 'ff') + encryptedNsec.slice(62)
+      expect(tampered).not.toBe(encryptedNsec)
 
       expect(() => {
         unsealAgentNsec('agent-1', tampered, SEAL_KEY, SEAL_LABEL)

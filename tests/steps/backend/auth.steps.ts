@@ -106,7 +106,8 @@ Given('a tampered auth token', async ({ world }) => {
   // Create a valid token then tamper with the signature
   const token = createRawAuthToken(keypair.seedHex, keypair.pubkey, 'GET', '/api/auth/me')
   // Flip a byte in the signature to make it invalid
-  const tamperedSig = token.token.slice(0, -2) + 'ff'
+  // Substitute a byte guaranteed to differ from the original (a fixed 'ff' is a no-op ~1/256 runs)
+  const tamperedSig = token.token.slice(0, -2) + (token.token.endsWith('ff') ? '00' : 'ff')
   getAuthTestState(world).tamperedToken = JSON.stringify({ ...token, token: tamperedSig })
 })
 
