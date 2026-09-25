@@ -16,7 +16,15 @@ nothing is written outside a temp directory. Caddy cases need Docker.
 Usage:
     python3 deploy/ansible/scripts/check-disk-tier-guards.py [--only GROUP ...]
 
-GROUP is one of: preflight, guards, skip, gating (default: all).
+GROUP is one of: preflight, guards, skip, gating, tags (default: all).
+
+Group `tags` is the tag-scoped half. Every `just deploy-*` recipe runs with
+`--tags X`, and a `tags: always` on a dynamic `include_tasks` tags ONLY the
+include, so a guard behind one is silently skipped exactly on the normal deploy
+path. It (a) statically refuses any include_tasks/include_role that carries
+`tags:` without `apply:`, and (b) re-runs the RAM, disk-tier and demo-mode
+guards and the unencrypted-host skip under each recipe's tag selection with the
+violating layout and requires the guard's own failure.
 """
 from __future__ import annotations
 
@@ -24,6 +32,7 @@ import getpass
 import grp
 import json
 import os
+import re
 import secrets
 import shutil
 import subprocess
@@ -270,11 +279,151 @@ def gating_case(r: Runner) -> None:
         print("ok    gating: postgres only on llamenos-platform1, ntfy only on llamenos-relay1")
 
 
+
+# ── tag-scoped guards ────────────────────────────────────────────────────────
+
+def recipe_tags() -> list[str]:
+    """Every `--tags X` a `just deploy-*` recipe passes to playbooks/deploy.yml."""
+    text = (ANSIBLE_DIR / "justfile").read_text()
+    tags: list[str] = []
+    for m in re.finditer(r"ansible-playbook playbooks/deploy\.yml[^\n]*--tags (\S+)", text):
+        for t in m.group(1).split(","):
+            if t not in tags:
+                tags.append(t)
+    return tags
+
+
+def static_include_cases(r: Runner) -> None:
+    """A dynamic include (include_tasks / include_role) with its own `tags:` tags
+    only the include statement. The tasks inside inherit nothing unless the
+    include also carries `apply: {tags: ...}`; use import_tasks/import_role when
+    the tag must reach every inner task."""
+    import yaml
+
+    modules = ("include_tasks", "include_role", "ansible.builtin.include_tasks", "ansible.builtin.include_role")
+
+    def walk(tasks, path, out):
+        for t in tasks if isinstance(tasks, list) else []:
+            if not isinstance(t, dict):
+                continue
+            for key in ("block", "rescue", "always"):
+                walk(t.get(key), path, out)
+            for mod in modules:
+                if mod in t and "tags" in t:
+                    args = t[mod]
+                    if not (isinstance(args, dict) and isinstance(args.get("apply"), dict) and "tags" in args["apply"]):
+                        out.append(f"{path}: {t.get('name', mod)!r}")
+
+    files = [ANSIBLE_DIR / "setup.yml", *sorted((ANSIBLE_DIR / "playbooks").rglob("*.yml")),
+             *sorted((ANSIBLE_DIR / "roles").glob("*/tasks/*.yml")),
+             *sorted((ANSIBLE_DIR / "roles").glob("*/handlers/*.yml"))]
+    bad: list[str] = []
+    for f in files:
+        data = yaml.safe_load(f.read_text())
+        rel = str(f.relative_to(ANSIBLE_DIR))
+        if not isinstance(data, list):
+            continue
+        walk(data, rel, bad)  # a tasks file is a plain list of tasks
+        for play in data:
+            if isinstance(play, dict):
+                for k in ("tasks", "pre_tasks", "post_tasks", "handlers"):
+                    walk(play.get(k), rel, bad)
+    r.expect("tags: no include_tasks/include_role carries `tags:` without `apply: {tags:}`", True,
+             "\n".join(bad), 1 if bad else 0)
+
+
+def fake_facts(nocache_free: int, memfree: int, root_free_gib: int = 100) -> dict:
+    """Facts for the play-1 checks of preflight.yml: a supported distro, plenty
+    of disk and the fabricated memory numbers. Passed as `-e ansible_facts=...`,
+    which outranks the facts the play gathers, so the same preflight.yml that
+    ships is exercised end to end with memory the host does not really have."""
+    proc = subprocess.run(["ansible", "localhost", "-c", "local", "-i", "localhost,", "-m", "ansible.builtin.setup"],
+                          capture_output=True, text=True, stdin=subprocess.DEVNULL, cwd=tempfile.gettempdir(),
+                          env={**os.environ, "ANSIBLE_NOCOLOR": "1"})
+    real = json.loads(proc.stdout[proc.stdout.index("=> ") + 3:])["ansible_facts"]
+    f = {k[len("ansible_"):]: v for k, v in real.items() if k.startswith("ansible_")}
+    f.update(os_family="Debian", distribution="Debian", distribution_major_version="13",
+             distribution_version="13", distribution_release="trixie", memfree_mb=memfree,
+             memory_mb={"real": {"free": memfree}, "nocache": {"free": nocache_free}},
+             mounts=[{"mount": "/", "size_available": root_free_gib * 1024 ** 3}])
+    return f
+
+
+def tag_cases(r: Runner) -> None:
+    static_include_cases(r)
+    pf = "playbooks/preflight.yml"
+    tags = recipe_tags()
+    r.expect("tags: found the deploy recipes' --tags in the justfile", len(tags) >= 5, f"got {tags}",
+             0 if len(tags) >= 5 else 1)
+    # `deploy` is what `setup.yml --tags deploy` uses; `preflight` is the tag setup.yml gives this playbook.
+    tags = [*tags, "deploy", "preflight"]
+    warm = fake_facts(7929, 481)
+    # Both hosts point at this machine; the play-1 (facts) checks run for one only.
+    only_platform = ("--limit", "llamenos-platform1")
+
+    for tag in tags:
+        t = f"--tags {tag}"
+        g = {**GROUPS, "llamenos_db": ["llamenos-platform1", "llamenos-relay1"]}
+        rc, out = r.run(pf, inventory(groups=g), {"ansible_facts": warm}, "--tags", tag)
+        r.expect(f"tags[{t}]: disk-tier guard refuses an unencrypted host in llamenos_db", False, out, rc,
+                 must=["REFUSING TO DEPLOY: llamenos-relay1", "the `llamenos_db` service"])
+        g = {**GROUPS, "llamenos_storage": []}
+        rc, out = r.run(pf, inventory(groups=g), {"ansible_facts": warm}, "--tags", tag)
+        r.expect(f"tags[{t}]: disk-tier guard refuses the empty-group fallback", False, out, rc,
+                 must=["the `llamenos_storage` service", "group is empty"])
+        h = {**HOSTS, "llamenos-relay1": {}}
+        rc, out = r.run(pf, inventory(hosts=h), {"ansible_facts": warm}, "--tags", tag)
+        r.expect(f"tags[{t}]: disk-tier guard refuses a host without llamenos_disk_encrypted", False, out, rc,
+                 must=["REQUIRED: set `llamenos_disk_encrypted: true` or `false`"])
+        rc, out = r.run(pf, inventory(), {"ansible_facts": warm, "demo_mode": True,
+                                          "demo_mode_confirm": "DESTROY_ALL_DATA"}, "--tags", tag)
+        r.expect(f"tags[{t}]: demo-mode guard refuses demo_mode in production", False, out, rc,
+                 must=["REFUSING TO DEPLOY: demo_mode, dev_routes_enabled and dev_reset_secret"])
+        rc, out = r.run(pf, inventory(), {"ansible_facts": warm, "dev_routes_enabled": True}, "--tags", tag)
+        r.expect(f"tags[{t}]: demo-mode guard refuses dev_routes_enabled in production", False, out, rc,
+                 must=["REFUSING TO DEPLOY: demo_mode, dev_routes_enabled and dev_reset_secret"])
+        # MemFree looks healthy but MemAvailable is below the floor -> must fail...
+        rc, out = r.run(pf, inventory(), {"ansible_facts": fake_facts(300, 8000)}, "--tags", tag, *only_platform)
+        r.expect(f"tags[{t}]: RAM floor refuses 300 MiB available (MemFree 8000)", False, out, rc,
+                 must=["INSUFFICIENT MEMORY", "Available RAM: 300 MiB"])
+        # ...and the #980 fix holds under tags: warm host, MemFree 481, available 7929 -> pass.
+        rc, out = r.run(pf, inventory(), {"ansible_facts": warm}, "--tags", tag, *only_platform)
+        r.expect(f"tags[{t}]: RAM floor passes a warm host (MemFree 481, available 7929)", True, out, rc,
+                 must=["RAM OK: 7929 MiB available"])
+
+    # Positive control: the good two-tier layout passes under tags AND the guard
+    # tasks visibly ran (a guard that was skipped would also "pass").
+    rc, out = r.run(pf, inventory(), {"ansible_facts": warm}, "--tags", "app")
+    r.expect("tags[--tags app]: two-tier layout passes and the guards actually ran", True, out, rc,
+             must=["llamenos-relay1: llamenos_disk_encrypted=False", "Production safety guard passed",
+                   "RAM OK: 7929 MiB"])
+
+    # Data-at-rest playbooks skip an unencrypted host even when a tag is selected.
+    for pb, extra in [
+        ("playbooks/backup.yml", {}),
+        ("playbooks/restore.yml", {}),
+        ("playbooks/update.yml", {}),
+        ("playbooks/rollback.yml", {}),
+        ("playbooks/observability.yml", {"observability_enabled": True}),
+        ("playbooks/test-restore.yml", {}),
+        ("playbooks/backup-status.yml", {}),
+    ]:
+        text = (ANSIBLE_DIR / pb).read_text()
+        # A tag the playbook itself defines, else an arbitrary one (`just backup` takes any service name).
+        tag = next((t for m in re.finditer(r"tags:\s*\[([^\]]*)\]", text)
+                    for t in re.split(r"\s*,\s*", m.group(1).strip()) if t and t != "always"), "postgres")
+        rc, out = r.run(pb, inventory(), extra, "--check", "--limit", "llamenos-relay1", "--tags", tag)
+        after = out.split("Skipping llamenos-relay1", 1)[-1].split("PLAY RECAP", 1)[0]
+        ran_after = "[llamenos-relay1]" in after.split("\n", 1)[-1]
+        r.expect(f"tags[--tags {tag}]: {pb} ends the unencrypted host before writing anything", True,
+                 out, rc if not ran_after else 1, must=["Skipping llamenos-relay1: llamenos_disk_encrypted is false"])
+
+
 def main() -> int:
     if not shutil.which("ansible-playbook"):
         print("ansible-playbook not found on PATH", file=sys.stderr)
         return 2
-    groups = {"preflight": preflight_cases, "guards": harness_cases, "skip": skip_cases, "gating": gating_case}
+    groups = {"preflight": preflight_cases, "guards": harness_cases, "skip": skip_cases, "gating": gating_case, "tags": tag_cases}
     only = sys.argv[sys.argv.index("--only") + 1:] if "--only" in sys.argv else list(groups)
     unknown = [g for g in only if g not in groups]
     if unknown:

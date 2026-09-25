@@ -26,7 +26,7 @@
     # app_environment: production. See deploy/ansible/playbooks/tasks/guard-demo-mode.yml
     # and issue #716.
     - name: Include shared demo/dev-mode production safety guard
-      ansible.builtin.include_tasks: tasks/guard-demo-mode.yml
+      ansible.builtin.import_tasks: tasks/guard-demo-mode.yml
       tags: always
 
     # Android testers are rung through a self-hosted ntfy/UnifiedPush relay
@@ -89,5 +89,5 @@
   gather_facts: false
   tasks:
     - name: Verify ntfy relay
-      ansible.builtin.include_tasks: tasks/verify-ntfy.yml
+      ansible.builtin.import_tasks: tasks/verify-ntfy.yml
       tags: [ntfy, verify]
