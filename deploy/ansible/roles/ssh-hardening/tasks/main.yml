@@ -71,3 +71,17 @@
 - name: Validate SSH configuration
   ansible.builtin.command: sshd -t
   changed_when: false
+
+# Apply the new sshd config NOW rather than at the end of the play.
+#
+# Handlers normally run only after every role in the play has succeeded. The
+# firewall role runs next and (re)configures UFW to allow ONLY `ssh_port`; if a
+# later role (docker, security-scan, ...) then failed, sshd would still be
+# listening on the old port behind a firewall that no longer admits it — a
+# lockout recoverable only through the provider console. Restarting sshd here,
+# after `sshd -t` has validated the file, keeps "where sshd listens" and "what
+# the firewall allows" consistent at every point a run can stop.
+# The current Ansible connection is an established (multiplexed) session and
+# survives the restart.
+- name: Restart sshd now (validated above), before the firewall changes
+  ansible.builtin.meta: flush_handlers

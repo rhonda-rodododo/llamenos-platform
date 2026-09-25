@@ -1,5 +1,16 @@
 # Self-Hosted Deployment Guide
 
+> **Known broken (2026-09-25):** `deploy/scripts/deploy-self-hosted.sh` cannot
+> currently produce a working deployment. `deploy/ansible/vars.yml` is committed,
+> so the script never reaches its "generate `vars.yml`" branch; and that branch
+> writes `llamenos_postgres_password` / `llamenos_hmac_secret` /
+> `llamenos_storage_access_key`, while preflight requires `pg_password`,
+> `hmac_secret`, `server_secret`, `storage_access_key`, `storage_secret_key` and
+> `webhook_base_url`. Use [`docs/deployment/first-deploy.md`](../deployment/first-deploy.md)
+> and `deploy/ansible/vars-production.example.yml` instead (drop the
+> `deployment_profile: official` block and the updates/DNS settings for a
+> plain self-host).
+
 ## Purpose
 
 Deploy a standalone Llamenos instance on your own server. This guide covers first-time setup and subsequent updates.

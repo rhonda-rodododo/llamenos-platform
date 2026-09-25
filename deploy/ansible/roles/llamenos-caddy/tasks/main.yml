@@ -23,6 +23,21 @@
     group: "{{ deploy_group }}"
     mode: "0750"
 
+# The updater artifacts directory is bind-mounted read-only into Caddy, so it
+# must exist (owned by the deploy user, who rsyncs releases into it) before the
+# stack starts — otherwise Docker creates it root-owned.
+- name: Create update-server artifacts directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_group }}"
+    mode: "0755"
+  loop:
+    - "{{ update_artifacts_dir }}"
+    - "{{ update_artifacts_dir }}/desktop"
+  when: llamenos_update_server_enabled | default(false) | bool
+
 - name: Template caddy compose file
   ansible.builtin.template:
     src: compose/caddy.j2

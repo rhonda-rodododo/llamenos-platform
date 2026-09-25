@@ -18,18 +18,18 @@ import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js'
  * @param agentId   Stable identifier for this agent instance (e.g. connection UUID)
  * @param sealKey   Hex-encoded 32-byte deploy secret (FIREHOSE_AGENT_SEAL_KEY)
  * @param sealLabel Domain separation constant (from crypto-labels.ts)
- * @returns pubkey (hex, 32 bytes) and encryptedNsec (hex nonce || ciphertext)
+ * @returns pubkey (hex, 32 bytes) and sealedAgentKey (hex nonce || ciphertext)
  */
 export function generateAgentKeypair(
   agentId: string,
   sealKey: string,
   sealLabel: string,
-): { pubkey: string; encryptedNsec: string } {
+): { pubkey: string; sealedAgentKey: string } {
   // Generate random Ed25519 keypair
-  const nsecBytes = ed25519.utils.randomSecretKey()
-  const pubkeyBytes = ed25519.getPublicKey(nsecBytes)
+  const agentSecretKey = ed25519.utils.randomSecretKey()
+  const pubkeyBytes = ed25519.getPublicKey(agentSecretKey)
   const pubkey = bytesToHex(pubkeyBytes)
-  const nsecHex = bytesToHex(nsecBytes)
+  const agentSecretKeyHex = bytesToHex(agentSecretKey)
 
   // Derive per-agent seal key via HKDF
   const sealKeyBytes = hexToBytes(sealKey)
@@ -41,33 +41,33 @@ export function generateAgentKeypair(
     32,
   )
 
-  // Encrypt nsec with AES-256-GCM
+  // Seal the Ed25519 secret key (hex) with AES-256-GCM
   const nonce = crypto.getRandomValues(new Uint8Array(12))
   const cipher = gcm(derivedKey, nonce)
-  const sealed = cipher.encrypt(new TextEncoder().encode(nsecHex))
+  const sealed = cipher.encrypt(new TextEncoder().encode(agentSecretKeyHex))
 
   // Encode as hex: nonce || ciphertext
-  const encryptedNsec = bytesToHex(nonce) + bytesToHex(sealed)
+  const sealedAgentKey = bytesToHex(nonce) + bytesToHex(sealed)
 
-  // Zero nsec from memory
-  nsecBytes.fill(0)
+  // Zero the raw secret key from memory
+  agentSecretKey.fill(0)
 
-  return { pubkey, encryptedNsec }
+  return { pubkey, sealedAgentKey }
 }
 
 /**
- * Unseal an agent nsec that was previously sealed with generateAgentKeypair.
+ * Unseal an agent Ed25519 secret key that was previously sealed with generateAgentKeypair.
  *
  * @param agentId        Must match the agentId used during sealing
- * @param encryptedNsec  Hex-encoded nonce || ciphertext blob
+ * @param sealedAgentKey  Hex-encoded nonce || ciphertext blob
  * @param sealKey        Hex-encoded 32-byte deploy secret
  * @param sealLabel      Must match the sealLabel used during sealing
- * @returns Hex-encoded nsec (32 bytes)
+ * @returns Hex-encoded Ed25519 secret key (32 bytes)
  * @throws If authentication tag verification fails
  */
-export function unsealAgentNsec(
+export function unsealAgentKey(
   agentId: string,
-  encryptedNsec: string,
+  sealedAgentKey: string,
   sealKey: string,
   sealLabel: string,
 ): string {
@@ -80,7 +80,7 @@ export function unsealAgentNsec(
     32,
   )
 
-  const combined = hexToBytes(encryptedNsec)
+  const combined = hexToBytes(sealedAgentKey)
   const nonce = combined.slice(0, 12)
   const ciphertext = combined.slice(12)
 

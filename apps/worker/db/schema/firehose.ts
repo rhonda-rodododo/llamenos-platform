@@ -31,7 +31,8 @@ export const firehoseConnections = pgTable(
     encryptedDisplayName: jsonb('encrypted_display_name'),
     reportTypeId: text('report_type_id').notNull(),
     agentPubkey: text('agent_pubkey').notNull(),
-    encryptedAgentNsec: text('encrypted_agent_nsec').notNull(),
+    // Column name is legacy ("nsec"): holds the AES-256-GCM-sealed Ed25519 agent key, not a nostr key.
+    sealedAgentKey: text('encrypted_agent_nsec').notNull(),
     geoContext: text('geo_context'),
     geoContextCountryCodes: text('geo_context_country_codes').array(),
     inferenceEndpoint: text('inference_endpoint'),

@@ -1,0 +1,89 @@
+---
+# Llamenos PRODUCTION vars — template for an "official" single-VPS deployment.
+#
+# THIS FILE IS A TEMPLATE AND MUST NEVER CONTAIN REAL VALUES. Copy it, fill it in,
+# then encrypt the copy:
+#
+#   cd deploy/ansible
+#   cp vars-production.example.yml vars-production.yml     # gitignored
+#   $EDITOR vars-production.yml
+#   ansible-vault encrypt vars-production.yml               # prompts for the vault password
+#
+# vars-production.yml is passed with `-e @vars-production.yml` (extra-vars beat
+# everything). Every playbook also loads the tracked deploy/ansible/vars.yml via
+# `vars_files`; that file is a set of safe defaults (image tags, retention,
+# toggles) — NEVER put real values in it, it is committed to git. Anything you
+# set here overrides it.
+#
+# Every secret below is deliberately EMPTY so preflight (playbooks/preflight.yml)
+# fails loudly if you forget one. Generate secrets on your workstation, not on
+# the server, and keep the vault password out of the repo and out of shell history.
+
+# ─── Profile ─────────────────────────────────────────────────────
+# "official" = app + postgres + rustfs + caddy + hardening + the desktop update
+# origin + DNS pre-validation. Set explicitly (also passed with -e by the
+# scripts/workflow) so behaviour does not depend on the tracked vars.yml.
+deployment_profile: official
+llamenos_update_server_enabled: true
+llamenos_dns_validation_enabled: true
+# Android has no FCM by design: without ntfy, Android devices can never be rung.
+llamenos_ntfy_enabled: true
+# Signal sidecar needs a registered Signal number + bearer token; enable it as a
+# separate, later step (then also set signal_notifier_bearer_token below).
+llamenos_signal_enabled: false
+observability_enabled: false
+
+# ─── Domain & TLS ────────────────────────────────────────────────
+# Apex domain you control. TLS terminates ON THIS BOX with a Let's Encrypt
+# (ISRG-chained) certificate — see docs/deployment/first-deploy.md for why a CDN
+# or provider proxy in front of it breaks the Android client.
+domain: ""                       # REQUIRED e.g. your-domain.example
+# Serve the app/API on api.<domain>; the apex only redirects to it.
+api_subdomain: api
+updates_domain: "updates.{{ domain }}"
+releases_domain: "releases.{{ domain }}"
+ntfy_domain: "push.{{ domain }}"
+# Public base URL clients and telephony webhooks use. REQUIRED in production.
+webhook_base_url: "https://{{ api_subdomain }}.{{ domain }}"
+# Let's Encrypt account/expiry notices. REQUIRED.
+acme_email: ""                   # REQUIRED
+
+# ─── SSH hardening (applied by playbooks/harden.yml) ─────────────
+# harden.yml moves sshd to this port. Pick a port that is NOT 2222: the FDE
+# unlock shell (dropbear, initramfs) also listens on 2222 with a different host
+# key, so reusing it produces host-key-changed warnings that train operators to
+# ignore the very warning that would reveal a MITM.
+ssh_port: 22022
+# Only these source addresses may reach SSH (UFW). REQUIRED — your admin egress
+# IP(s). Locking yourself out is recoverable only through the provider console.
+ssh_allowed_cidrs:
+  - "REPLACE_WITH_YOUR_IP/32"
+
+# ─── Application ─────────────────────────────────────────────────
+app_environment: production
+hotline_name: Hotline
+# App container image. The default in vars.yml (docker.io/llamenos/llamenos:latest)
+# is NOT published — set this explicitly. See docs/deployment/first-deploy.md
+# ("Getting the app image onto the server").
+llamenos_app_image: ""           # REQUIRED e.g. llamenos:0.19.16 (docker load) or a registry ref
+# Admin Ed25519 public key (64 lowercase hex): `bun run bootstrap-admin` on your
+# workstation. Optional — the first admin can be bootstrapped from the desktop app.
+admin_pubkey: ""
+
+# ─── Pinned service images (digests re-verified 2026-09-25) ──────
+llamenos_postgres_image: postgres:17-alpine@sha256:3430fe182f5065a6ea505c3d432d2c7fff18fbab954df8f277c1dbf4c70124af
+llamenos_caddy_image: caddy:2.9-alpine@sha256:b4e3952384eb9524a887633ce65c752dd7c71314d2c2acf98cd5c715aaa534f0
+
+# ─── Secrets — generate each on your workstation ─────────────────
+hmac_secret: ""                  # openssl rand -hex 32   (>= 32 chars)
+server_secret: ""                # openssl rand -hex 32   (exactly 64 hex chars)
+pg_password: ""                  # openssl rand -base64 24 (>= 16 chars)
+storage_access_key: ""           # openssl rand -hex 16
+storage_secret_key: ""           # openssl rand -base64 24 (>= 16 chars)
+# signal_notifier_bearer_token: ""   # openssl rand -hex 32 — only if llamenos_signal_enabled
+
+# ─── Backups (playbooks/backup.yml) ──────────────────────────────
+# age PUBLIC key only. Keep the private key OFF the server (age-keygen -o key.txt).
+backup_age_public_key: ""        # age1...  (59 chars)
+# Off-site copy (rclone remote you configured on the server). Empty = local only.
+backup_rclone_remote: ""

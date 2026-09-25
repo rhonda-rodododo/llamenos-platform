@@ -5,7 +5,7 @@
 # (OpenTofu) from configuration management (Ansible).
 
 locals {
-  inventory_path = "${path.module}/../../../ansible/inventory.yml"
+  inventory_path = "${path.module}/../../../ansible/inventory-production.yml"
 
   inventory_content = yamlencode({
     all = {

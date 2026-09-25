@@ -12,6 +12,9 @@ services:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy-data:/data
       - caddy-config:/config
+{% if llamenos_update_server_enabled | default(false) | bool %}
+      - {{ update_artifacts_dir }}:/srv/updates:ro
+{% endif %}
     environment:
       - DOMAIN={{ domain }}
       - ACME_EMAIL={{ acme_email }}

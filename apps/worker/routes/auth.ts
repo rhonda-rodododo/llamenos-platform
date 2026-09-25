@@ -55,7 +55,7 @@ auth.post('/login',
       return c.json({ error: 'Too many login attempts. Try again later.' }, 429)
     }
 
-    // Verify Schnorr signature before returning any user information
+    // Verify Ed25519 auth token signature before returning any user information
     const url = new URL(c.req.url)
     const isValid = await verifyAuthToken({ pubkey: body.pubkey, timestamp: body.timestamp, token: body.token, nonce: body.nonce }, c.req.method, url.pathname)
     if (!isValid) return c.json({ error: 'Authentication failed' }, 401)
@@ -109,7 +109,7 @@ auth.post('/bootstrap',
 
     const body = c.req.valid('json')
 
-    // Verify Schnorr signature — proves caller owns the private key
+    // Verify Ed25519 auth token signature — proves caller owns the private key
     const bootstrapUrl = new URL(c.req.url)
     const isValid = await verifyAuthToken({ pubkey: body.pubkey, timestamp: body.timestamp, token: body.token, nonce: body.nonce }, c.req.method, bootstrapUrl.pathname)
     if (!isValid) return c.json({ error: 'Authentication failed' }, 401)

@@ -67,7 +67,7 @@ invites.post('/redeem',
     const services = c.get('services')
     const body = c.req.valid('json')
 
-    // Verify Schnorr signature
+    // Verify Ed25519 auth token signature
     const inviteUrl = new URL(c.req.url)
     const isValid = await verifyAuthToken({ pubkey: body.pubkey, timestamp: body.timestamp, token: body.token }, c.req.method, inviteUrl.pathname)
     if (!isValid) {
