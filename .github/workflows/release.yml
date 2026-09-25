@@ -423,6 +423,44 @@ jobs:
             echo "EOF"
           } >> "$GITHUB_OUTPUT"
 
+      # ── Pre-publish gate: the image must actually boot against PostgreSQL ──
+      # CI's E2E jobs build this Dockerfile too, but only ever run it on CI
+      # hardware, whose CPUID is honest. 0.19.16 shipped an image that could
+      # not authenticate to PostgreSQL (empty SCRAM proof) on a VPS whose
+      # virtual CPU model hides SSE4.2 — see the "simdutf kernel pin" block in
+      # deploy/docker/Dockerfile. Both smokes below must pass before anything
+      # is pushed; the push step then rebuilds from this builder's cache, so
+      # the published image is the one that was tested.
+      - name: Build image for the pre-publish smoke
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: deploy/docker/Dockerfile
+          target: app
+          load: true
+          push: false
+          tags: llamenos-release-smoke:${{ github.sha }}
+          cache-from: type=registry,ref=${{ steps.meta.outputs.image }}:buildcache
+
+      - name: Smoke image against PostgreSQL 17 (runner CPU)
+        env:
+          IMAGE: llamenos-release-smoke:${{ github.sha }}
+        run: scripts/image-smoke.sh "$IMAGE"
+
+      - name: Enable KVM for the CPUID-masked smoke
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
+            | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends qemu-system-x86 qemu-utils genisoimage
+
+      - name: Smoke image on a CPUID-masked KVM guest (-cpu kvm64)
+        env:
+          IMAGE: llamenos-release-smoke:${{ github.sha }}
+        run: scripts/image-smoke.sh --cpu kvm64 "$IMAGE"
+
       - name: Build and push stable image
         id: build-push
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
