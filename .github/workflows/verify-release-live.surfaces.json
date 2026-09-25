@@ -1,0 +1,41 @@
+{
+  "_comment": "Single reviewable source of truth for which verify-release-live.yml surfaces gate the aggregate (#956, milestone #769). Every surface must be listed. A surface with required=false MUST carry a reason: it is NOT skipped silently and NOT reported green — the Summary job prints 'NOT REQUIRED (out of milestone scope)' plus this reason on every run, so descoping is a visible decision made in a PR. Changing this file is a change to the release gate: it is under .github/workflows/ and therefore code-owned.",
+  "milestone": "Internal beta — Android + desktop (#769); iOS and the desktop auto-update channel deferred",
+  "surfaces": {
+    "desktop-installer": {
+      "required": true,
+      "description": "Latest GitHub Release carries a signed installer per required platform, each matching CHECKSUMS.txt"
+    },
+    "staging-backend": {
+      "required": true,
+      "description": "Staging backend health, demoMode and ntfy push relay"
+    },
+    "play-track": {
+      "required": true,
+      "description": "Play internal track versionCode matches the latest release"
+    },
+    "testflight": {
+      "required": false,
+      "reason": "iOS distribution is deferred for the first internal beta (Android + desktop only), tracked in #769"
+    },
+    "desktop-updater": {
+      "required": false,
+      "reason": "the desktop auto-update channel (RustFS + llamenos-releases, #714/#715) is out of beta scope; testers install from the GitHub Release, verified by the desktop-installer surface. Re-require this once #714/#715 land"
+    }
+  },
+  "desktopInstallerPlatforms": {
+    "linux": {
+      "required": true,
+      "installerPattern": "\\.(AppImage|deb|rpm)$"
+    },
+    "windows": {
+      "required": true,
+      "installerPattern": "(-setup\\.exe|\\.msi)$"
+    },
+    "macos": {
+      "required": false,
+      "installerPattern": "\\.dmg$",
+      "reason": "no Apple Developer account yet (#741): tauri-release.yml deliberately withholds the macOS bundle because Gatekeeper would refuse to open an unsigned/un-notarized .dmg. Re-require once #741 lands"
+    }
+  }
+}
