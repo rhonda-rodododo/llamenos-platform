@@ -330,16 +330,17 @@ You'll see the welcome banner with next-step instructions.
 
 ## Hand-off to Ansible
 
-From your workstation, with the Llamenos checkout still open:
+From your workstation, with the Llamenos checkout still open, follow
+[`first-deploy.md`](first-deploy.md) from step 3 (DNS) onward. In short:
+DNS records → `inventory-production.yml` + `vars-production.yml` →
+`playbooks/preflight.yml` → `playbooks/harden.yml` → update `ansible_port` →
+`playbooks/deploy.yml` → `playbooks/smoke-check.yml`. See
+`deploy/ansible/vars-production.example.yml` for every value you must supply.
 
-```bash
-cd deploy/ansible
-just bootstrap                # one-time
-ansible-playbook setup.yml -i '<vps-ip>,'
-```
-
-This runs the full hardening + Llamenos deployment playbook against your
-new VPS. See `deploy/ansible/README.md` for vars configuration.
+> Do not run `ansible-playbook setup.yml -i '<ip>,'` (an older version of this
+> section, and the installed motd, suggested it): an ad-hoc `<ip>,` inventory
+> puts the host in no group, so the deploy plays match nothing and skip, and it
+> carries none of the required variables.
 
 ## Troubleshooting
 

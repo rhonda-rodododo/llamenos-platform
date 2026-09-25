@@ -64,6 +64,14 @@ APNS_TEAM_ID={{ apns_team_id }}
 {% endif %}
 {% if llamenos_ntfy_enabled | default(false) | bool %}
 NTFY_URL={{ ntfy_url | default('http://ntfy:80') }}
+{# NTFY_URL is the server-side (internal) address. Android devices register
+   endpoints on the PUBLIC vhost, and apps/worker/lib/ntfy-origin.ts trusts an
+   endpoint only if its origin equals NTFY_URL or NTFY_PUBLIC_URL — without this
+   line every device endpoint on https://<ntfy_domain> is rejected and Android
+   devices can never be rung. #}
+{% if (ntfy_domain | default('')) | length > 0 %}
+NTFY_PUBLIC_URL=https://{{ ntfy_domain }}
+{% endif %}
 {% if (ntfy_auth_token | default('')) | length > 0 %}
 NTFY_AUTH_TOKEN={{ ntfy_auth_token }}
 {% endif %}
