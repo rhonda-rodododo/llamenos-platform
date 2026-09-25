@@ -11,12 +11,11 @@
  *
  * Circuit breaker: 3 consecutive extraction failures auto-pause the connection.
  */
-import { hexToBytes, bytesToHex, utf8ToBytes } from '@shared/encoding'
+import { hexToBytes, utf8ToBytes } from '@shared/encoding'
 import { hpkeOpen, symmetricDecrypt } from '@llamenos/crypto/ffi'
 import {
   LABEL_FIREHOSE_AGENT_SEAL,
   LABEL_FIREHOSE_BUFFER_ENCRYPT,
-  LABEL_FIREHOSE_REPORT_WRAP,
   LABEL_MESSAGE,
 } from '@shared/crypto-labels'
 import { KIND_FIREHOSE_REPORT } from '@shared/event-kinds'
@@ -25,7 +24,7 @@ import type { RecipientEnvelope } from '@shared/types'
 import type { Database } from '../db'
 import { unsealAgentKey } from '../lib/agent-identity'
 import { encryptMessageForStorage } from '../lib/crypto'
-import { CircuitBreaker, type CircuitBreakerOptions } from '../lib/circuit-breaker'
+import { CircuitBreaker } from '../lib/circuit-breaker'
 import { createLogger } from '../lib/logger'
 import { clearWindowKeyCache } from '../messaging/firehose-observer'
 import { publishEvent } from '../lib/ws-events'
