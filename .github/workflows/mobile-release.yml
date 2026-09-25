@@ -1,5 +1,10 @@
 # CI workflow for mobile (iOS + Android) release builds.
-# Builds signed mobile apps and uploads to TestFlight / Play Store / GitHub Releases.
+# Builds signed mobile apps and publishes verifiable release artifacts.
+#
+# Policy: CI builds and publishes artifacts ONLY. It never submits to a store
+# (no Play Console upload, no TestFlight/App Store Connect upload). Store
+# submission is done locally with fastlane (apps/android/fastlane,
+# apps/ios/fastlane) from the signed AAB / IPA this workflow produces.
 #
 # GitHub Releases: each platform publishes to its OWN release —
 # `android-v<version>` (signed APK + SHA-256 + android-build-meta.json) and
@@ -47,14 +52,10 @@ jobs:
 
     env:
       HAS_KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
-      # The secret is named PLAY_SERVICE_ACCOUNT (verify-release-live.yml reads
-      # the same one). This used to say PLAY_SERVICE_ACCOUNT_JSON, which does
-      # not exist, so the Play upload was silently skipped on every run.
-      HAS_PLAY_SERVICE_ACCOUNT: ${{ secrets.PLAY_SERVICE_ACCOUNT != '' }}
       # app/build.gradle.kts relocates the Gradle build dir to $RUNNER_TEMP on
       # Linux (ecryptfs workaround for self-hosted dev boxes), which would put
       # every output OUTSIDE apps/android/app/build/ — where the checksum,
-      # attestation, upload-artifact, fastlane and release-upload steps below
+      # attestation, upload-artifact and release-upload steps below
       # all look. Pin it back so those paths are real.
       ANDROID_BUILD_DIR: ${{ github.workspace }}/apps/android/app/build
 
@@ -278,8 +279,9 @@ jobs:
             apps/android/app/build/outputs/mapping/release/mapping.txt
           retention-days: 30
 
-      # Runs BEFORE the Play upload so an installable APK is published even if
-      # the Play Console step fails (it fails loudly, after this).
+      # The signed AAB (for local fastlane store submission) is the
+      # `android-release` workflow artifact above; the release published here
+      # carries the installable APK, its checksum and build metadata.
       #
       # Published to a DEDICATED `android-v<version>` release, not `v<version>`:
       # release.yml publishes `v<version>` BEFORE dispatching this workflow and
@@ -311,11 +313,9 @@ jobs:
             exit 1
           fi
 
-          # Record which versionCode this run targeted for this release, so
+          # Record which versionCode this run built for this release, so
           # verify-release-live.yml (#721) can compare it against whatever
-          # versionCode is actually LIVE on the Play Console internal track
-          # — the only way to tell a successful Play upload apart from a
-          # swallowed one after the fact.
+          # versionCode is LIVE on the Play Console internal track.
           mkdir -p release-assets
           cp "$APK" "$CHECKSUM" release-assets/
           jq -n --arg version "$VERSION" --argjson versionCode "$RUN_NUMBER" \
@@ -408,24 +408,6 @@ jobs:
           gh release edit "${TAG}" --repo "${GITHUB_REPOSITORY}" --draft=false --latest=false
           echo "Published https://github.com/${GITHUB_REPOSITORY}/releases/tag/${TAG}"
 
-      - name: Setup Ruby
-        if: env.HAS_PLAY_SERVICE_ACCOUNT == 'true'
-        uses: ruby/setup-ruby@95ef2b042f9d7a56d8268cba8559e2842e2ad01b
-        with:
-          ruby-version: '3.3'
-          bundler-cache: true
-          working-directory: apps/android
-
-      - name: Upload to Play Console internal track
-        if: env.HAS_PLAY_SERVICE_ACCOUNT == 'true'
-        working-directory: apps/android
-        env:
-          GOOGLE_PLAY_JSON_KEY: ${{ secrets.PLAY_SERVICE_ACCOUNT }}
-        run: |
-          echo "$GOOGLE_PLAY_JSON_KEY" > /tmp/play-key.json
-          SUPPLY_JSON_KEY=/tmp/play-key.json bundle exec fastlane android internal
-          rm -f /tmp/play-key.json
-
   # ─── iOS Release ──────────────────────────────────────────────
   build-ios:
     runs-on: macos-latest
@@ -436,7 +418,6 @@ jobs:
 
     env:
       HAS_APPLE_CERTIFICATE: ${{ secrets.IOS_CERTIFICATE_BASE64 != '' }}
-      HAS_APPLE_API_KEY: ${{ secrets.APPLE_API_KEY_BASE64 != '' }}
 
     steps:
       - name: Checkout
@@ -542,7 +523,7 @@ jobs:
           echo "VERSION=${VERSION}" >> "$GITHUB_ENV"
 
           # CFBundleShortVersionString is managed by knope — do not patch here.
-          # CFBundleVersion (build number) is monotonic (GitHub run_number) for TestFlight.
+          # CFBundleVersion (build number) is monotonic (GitHub run_number) so store submission never collides.
           sed -i '' "s|<key>CFBundleVersion</key>[[:space:]]*<string>[^<]*</string>|<key>CFBundleVersion</key>\n\t<string>${RUN_NUMBER}</string>|" apps/ios/Sources/App/Info.plist
 
       - name: Setup Apple signing
@@ -624,41 +605,20 @@ jobs:
             apps/ios/build/Llamenos.xcarchive/dSYMs/
           retention-days: 30
 
-      - name: Upload to TestFlight
-        if: success() && env.HAS_APPLE_API_KEY == 'true'
-        env:
-          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY_BASE64 }}
-          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
-          APPLE_API_ISSUER_ID: ${{ secrets.APPLE_API_ISSUER_ID }}
-        run: |
-          # Decode API key
-          mkdir -p ~/.appstoreconnect/private_keys
-          echo "$APPLE_API_KEY" | base64 --decode > ~/.appstoreconnect/private_keys/"AuthKey_${APPLE_API_KEY_ID}.p8"
-
-          # Upload via altool
-          IPA=$(find apps/ios/build/export -name "*.ipa" | head -1)
-          if [ -n "$IPA" ]; then
-            xcrun altool --upload-app \
-              --type ios \
-              --file "$IPA" \
-              --apiKey "$APPLE_API_KEY_ID" \
-              --apiIssuer "$APPLE_API_ISSUER_ID"
-          fi
-
       # Published to a DEDICATED `ios-v<version>` release, not `v<version>`:
       # release.yml publishes `v<version>` BEFORE dispatching this workflow and
       # the repo has immutable releases enabled, so `gh release upload
       # v<version>` is rejected. Same approach (and naming) as tauri-release.yml's
-      # `desktop-v<version>` (#957). No IPA is attached — TestFlight is the
-      # distribution channel; this release carries the build metadata only.
+      # `desktop-v<version>` (#957). No IPA is attached — the signed IPA is the
+      # `ios-release` workflow artifact; this release carries the build metadata only.
       #
       # Runs only when every step above succeeded (no `if: always()` any more).
-      # Publishing is irreversible, and a run that failed to archive/export/upload
+      # Publishing is irreversible, and a run that failed to archive/export
       # now fails the job loudly on its own — recording metadata for it would only
-      # freeze the version's release and block the retry. A run that "succeeds"
-      # without reaching TestFlight (no API key configured) still records what it
-      # targeted, which is exactly what verify-release-live.yml (#721) compares
-      # against the live TestFlight build number (#743).
+      # freeze the version's release and block the retry. CI never submits to
+      # TestFlight; the recorded build number is what the run built, which
+      # verify-release-live.yml (#721) compares against the live TestFlight
+      # build number.
       - name: Publish iOS build metadata to GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -676,7 +636,7 @@ jobs:
           {
             echo "## iOS v${VERSION} — build record"
             echo
-            echo "Build number (CFBundleVersion): \`${RUN_NUMBER}\`. The build itself is distributed through TestFlight; this release records what the run targeted (\`ios-build-meta.json\`) so verify-release-live.yml can compare it to the live TestFlight build."
+            echo "Build number (CFBundleVersion): \`${RUN_NUMBER}\`. CI does not submit to the App Store; the signed IPA is the \`ios-release\` workflow artifact and is submitted locally with fastlane. This release records what the run built (\`ios-build-meta.json\`)."
             echo
             echo "This is a separate \`ios-v${VERSION}\` release because the \`v${VERSION}\` release is immutable once published and cannot accept iOS assets."
           } > release-body.md
