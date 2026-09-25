@@ -75,21 +75,20 @@ async function seedConversationViaApi(
 /**
  * Navigate to the conversations page and select the seeded conversation.
  * Selection is scoped by the sender's unique last-4 digits so parallel workers
- * never select each other's conversations. Returns false when the seeded
- * conversation does not render (seed failure).
+ * never select each other's conversations. The conversation was seeded through
+ * the real API, so it must render — a missing card is an app bug, not a reason
+ * to fall back to the "no conversation" branch.
  */
-async function navigateAndSelect(page: Page, seeded: SeededConversation): Promise<boolean> {
+async function navigateAndSelect(page: Page, seeded: SeededConversation): Promise<void> {
   await Navigation.goToConversations(page)
   const item = page.getByTestId(TestIds.CONVERSATION_ITEM).filter({ hasText: seeded.last4 })
-  const visible = await item.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
-  if (!visible) return false
+  await expect(item).toBeVisible({ timeout: Timeouts.ELEMENT })
   await item.click()
   // Remember the last-4 for steps that must re-select the same conversation
   // after the app clears the detail selection (closing sets selectedId null).
   await page.evaluate((l4) => {
     ;(window as unknown as Record<string, unknown>).__test_conv_last4 = l4
   }, seeded.last4)
-  return true
 }
 
 // --- Conversation setup ---
@@ -98,8 +97,9 @@ Given('a conversation exists', async ({ page, backendRequest, workerHub }) => {
   const seeded = await seedConversationViaApi(backendRequest, workerHub)
   // Select the conversation: downstream steps (assign, thread view) act on the
   // detail pane, which only renders once a conversation is selected.
-  const selected = seeded !== null && (await navigateAndSelect(page, seeded))
-  if (!selected) {
+  if (seeded) {
+    await navigateAndSelect(page, seeded)
+  } else {
     // Messaging not supported in this environment — verify at least the page loaded
     // and flag so downstream steps take the deterministic "no conversation" branch.
     await Navigation.goToConversations(page).catch(() => {})
@@ -110,8 +110,8 @@ Given('a conversation exists', async ({ page, backendRequest, workerHub }) => {
 
 Given('I have an open conversation', async ({ page, backendRequest, workerHub }) => {
   const seeded = await seedConversationViaApi(backendRequest, workerHub)
-  const selected = seeded !== null && (await navigateAndSelect(page, seeded))
-  if (selected) {
+  if (seeded) {
+    await navigateAndSelect(page, seeded)
     // Claim the conversation through the UI so it becomes "active" and the
     // composer is visible. The conversation was just seeded via
     // simulateIncomingMessage, so it is guaranteed to be unassigned — the
@@ -157,8 +157,9 @@ Given('an open conversation exists', async ({ page, backendRequest, workerHub })
   // "Open" means active: the close button only renders once the conversation
   // is claimed, so claim it through the real API before navigating.
   const seeded = await seedConversationViaApi(backendRequest, workerHub, 'active')
-  const selected = seeded !== null && (await navigateAndSelect(page, seeded))
-  if (!selected) {
+  if (seeded) {
+    await navigateAndSelect(page, seeded)
+  } else {
     await Navigation.goToConversations(page).catch(() => {})
     await expect(page.getByTestId(TestIds.PAGE_TITLE)).toBeVisible({ timeout: Timeouts.ELEMENT })
     await flagNoConversation(page)
@@ -170,8 +171,9 @@ Given('a closed conversation exists', async ({ page, backendRequest, workerHub }
   // the reopen button — rendered only for selected `closed` conversations —
   // is actually available.
   const seeded = await seedConversationViaApi(backendRequest, workerHub, 'closed')
-  const selected = seeded !== null && (await navigateAndSelect(page, seeded))
-  if (!selected) {
+  if (seeded) {
+    await navigateAndSelect(page, seeded)
+  } else {
     await Navigation.goToConversations(page).catch(() => {})
     await expect(page.getByTestId(TestIds.PAGE_TITLE)).toBeVisible({ timeout: Timeouts.ELEMENT })
     await flagNoConversation(page)
@@ -180,8 +182,9 @@ Given('a closed conversation exists', async ({ page, backendRequest, workerHub }
 
 Given('conversations exist', async ({ page, backendRequest, workerHub }) => {
   const seeded = await seedConversationViaApi(backendRequest, workerHub)
-  const selected = seeded !== null && (await navigateAndSelect(page, seeded))
-  if (!selected) {
+  if (seeded) {
+    await navigateAndSelect(page, seeded)
+  } else {
     await Navigation.goToConversations(page).catch(() => {})
     await flagNoConversation(page)
   }

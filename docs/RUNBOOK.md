@@ -170,12 +170,10 @@ NEW_BRIDGE_SECRET=$(openssl rand -base64 24)
 sed -i "s|^ARI_PASSWORD=.*|ARI_PASSWORD=${NEW_ARI_PASSWORD}|" .env
 sed -i "s|^BRIDGE_SECRET=.*|BRIDGE_SECRET=${NEW_BRIDGE_SECRET}|" .env
 
-# Update Asterisk ARI config
-docker compose exec asterisk sed -i \
-  "s|^password=.*|password=${NEW_ARI_PASSWORD}|" /etc/asterisk/ari.conf
-
-# Restart all affected services
-docker compose restart asterisk sip-bridge app
+# Recreate all affected services. Asterisk's ARI password is rendered from
+# ARI_PASSWORD into a compose config at container creation, so `restart`
+# would keep the old password — the containers must be recreated.
+docker compose --profile asterisk up -d --force-recreate asterisk sip-bridge app
 ```
 
 ---

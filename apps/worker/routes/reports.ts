@@ -3,7 +3,7 @@ import { describeRoute, resolver, validator } from 'hono-openapi'
 import type { AppEnv } from '../types'
 import { requirePermission, checkPermission } from '../middleware/permission-guard'
 import { listReportsQuerySchema, createReportBodySchema, reportMessageBodySchema, assignReportBodySchema, updateReportBodySchema, reportListResponseSchema, reportCategoriesResponseSchema, reportFilesResponseSchema, reportLinkedCasesResponseSchema } from '@protocol/schemas/reports'
-import { paginationSchema, paginatedMeta } from '@protocol/schemas/common'
+import { paginationSchema } from '@protocol/schemas/common'
 import { conversationResponseSchema, messageResponseSchema } from '@protocol/schemas/conversations'
 import { okResponseSchema } from '@protocol/schemas/common'
 import { reportTypeListResponseSchema } from '@protocol/schemas/settings'
@@ -13,9 +13,6 @@ import { KIND_MESSAGE_NEW, KIND_CONVERSATION_ASSIGNED } from '@shared/event-kind
 import { publishEvent } from '../lib/ws-events'
 import { verifyReportAccess, isReport } from '../lib/report-access'
 import { linkCaseToReportBodySchema } from '@protocol/schemas/report-links'
-import { createLogger } from '../lib/logger'
-
-const logger = createLogger('routes.reports')
 
 /**
  * Normalize conversation metadata — Drizzle bun-sql may double-serialize JSONB
@@ -157,12 +154,12 @@ reports.post('/',
       readerEnvelopes: body.readerEnvelopes,
     })
 
-    // Publish report event to Nostr relay
+    // Publish report event to the report's hub — clients subscribe per hub
     publishEvent(c.env, KIND_MESSAGE_NEW, {
       type: 'report:new',
       conversationId: conversation.id,
       category: body.category,
-    })
+    }, conversation.hubId ?? undefined)
 
     await audit(services.audit, 'reportCreated', pubkey, {
       conversationId: conversation.id,
@@ -385,11 +382,11 @@ reports.post('/:id/messages',
       attachmentIds: body.attachmentIds,
     })
 
-    // Publish message event to Nostr relay
+    // Publish message event to the report's hub — clients subscribe per hub
     publishEvent(c.env, KIND_MESSAGE_NEW, {
       type: 'message:new',
       conversationId: id,
-    })
+    }, report.hubId ?? undefined)
 
     return c.json(msg)
   },
@@ -428,12 +425,12 @@ reports.post('/:id/assign',
 
     await audit(services.audit, 'reportAssigned', pubkey, { reportId: id, assignedTo: body.assignedTo })
 
-    // Publish assignment event to Nostr relay
+    // Publish assignment event to the report's hub — clients subscribe per hub
     publishEvent(c.env, KIND_CONVERSATION_ASSIGNED, {
       type: 'conversation:assigned',
       conversationId: id,
       assignedTo: body.assignedTo,
-    })
+    }, updated.hubId ?? undefined)
 
     return c.json(updated)
   },

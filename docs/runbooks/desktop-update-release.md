@@ -13,7 +13,7 @@ yet functional end to end**: `scripts/generate-update-manifest.sh` produces
 `"platforms": {}` for the real release artifacts (it searches for
 `*.app.tar.gz.sig` / `*.nsis.zip.sig` / `*.AppImage.tar.gz.sig`; Tauri v2 ships
 `*.AppImage.sig`, `*-setup.exe.sig`, `*.msi.sig`), and `RUSTFS_PUBLIC_URL` is never
-set by the workflow, so URLs default to `https://releases.llamenos.org`. Details and
+set by the workflow, so URLs default to `https://releases.llamenos-hotline.org`. Details and
 the hosting options: [`docs/deployment/first-deploy.md` §5](../deployment/first-deploy.md#5-serving-desktop-updates-from-this-box).
 
 ## What the server serves

@@ -29,7 +29,7 @@ function buildAllowedOrigins(env: { CORS_ALLOWED_ORIGINS?: string }): Set<string
       if (trimmed && trimmed !== '*') base.add(trimmed)
     }
   } else {
-    base.add('https://app.llamenos.org')
+    base.add('https://app.llamenos-hotline.org')
     base.add('https://demo.llamenos-platform.com')
   }
   return base

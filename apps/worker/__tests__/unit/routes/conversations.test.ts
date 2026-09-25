@@ -3,7 +3,6 @@ import { Hono } from 'hono'
 import type { AppEnv } from '@worker/types'
 import conversationsRoute from '@worker/routes/conversations'
 import * as wsEvents from '@worker/lib/ws-events'
-import * as pushDispatch from '@worker/lib/push-dispatch'
 import * as serviceFactories from '@worker/lib/service-factories'
 
 vi.mock('@worker/lib/ws-events', () => ({
@@ -750,6 +749,31 @@ describe('conversations route', () => {
       expect(logs.length).toBeGreaterThan(0)
       expect(logs[0].recipientPubkey).toBe('test-pubkey-' + '0'.repeat(50))
       expect(logs[0].wakePayload.conversationId).toBe('conv-1')
+    })
+
+    it('publishes the assignment to the conversation hub, where clients subscribe', async () => {
+      const publishSpy = vi.mocked(wsEvents.publishEvent)
+      publishSpy.mockClear()
+      const getSpy = vi.fn().mockResolvedValue({
+        id: 'conv-1',
+        hubId: 'hub-1',
+        channelType: 'sms',
+        status: 'waiting',
+      })
+      const claimSpy = vi.fn().mockResolvedValue({ id: 'conv-1', hubId: 'hub-1', assignedTo: 'test-pubkey-' + '0'.repeat(50), status: 'active' })
+      const app = createTestApp({
+        permissions: ['conversations:claim-sms'],
+        services: { conversations: { getById: getSpy, claim: claimSpy } },
+      })
+
+      const res = await app.request('/conv-1/claim', { method: 'POST' })
+      expect(res.status).toBe(200)
+      expect(publishSpy).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.any(Number),
+        expect.objectContaining({ type: 'conversation:assigned', conversationId: 'conv-1' }),
+        'hub-1',
+      )
     })
   })
 })

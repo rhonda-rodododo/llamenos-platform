@@ -133,7 +133,12 @@ services:
       - "5060:5060/tcp"   # SIP TCP
       - "8088:8088"       # ARI HTTP
     volumes:
-      - asterisk-config:/etc/asterisk
+      - ./asterisk-config:/etc/asterisk:ro
+    # ari.conf #includes this file for the ARI user's password — Asterisk
+    # cannot read ARI_PASSWORD from its environment itself.
+    configs:
+      - source: ari_credentials
+        target: /run/llamenos/ari-credentials.conf
     healthcheck:
       test: ["CMD", "asterisk", "-rx", "core show version"]
       interval: 30s
@@ -190,10 +195,15 @@ services:
       retries: 3
       start_period: 5s
 
+configs:
+  # Rendered from ARI_PASSWORD so asterisk and sip-bridge share one credential.
+  ari_credentials:
+    content: |
+      password = ${ARI_PASSWORD:-changeme}
+
 volumes:
   pgdata:
   rustfsdata:
   signal-data:
   ollama-data:
-  asterisk-config:
   ntfy-data:

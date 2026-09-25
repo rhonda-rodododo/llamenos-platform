@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Migrate DNS for `api.llamenos.org`, `updates.llamenos.org`, and `releases.llamenos.org` from Cloudflare to 1984 Hosting DNS.
+Migrate DNS for `api.llamenos-hotline.org`, `updates.llamenos-hotline.org`, and `releases.llamenos-hotline.org` from Cloudflare to 1984 Hosting DNS.
 
 ## Prerequisites
 
@@ -18,15 +18,15 @@ Migrate DNS for `api.llamenos.org`, `updates.llamenos.org`, and `releases.llamen
 #### 1. Lower TTLs on Cloudflare
 
 In Cloudflare DNS dashboard, set TTL to 60 seconds for:
-- `api.llamenos.org` A record
-- `updates.llamenos.org` A record (if exists)
-- `releases.llamenos.org` A record (if exists)
+- `api.llamenos-hotline.org` A record
+- `updates.llamenos-hotline.org` A record (if exists)
+- `releases.llamenos-hotline.org` A record (if exists)
 
 #### 2. Document current records
 
 ```bash
-dig +short api.llamenos.org A
-dig +short api.llamenos.org AAAA
+dig +short api.llamenos-hotline.org A
+dig +short api.llamenos-hotline.org AAAA
 # Record all values for rollback
 ```
 
@@ -55,13 +55,13 @@ Change nameservers from Cloudflare to 1984 Hosting nameservers. Find 1984's name
 # Check from multiple resolvers
 for ns in 8.8.8.8 1.1.1.1 9.9.9.9; do
   echo "=== $ns ==="
-  dig @$ns +short api.llamenos.org A
-  dig @$ns +short updates.llamenos.org A
-  dig @$ns +short releases.llamenos.org A
+  dig @$ns +short api.llamenos-hotline.org A
+  dig @$ns +short updates.llamenos-hotline.org A
+  dig @$ns +short releases.llamenos-hotline.org A
 done
 
 # Full trace
-dig +trace api.llamenos.org
+dig +trace api.llamenos-hotline.org
 ```
 
 #### 6. Run Ansible preflight DNS validation
@@ -97,7 +97,7 @@ If issues arise during cutover:
 
 ```bash
 # All three domains resolve to 1984 VPS IP
-curl -s https://api.llamenos.org/api/health/ready
-curl -s https://updates.llamenos.org/health
-curl -s https://releases.llamenos.org/desktop/latest.json | jq .version
+curl -s https://api.llamenos-hotline.org/api/health/ready
+curl -s https://updates.llamenos-hotline.org/health
+curl -s https://releases.llamenos-hotline.org/desktop/latest.json | jq .version
 ```

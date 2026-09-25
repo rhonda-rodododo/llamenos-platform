@@ -264,6 +264,13 @@ export function useConversations() {
     return () => { mounted = false; clearInterval(interval) }
   }, [])
 
+  // Apply a conversation returned by a mutation (claim, reopen) so the acting
+  // user's view reflects their own action without waiting for the relay echo
+  // or the next poll.
+  const applyConversation = useCallback((updated: Conversation) => {
+    setConversations(prev => prev.map(c => c.id === updated.id ? updated : c))
+  }, [])
+
   const waitingConversations = conversations.filter(c => c.status === 'waiting')
   const activeConversations = conversations.filter(c => c.status === 'active')
 
@@ -271,6 +278,7 @@ export function useConversations() {
     conversations,
     waitingConversations,
     activeConversations,
+    applyConversation,
   }
 }
 

@@ -11,7 +11,7 @@
  * the attacker supplied.
  *
  * @param request - Incoming webhook request
- * @param baseUrl - Configured public base URL (e.g. "https://api.llamenos.org")
+ * @param baseUrl - Configured public base URL (e.g. "https://api.llamenos-hotline.org")
  *                  When empty, falls back to request.url (unsafe — dev only).
  */
 export function buildWebhookUrl(request: Request, baseUrl: string): URL {

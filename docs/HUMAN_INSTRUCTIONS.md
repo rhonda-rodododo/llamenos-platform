@@ -670,8 +670,8 @@ identifiers, and configuration values are consistent across the project.
 - [x] **Tauri updater public key** is set in `apps/desktop/tauri.conf.json`
       (`plugins.updater.pubkey` contains the real minisign Ed25519 public key; key ID E1F35E58BD83142F)
 - [x] **Tauri updater endpoint** URL in `apps/desktop/tauri.conf.json` points to
-      the RustFS update server (primary: `https://updates.llamenos.org/desktop/latest.json`,
-      fallback: `https://releases.llamenos.org/desktop/latest.json`)
+      the RustFS update server (primary: `https://updates.llamenos-hotline.org/desktop/latest.json`,
+      fallback: `https://releases.llamenos-hotline.org/desktop/latest.json`)
 - [ ] **App identifier** is finalized in `apps/desktop/tauri.conf.json`
       (currently: `org.llamenos.hotline`)
 - [ ] **Version numbers are in sync** across all files:
@@ -693,7 +693,7 @@ identifiers, and configuration values are consistent across the project.
       is needed. `tauri-release.yml` builds from the monorepo directly.
 - [ ] **All GitHub Secrets from Section 7** are set and populated
 - [ ] **CSP `connect-src`** in `apps/desktop/tauri.conf.json` includes the
-      production API domain (currently: `https://app.llamenos.org`)
+      production API domain (currently: `https://app.llamenos-hotline.org`)
 - [ ] **Update manifest script** (`scripts/generate-update-manifest.sh`) uses
       the correct repository name in `REPO` variable (currently:
       `rhonda-rodododo/llamenos`)
