@@ -28,6 +28,24 @@
       - tmux
     state: present
 
+# System hostname: declarative so a deploy can correct whatever the installer
+# baked in. Defaults to inventory_hostname (existing behaviour) unless
+# llamenos_system_hostname is set.
+- name: Set system hostname to {{ llamenos_system_hostname | default(inventory_hostname) }}
+  ansible.builtin.hostname:
+    name: "{{ llamenos_system_hostname | default(inventory_hostname) }}"
+
+# Keep the hostname resolvable locally (Debian convention: 127.0.1.1). An
+# unresolvable hostname makes sudo slow and breaks some services. Replaces the
+# existing 127.0.1.1 line (dropping a stale entry for the OLD hostname); all
+# other /etc/hosts entries are left untouched.
+- name: Map 127.0.1.1 to the system hostname in /etc/hosts
+  ansible.builtin.lineinfile:
+    path: /etc/hosts
+    regexp: '^127\.0\.1\.1\s'
+    line: "127.0.1.1 {{ llamenos_system_hostname | default(inventory_hostname) }}"
+    state: present
+
 - name: Set timezone to {{ timezone }}
   community.general.timezone:
     name: "{{ timezone }}"

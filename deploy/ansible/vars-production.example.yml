@@ -55,6 +55,11 @@ webhook_base_url: "https://{{ api_subdomain }}.{{ domain }}"
 # Let's Encrypt account/expiry notices. REQUIRED.
 acme_email: ""                   # REQUIRED
 
+# System hostname (cosmetic for TLS: Caddy takes its vhosts from `domain`, not the
+# system hostname; it does affect logs, shell prompts and `uname -n`).
+# Set per host in inventory/host_vars; defaults to the inventory hostname when unset.
+# llamenos_system_hostname: hotline-host.example
+
 # ─── SSH hardening (applied by playbooks/harden.yml, on both hosts) ─
 # harden.yml moves sshd to this port. Pick a port that is NOT 2222: the FDE
 # unlock shell (dropbear, initramfs) also listens on 2222 with a different host

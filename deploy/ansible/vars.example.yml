@@ -428,6 +428,11 @@ security_scan_fail_on_os_updates: false
 security_generate_sbom: false
 
 # ─── System ─────────────────────────────────────────────────────
+# System hostname (cosmetic for TLS: Caddy takes its vhosts from `domain`, not the
+# system hostname; it does affect logs, shell prompts and `uname -n`).
+# Defaults to the inventory hostname when unset.
+# llamenos_system_hostname: hotline-host.example
+
 # Timezone for the server
 timezone: UTC
 
