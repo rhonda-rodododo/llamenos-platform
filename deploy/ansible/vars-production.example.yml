@@ -73,6 +73,10 @@ hotline_name: Hotline
 # is NOT published — set this explicitly. See docs/deployment/first-deploy.md
 # ("Getting the app image onto the server").
 llamenos_app_image: ""           # REQUIRED e.g. llamenos:0.19.16 (docker load) or a registry ref
+# Pull policy for the app image only: missing (default; use a docker-loaded image,
+# pull only if absent) | always (refresh from a registry every run) | never.
+# Leave unset unless you publish the image to a registry and want `always`.
+# llamenos_app_image_pull_policy: missing
 # Admin Ed25519 public key (64 lowercase hex): `bun run bootstrap-admin` on your
 # workstation. Optional — the first admin can be bootstrapped from the desktop app.
 admin_pubkey: ""
