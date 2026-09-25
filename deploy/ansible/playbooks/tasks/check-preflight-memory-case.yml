@@ -1,0 +1,27 @@
+---
+- name: "{{ case.name }}: fabricate facts"
+  ansible.builtin.set_fact:
+    ansible_facts: >-
+      {{ ansible_facts | combine({
+           'memfree_mb': case.real_free,
+           'memory_mb': {'real': {'free': case.real_free}, 'nocache': {'free': case.nocache_free}}
+         }, recursive=true) }}
+
+- name: "{{ case.name }}: run the shipped assertion"
+  block:
+    - ansible.builtin.include_tasks: assert-memory.yml
+    - ansible.builtin.set_fact:
+        _passed: true
+  rescue:
+    - ansible.builtin.set_fact:
+        _passed: false
+
+- name: "{{ case.name }}: new assertion behaves as expected"
+  ansible.builtin.assert:
+    that: _passed == case.expect_pass
+    fail_msg: "{{ case.name }}: expected pass={{ case.expect_pass }}, got {{ _passed }}"
+
+- name: "{{ case.name }}: old MemFree expression (the bug) behaves as documented"
+  ansible.builtin.assert:
+    that: (ansible_facts.memfree_mb >= 512) == case.old_expect_pass
+    fail_msg: "{{ case.name }}: old expression result changed"
