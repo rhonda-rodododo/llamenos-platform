@@ -6,11 +6,11 @@
 #   - This host is not in the llamenos_app group (when the group has members)
 
 - name: Skip if app not enabled
-  ansible.builtin.meta: end_play
+  ansible.builtin.meta: end_role
   when: not (llamenos_app_enabled | default(true))
 
 - name: Skip if not assigned to this host
-  ansible.builtin.meta: end_play
+  ansible.builtin.meta: end_role
   when: >
     groups.get('llamenos_app', []) | length > 0 and
     inventory_hostname not in groups.get('llamenos_app', [])

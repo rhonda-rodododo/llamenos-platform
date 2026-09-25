@@ -37,6 +37,10 @@
       - caddy
 
   tasks:
+    - name: Skip hosts without disk encryption (this play keeps data at rest)
+      ansible.builtin.include_tasks: tasks/skip-unencrypted-host.yml
+      tags: always
+
     # ── Phase 1: Snapshot & Backup (runs outside rescue) ───────────
     - name: Track current versions (pre-update snapshot)
       ansible.builtin.include_role:

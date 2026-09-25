@@ -1,27 +1,39 @@
----
 all:
   vars:
     ansible_python_interpreter: /usr/bin/python3
   children:
     llamenos_servers:
       hosts:
-        vps1:
+        # 1984 Hosting — full-disk encryption (LUKS2 + dropbear remote unlock).
+        # Runs the app, PostgreSQL, RustFS and every secret.
+        llamenos-platform1:
           ansible_host: YOUR_SERVER_IP
           ansible_user: YOUR_DEPLOY_USER
           ansible_ssh_private_key_file: ~/.ssh/YOUR_SSH_KEY
           ansible_port: 22
+          llamenos_disk_encrypted: true
+        # FlokiNET — NO disk encryption. Push relay only (ntfy + its Caddy);
+        # preflight refuses to place anything that keeps secrets at rest here.
+        llamenos-relay1:
+          ansible_host: YOUR_FLOKINET_SERVER_IP
+          ansible_user: YOUR_DEPLOY_USER
+          ansible_ssh_private_key_file: ~/.ssh/YOUR_SSH_KEY
+          ansible_port: 22
+          llamenos_disk_encrypted: false
     llamenos_app:
       hosts:
-        vps1: {}
+        llamenos-platform1: {}
     llamenos_db:
       hosts:
-        vps1: {}
-    llamenos_proxy:
-      hosts:
-        vps1: {}
+        llamenos-platform1: {}
     llamenos_storage:
       hosts:
-        vps1: {}
-    llamenos_relay:
+        llamenos-platform1: {}
+    # Each host's Caddy serves only what runs on that host.
+    llamenos_proxy:
       hosts:
-        vps1: {}
+        llamenos-platform1: {}
+        llamenos-relay1: {}
+    llamenos_ntfy:
+      hosts:
+        llamenos-relay1: {}

@@ -1,5 +1,7 @@
 ---
-# Llamenos PRODUCTION vars — template for an "official" single-VPS deployment.
+# Llamenos PRODUCTION vars — template for an "official" deployment: an encrypted
+# platform host plus an unencrypted push-relay host (inventory-production.example.yml
+# holds the host layout and each host's llamenos_disk_encrypted marker).
 #
 # THIS FILE IS A TEMPLATE AND MUST NEVER CONTAIN REAL VALUES. Copy it, fill it in,
 # then encrypt the copy:
@@ -27,6 +29,7 @@ deployment_profile: official
 llamenos_update_server_enabled: true
 llamenos_dns_validation_enabled: true
 # Android has no FCM by design: without ntfy, Android devices can never be rung.
+# ntfy runs on the relay host (the `llamenos_ntfy` inventory group).
 llamenos_ntfy_enabled: true
 # Signal sidecar needs a registered Signal number + bearer token; enable it as a
 # separate, later step (then also set signal_notifier_bearer_token below).
@@ -42,19 +45,23 @@ domain: ""                       # REQUIRED e.g. your-domain.example
 api_subdomain: api
 updates_domain: "updates.{{ domain }}"
 releases_domain: "releases.{{ domain }}"
-ntfy_domain: "push.{{ domain }}"
+# The push relay's public name. It must resolve to the RELAY host, not the
+# platform host every other name points at (preflight checks this per host).
+# Infrastructure names for the official deployment live on llamenos-hotline.org
+# whatever `domain` is; a self-hoster sets e.g. "push.{{ domain }}".
+ntfy_domain: "push.llamenos-hotline.org"
 # Public base URL clients and telephony webhooks use. REQUIRED in production.
 webhook_base_url: "https://{{ api_subdomain }}.{{ domain }}"
 # Let's Encrypt account/expiry notices. REQUIRED.
 acme_email: ""                   # REQUIRED
 
-# ─── SSH hardening (applied by playbooks/harden.yml) ─────────────
+# ─── SSH hardening (applied by playbooks/harden.yml, on both hosts) ─
 # harden.yml moves sshd to this port. Pick a port that is NOT 2222: the FDE
 # unlock shell (dropbear, initramfs) also listens on 2222 with a different host
 # key, so reusing it produces host-key-changed warnings that train operators to
 # ignore the very warning that would reveal a MITM.
 ssh_port: 22022
-# Only these source addresses may reach SSH (UFW). REQUIRED — your admin egress
+# Only these source addresses may reach SSH (UFW), on both hosts. REQUIRED — your admin egress
 # IP(s). Locking yourself out is recoverable only through the provider console.
 ssh_allowed_cidrs:
   - "REPLACE_WITH_YOUR_IP/32"

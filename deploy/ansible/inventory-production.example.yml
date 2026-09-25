@@ -1,21 +1,30 @@
 ---
-# Production inventory template — a single VPS running every service.
+# Production inventory template — two hosts, two tiers.
 #
 #   cp inventory-production.example.yml inventory-production.yml   # gitignored
 #   $EDITOR inventory-production.yml
 #
 # Pass it with `-i inventory-production.yml` (deploy-official.sh and the
 # deploy-prod workflow do). Never commit the filled-in copy.
+#
+#   llamenos-platform1  full-disk encryption (the FDE installer ISO). App, API,
+#                       PostgreSQL, RustFS, backups, every secret incl. the APNs key.
+#   llamenos-relay1     NO disk encryption. The ntfy/UnifiedPush push relay and the
+#                       Caddy in front of it, nothing else.
+#
+# `llamenos_disk_encrypted` is what enforces that split: preflight refuses to place
+# the app, database or storage on a host marked false, and backups, restores,
+# updates and observability skip it. See docs/deployment/first-deploy.md.
 all:
   vars:
     ansible_python_interpreter: /usr/bin/python3
   children:
     llamenos_servers:
       hosts:
-        vps1:
+        llamenos-platform1:
           # The VPS PUBLIC IPv4 address (not a hostname): preflight's DNS check
-          # compares every public hostname against this value.
-          ansible_host: REPLACE_WITH_VPS_IPV4
+          # compares every public hostname this host serves against this value.
+          ansible_host: REPLACE_WITH_PLATFORM_VPS_IPV4
           # Created by the FDE installer ISO (scripts/build-iso.sh --user, default "deploy").
           ansible_user: deploy
           # The key you passed to build-iso.sh --ssh-key (private half).
@@ -25,15 +34,33 @@ all:
           # then run everything else. harden.yml moves sshd; Ansible cannot
           # follow it by itself on a re-run.
           ansible_port: 22
+          # Installed from the FDE ISO (LUKS2). Only set true if that is so.
+          llamenos_disk_encrypted: true
+        llamenos-relay1:
+          # Public IPv4 of the relay VPS. push.<domain> must resolve here.
+          ansible_host: REPLACE_WITH_RELAY_VPS_IPV4
+          # A sudo-capable user you created on the provider's stock Debian image.
+          ansible_user: REPLACE_WITH_RELAY_DEPLOY_USER
+          ansible_ssh_private_key_file: ~/.ssh/REPLACE_WITH_KEY_NAME
+          # Same rule as above: 22 for harden.yml, then `ssh_port`.
+          ansible_port: 22
+          # No full-disk encryption on this host.
+          llamenos_disk_encrypted: false
     llamenos_app:
       hosts:
-        vps1: {}
+        llamenos-platform1: {}
     llamenos_db:
       hosts:
-        vps1: {}
-    llamenos_proxy:
-      hosts:
-        vps1: {}
+        llamenos-platform1: {}
     llamenos_storage:
       hosts:
-        vps1: {}
+        llamenos-platform1: {}
+    # One Caddy per host; each serves only the vhosts for what runs on it
+    # (platform: api./apex/updates./releases., relay: push.).
+    llamenos_proxy:
+      hosts:
+        llamenos-platform1: {}
+        llamenos-relay1: {}
+    llamenos_ntfy:
+      hosts:
+        llamenos-relay1: {}

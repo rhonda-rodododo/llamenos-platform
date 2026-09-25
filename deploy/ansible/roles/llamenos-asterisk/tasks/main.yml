@@ -6,11 +6,11 @@
 #   - This host is not in the llamenos_asterisk group (when the group has members)
 
 - name: Skip if asterisk not enabled
-  ansible.builtin.meta: end_play
+  ansible.builtin.meta: end_role
   when: not (llamenos_asterisk_enabled | default(false))
 
 - name: Skip if not assigned to this host
-  ansible.builtin.meta: end_play
+  ansible.builtin.meta: end_role
   when: >
     groups.get('llamenos_asterisk', []) | length > 0 and
     inventory_hostname not in groups.get('llamenos_asterisk', [])

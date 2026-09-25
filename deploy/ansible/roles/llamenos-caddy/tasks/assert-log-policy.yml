@@ -1,0 +1,27 @@
+---
+# Asserts Caddy's effective log policy for a host without disk encryption.
+#
+# Input: `caddy_adapted_config` — the JSON config Caddy runs, i.e. the output
+# of `caddy adapt` on the deployed Caddyfile (tasks/main.yml), or on a rendered
+# one (playbooks/check-disk-tier-guards.yml, which also proves this fails on an
+# injected access log or a missing filter).
+
+- name: Assert no access log and IP/URI stripping on an unencrypted disk
+  ansible.builtin.assert:
+    that:
+      - _servers | dict2items | selectattr('value.logs', 'defined') | list | length == 0
+      - _default_log.encoder.format | default('') == 'filter'
+      - _stripped | difference(_default_log.encoder.fields | default({}) | dict2items
+          | selectattr('value.filter', 'equalto', 'delete') | map(attribute='key') | list) | length == 0
+    fail_msg: |
+      Caddy on {{ inventory_hostname }} (llamenos_disk_encrypted: false) would write
+      client addresses or device topics to disk. Servers with an access log:
+      {{ _servers | dict2items | selectattr('value.logs', 'defined') | map(attribute='key') | list }};
+      default logger encoder: {{ _default_log.encoder | default('none') }}.
+      See the log block at the top of roles/llamenos-caddy/templates/caddy.j2.
+    success_msg: "Caddy on {{ inventory_hostname }}: no access log; {{ _stripped | join(', ') }} dropped"
+  vars:
+    _adapted: "{{ caddy_adapted_config }}"
+    _servers: "{{ _adapted.apps.http.servers | default({}) }}"
+    _default_log: "{{ _adapted.logging.logs.default | default({}) }}"
+    _stripped: ['request>remote_ip', 'request>remote_port', 'request>client_ip', 'request>uri', 'request>headers>X-Forwarded-For']

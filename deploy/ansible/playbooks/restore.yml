@@ -35,6 +35,10 @@
     restore_age_key_path: "{{ backup_age_private_key_path | default('') }}"
 
   pre_tasks:
+    - name: Skip hosts without disk encryption (this play keeps data at rest)
+      ansible.builtin.include_tasks: tasks/skip-unencrypted-host.yml
+      tags: always
+
     - name: Validate age key path (if encryption is configured)
       ansible.builtin.stat:
         path: "{{ restore_age_key_path }}"

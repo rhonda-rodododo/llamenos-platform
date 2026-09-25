@@ -12,7 +12,7 @@ services:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy-data:/data
       - caddy-config:/config
-{% if llamenos_update_server_enabled | default(false) | bool %}
+{% if _caddy_serves_app | bool and llamenos_update_server_enabled | default(false) | bool %}
       - {{ update_artifacts_dir }}:/srv/updates:ro
 {% endif %}
     environment:
@@ -23,8 +23,14 @@ services:
     logging:
       driver: json-file
       options:
+{% if llamenos_disk_encrypted | default(false) | bool %}
         max-size: "10m"
         max-file: "5"
+{% else %}
+        # Unencrypted disk: one small file (see the log filter in the Caddyfile).
+        max-size: "1m"
+        max-file: "1"
+{% endif %}
         tag: "llamenos-caddy"
 
 volumes:

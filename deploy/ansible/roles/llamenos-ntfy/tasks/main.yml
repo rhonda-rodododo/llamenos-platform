@@ -22,13 +22,19 @@
 #     string chosen by the ntfy Android library) is the capability. Anyone
 #     without the exact topic name gets nothing; anonymous *write* is never
 #     granted, so an unauthenticated publish is always rejected.
+#
+# At rest (see README.md "What this role leaves on disk"): auth.db and the
+# .publish-token copy of the same credential — nothing else. ntfy keeps its
+# message cache in memory because NTFY_CACHE_FILE is never set; on a host whose
+# disk is not encrypted (llamenos_disk_encrypted: false) the two guards below
+# make that a checked property instead of an omission.
 
 - name: Skip if ntfy not enabled
-  ansible.builtin.meta: end_play
+  ansible.builtin.meta: end_role
   when: not (llamenos_ntfy_enabled | default(false) | bool)
 
 - name: Skip if not assigned to this host
-  ansible.builtin.meta: end_play
+  ansible.builtin.meta: end_role
   when: >
     groups.get('llamenos_ntfy', []) | length > 0 and
     inventory_hostname not in groups.get('llamenos_ntfy', [])
@@ -59,6 +65,10 @@
     owner: "{{ deploy_user }}"
     group: "{{ deploy_group }}"
     mode: "0750"
+
+- name: Refuse ntfy persistence settings on a host without disk encryption
+  ansible.builtin.include_tasks: guard-no-persistence.yml
+  when: not (llamenos_disk_encrypted | default(false) | bool)
 
 - name: Template ntfy compose file
   ansible.builtin.template:
@@ -99,3 +109,40 @@
 # compose project — see provision.yml for the contract.
 - name: Provision the publish account, token and access control
   ansible.builtin.include_tasks: provision.yml
+
+# Second, independent check of the same property, against what ntfy actually
+# wrote rather than what it was told: a future image that starts persisting
+# something by default is caught here even though the compose body is clean.
+- name: List the ntfy data volume
+  community.docker.docker_container_exec:
+    container: "{{ ntfy_container_name }}"
+    command: ls -A /var/lib/ntfy
+  register: ntfy_data_listing
+  changed_when: false
+  when: not (llamenos_disk_encrypted | default(false) | bool)
+
+- name: Assert auth.db is the only thing ntfy keeps on an unencrypted disk
+  ansible.builtin.assert:
+    that:
+      - ntfy_data_listing.stdout_lines | difference(['auth.db', 'auth.db-wal', 'auth.db-shm']) | length == 0
+    fail_msg: |
+      ntfy on {{ inventory_hostname }} (llamenos_disk_encrypted: false) has written
+      more than its auth database to /var/lib/ntfy:
+        {{ ntfy_data_listing.stdout_lines | difference(['auth.db', 'auth.db-wal', 'auth.db-shm']) | join(', ') }}
+      Stop the service, find what enabled it, and remove the files before re-running.
+    success_msg: "ntfy data volume holds only: {{ ntfy_data_listing.stdout_lines | join(', ') }}"
+  when: not (llamenos_disk_encrypted | default(false) | bool)
+
+# The app reads ntfy_auth_token through the shared worker env template. When
+# the relay runs on its own host, the fact set by provision.yml exists only
+# here, so hand it to the app hosts for the "Deploy application services" play
+# (roles/service-discovery already pointed their ntfy_url at the public vhost).
+- name: Hand the publish token to app hosts on other machines
+  ansible.builtin.set_fact:
+    ntfy_auth_token: "{{ ntfy_auth_token }}"
+  delegate_to: "{{ item }}"
+  delegate_facts: true
+  loop: "{{ groups.get('llamenos_app', []) | difference([inventory_hostname]) }}"
+  loop_control:
+    label: "{{ item }}"
+  no_log: true

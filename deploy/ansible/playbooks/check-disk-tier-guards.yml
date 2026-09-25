@@ -1,0 +1,114 @@
+---
+# CI/dev verification playbook — NOT part of the deployment flow.
+#
+# Runs the ntfy and Caddy disk-tier guards against rendered templates, without
+# a server, so scripts/check-disk-tier-guards.py can prove each guard passes on
+# the shipped templates AND fails on an injected defect. Driven by
+# `disk_tier_case` against the two-host inventory the script writes:
+#
+#   ntfy_clean          relay host, shipped ntfy template        -> must pass
+#   ntfy_cache_file     same, NTFY_CACHE_FILE injected           -> must fail
+#   caddy_relay         relay host Caddyfile, adapted by Caddy   -> must pass
+#   caddy_access_log    same, `log` injected into the ntfy vhost -> must fail
+#   caddy_no_filter     relay Caddyfile rendered without filter  -> must fail
+#   caddy_platform      encrypted app host: API vhosts, no push. -> must pass
+#
+# Needs Docker on the control node (Caddy itself adapts the Caddyfile — the
+# same check tasks/main.yml runs on a real host).
+
+- name: Check the disk-tier guards against rendered templates
+  hosts: llamenos_servers
+  connection: local
+  gather_facts: false
+  become: false
+  vars_files:
+    - ../vars.yml
+    - ../roles/llamenos-ntfy/defaults/main.yml
+  vars:
+    disk_tier_caddy_image: "{{ llamenos_caddy_image | default('caddy:2.9-alpine') }}"
+  tasks:
+    - name: Require a known case
+      ansible.builtin.assert:
+        that:
+          - disk_tier_case in ['ntfy_clean', 'ntfy_cache_file', 'caddy_relay', 'caddy_access_log', 'caddy_no_filter', 'caddy_platform']
+        fail_msg: "Unknown disk_tier_case: {{ disk_tier_case | default('NOT SET') }}"
+      run_once: true
+
+    - name: Pick the host each case runs as
+      ansible.builtin.set_fact:
+        _case_host: "{{ 'llamenos-platform1' if disk_tier_case == 'caddy_platform' else 'llamenos-relay1' }}"
+
+    - name: Run ntfy cases
+      when:
+        - disk_tier_case.startswith('ntfy_')
+        - inventory_hostname == _case_host
+      block:
+        - name: Inject a persistent message cache into the rendered compose body
+          ansible.builtin.set_fact:
+            ntfy_rendered_compose: >-
+              {{ lookup('ansible.builtin.template', playbook_dir ~ '/../roles/llamenos-ntfy/templates/compose/ntfy.j2')
+                 | regex_replace('(\n(\s*)- NTFY_AUTH_FILE=[^\n]*)', '\1\n\2- NTFY_CACHE_FILE=/var/lib/ntfy/cache.db') }}
+          when: disk_tier_case == 'ntfy_cache_file'
+
+        - name: Prove the injection landed (a no-op injection would make the case meaningless)
+          ansible.builtin.assert:
+            that:
+              - "'NTFY_CACHE_FILE=' in ntfy_rendered_compose"
+          when: disk_tier_case == 'ntfy_cache_file'
+
+        - name: Run the ntfy persistence guard
+          ansible.builtin.include_tasks: ../roles/llamenos-ntfy/tasks/guard-no-persistence.yml
+
+    - name: Run Caddy cases
+      when:
+        - disk_tier_case.startswith('caddy_')
+        - inventory_hostname == _case_host
+      block:
+        - name: Decide which vhosts this host serves (roles/llamenos-caddy placement)
+          ansible.builtin.include_tasks: ../roles/llamenos-caddy/tasks/placement.yml
+
+        - name: Render this host's Caddyfile
+          ansible.builtin.set_fact:
+            _caddyfile: >-
+              {{ lookup('ansible.builtin.template', playbook_dir ~ '/../roles/llamenos-caddy/templates/caddy.j2',
+                        template_vars={'llamenos_disk_encrypted': (disk_tier_case == 'caddy_no_filter') or llamenos_disk_encrypted}) }}
+
+        - name: Inject an access log into the ntfy vhost
+          ansible.builtin.set_fact:
+            _caddyfile: "{{ _caddyfile | regex_replace('(\n' ~ (ntfy_domain | regex_escape) ~ ' \\{\n)', '\\1    log\n') }}"
+          when: disk_tier_case == 'caddy_access_log'
+
+        - name: Prove the injection landed
+          ansible.builtin.assert:
+            that:
+              - _caddyfile is regex('\n' ~ (ntfy_domain | regex_escape) ~ ' \\{\n    log\n')
+          when: disk_tier_case == 'caddy_access_log'
+
+        - name: Assert the relay serves ntfy and nothing of the app
+          ansible.builtin.assert:
+            that:
+              - _caddyfile is regex('\n' ~ (ntfy_domain | regex_escape) ~ ' \\{')
+              - "'reverse_proxy app:3000' not in _caddyfile"
+              - "'/srv/updates' not in _caddyfile"
+          when: _case_host == 'llamenos-relay1'
+
+        - name: Assert the app host serves the API and not the relay's ntfy vhost
+          ansible.builtin.assert:
+            that:
+              - "'reverse_proxy app:3000' in _caddyfile"
+              - "'reverse_proxy ntfy:80' not in _caddyfile"
+              - "'log default' not in _caddyfile"
+          when: _case_host == 'llamenos-platform1'
+
+        - name: Adapt it with Caddy
+          ansible.builtin.command:
+            cmd: docker run --rm -i {{ disk_tier_caddy_image }} caddy adapt --adapter caddyfile --config /dev/stdin
+            stdin: "{{ _caddyfile }}"
+          register: _adapt
+          changed_when: false
+
+        - name: Run the Caddy log-policy assertion
+          ansible.builtin.include_tasks: ../roles/llamenos-caddy/tasks/assert-log-policy.yml
+          vars:
+            caddy_adapted_config: "{{ _adapt.stdout | from_json }}"
+          when: _case_host == 'llamenos-relay1'
