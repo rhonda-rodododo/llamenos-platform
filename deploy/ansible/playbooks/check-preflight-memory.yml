@@ -1,0 +1,25 @@
+---
+# CI/dev verification playbook — NOT part of the deployment flow.
+#
+# Proves the preflight RAM assertion with fabricated facts:
+#   warm_cache   MemFree 481 / available 7929 (real relay-host numbers)
+#                -> new assertion must PASS, old MemFree expression must FAIL
+#   exhausted    MemFree 100 / available 300   -> new assertion must FAIL
+#   boundary     available exactly 512          -> must PASS
+# Run: ansible-playbook playbooks/check-preflight-memory.yml
+- name: Check the preflight memory assertion
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    cases:
+      - {name: warm_cache, real_free: 481, nocache_free: 7929, expect_pass: true, old_expect_pass: false}
+      - {name: exhausted, real_free: 100, nocache_free: 300, expect_pass: false, old_expect_pass: false}
+      - {name: boundary, real_free: 100, nocache_free: 512, expect_pass: true, old_expect_pass: false}
+  tasks:
+    - name: Run each case against the shipped task file
+      ansible.builtin.include_tasks: tasks/check-preflight-memory-case.yml
+      loop: "{{ cases }}"
+      loop_control:
+        loop_var: case
+        label: "{{ case.name }}"

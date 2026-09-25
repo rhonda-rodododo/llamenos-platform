@@ -1,0 +1,24 @@
+---
+# Shared RAM floor for preflight (and its regression check).
+#
+# Uses ansible_memory_mb.nocache.free, which tracks the kernel's MemAvailable.
+# NEVER use ansible_memory_mb.real.free / ansible_facts.memfree_mb: that is
+# MemFree, which excludes reclaimable page cache. A host that has been serving
+# traffic for a while has most of its RAM in cache, so MemFree drops below the
+# floor on every warm production host while a freshly rebooted host passes.
+- name: Assert minimum available RAM (512 MiB, including reclaimable cache)
+  ansible.builtin.assert:
+    that:
+      - ansible_facts.memory_mb.nocache.free >= 512
+    fail_msg: |
+      INSUFFICIENT MEMORY: less than 512 MiB of RAM is available on the target host.
+
+      Available RAM: {{ ansible_facts.memory_mb.nocache.free }} MiB
+      Required:      512 MiB minimum
+
+      "Available" here means MemAvailable: free memory PLUS reclaimable page
+      cache (ansible_memory_mb.nocache.free) — NOT MemFree. A low MemFree with
+      a large buff/cache is normal on a warm host and is not a failure.
+
+      Llamenos requires at least 1 GiB RAM total; 512 MiB must be available at deploy time.
+    success_msg: "RAM OK: {{ ansible_facts.memory_mb.nocache.free }} MiB available (incl. reclaimable cache)"

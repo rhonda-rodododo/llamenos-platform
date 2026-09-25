@@ -89,3 +89,11 @@ tests/load/*.json
 .dprint/cache/
 
 .fleet-worktrees/
+
+# Large local test artifact. Not produced by anything tracked in this repo, but it
+# appears in working trees and is ~1.3 GB. It has twice been staged accidentally by
+# `git add -A` / `git rebase --exec 'commit --amend'` and came within one push of
+# landing in this public repo. The backend is PostgreSQL, so no tracked sqlite file
+# is expected at the root.
+/.test-encrypted-seed.sqlite
+/*.sqlite
