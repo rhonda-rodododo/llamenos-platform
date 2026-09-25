@@ -219,6 +219,27 @@ export function buildBindingReport(): { rows: BindingRow[]; unresolvedServerMoun
   return { rows, unresolvedServerMounts: unresolvedMounts }
 }
 
+/**
+ * Escapes a value for safe interpolation into a generated markdown table cell
+ * (or any other line-oriented markdown construct built by string concatenation
+ * in this file). Order matters: backslashes must be escaped FIRST, otherwise
+ * the backslash inserted to escape a pipe gets re-escaped into `\\|`, which
+ * renders as a literal backslash followed by a column break — the exact
+ * "incomplete sanitization" shape CodeQL flags. Newlines/carriage returns are
+ * collapsed to a space since a raw newline ends a markdown table row (or, in
+ * the bullet-list sections, prematurely ends the list item).
+ *
+ * Every interpolated field in every generated row — not just free-text notes —
+ * must go through this, since any of them can (in principle) contain a pipe
+ * or newline and corrupt the table.
+ */
+export function escapeMarkdownCell(value: string): string {
+  return value
+    .replace(/\\/g, '\\\\')
+    .replace(/\|/g, '\\|')
+    .replace(/\r\n|\r|\n/g, ' ')
+}
+
 function verdictCounts(rows: BindingRow[]): Record<string, number> {
   const counts: Record<string, number> = {}
   for (const row of rows) {
@@ -229,7 +250,7 @@ function verdictCounts(rows: BindingRow[]): Record<string, number> {
   return counts
 }
 
-function renderMarkdown(rows: BindingRow[], unresolvedServerMounts: string[]): string {
+export function renderMarkdown(rows: BindingRow[], unresolvedServerMounts: string[]): string {
   const counts = verdictCounts(rows)
   const lines: string[] = []
   lines.push('# API route -> schema binding report')
@@ -242,7 +263,7 @@ function renderMarkdown(rows: BindingRow[], unresolvedServerMounts: string[]): s
   lines.push('| Verdict | Count |')
   lines.push('|---|---|')
   for (const [verdict, count] of Object.entries(counts).sort((a, b) => b[1] - a[1])) {
-    lines.push(`| ${verdict} | ${count} |`)
+    lines.push(`| ${escapeMarkdownCell(verdict)} | ${escapeMarkdownCell(String(count))} |`)
   }
   lines.push('')
   lines.push(`Client functions analyzed: **${rows.length}**`)
@@ -258,7 +279,12 @@ function renderMarkdown(rows: BindingRow[], unresolvedServerMounts: string[]): s
   lines.push('|---|---|---|---|---|---|---|')
   for (const row of [...rows].sort((a, b) => a.file.localeCompare(b.file) || a.line - b.line)) {
     const notes = [row.body.note, row.response.note, row.unresolvedReason].filter(Boolean).join('<br>')
-    lines.push(`| \`${row.functionName}\` | ${row.file}:${row.line} | ${row.method} | \`${row.pathPattern || '?'}\` | ${row.body.verdict} | ${row.response.verdict} | ${notes.replace(/\|/g, '\\|')} |`)
+    const fileLine = escapeMarkdownCell(`${row.file}:${row.line}`)
+    lines.push(
+      `| \`${escapeMarkdownCell(row.functionName)}\` | ${fileLine} | ${escapeMarkdownCell(row.method)} | ` +
+        `\`${escapeMarkdownCell(row.pathPattern || '?')}\` | ${escapeMarkdownCell(row.body.verdict)} | ` +
+        `${escapeMarkdownCell(row.response.verdict)} | ${escapeMarkdownCell(notes)} |`
+    )
   }
   lines.push('')
   lines.push('## Field-level diffs (schema fields vs. hand-written client shape)')
@@ -273,9 +299,11 @@ function renderMarkdown(rows: BindingRow[], unresolvedServerMounts: string[]): s
       if (!binding.fieldDiff) continue
       const { missingOnClient, extraOnClient } = binding.fieldDiff
       if (!missingOnClient.length && !extraOnClient.length) continue
-      lines.push(`- \`${row.functionName}\` (${label}, schema \`${binding.schemaIdent}\`):`)
-      if (missingOnClient.length) lines.push(`  - missing on client: ${missingOnClient.map(f => `\`${f}\``).join(', ')}`)
-      if (extraOnClient.length) lines.push(`  - extra on client (not in schema): ${extraOnClient.map(f => `\`${f}\``).join(', ')}`)
+      lines.push(`- \`${escapeMarkdownCell(row.functionName)}\` (${label}, schema \`${escapeMarkdownCell(binding.schemaIdent ?? '')}\`):`)
+      if (missingOnClient.length)
+        lines.push(`  - missing on client: ${missingOnClient.map(f => `\`${escapeMarkdownCell(f)}\``).join(', ')}`)
+      if (extraOnClient.length)
+        lines.push(`  - extra on client (not in schema): ${extraOnClient.map(f => `\`${escapeMarkdownCell(f)}\``).join(', ')}`)
     }
   }
   lines.push('')
