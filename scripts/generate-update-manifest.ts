@@ -14,7 +14,7 @@
  *     --version 0.18.0 \
  *     --notes "Bug fixes and improvements" \
  *     --output dist/latest.json \
- *     --url-base "https://releases.llamenos.org/desktop/v0.18.0"
+ *     --url-base "https://releases.llamenos-hotline.org/desktop/v0.18.0"
  *
  * In CI, artifact signatures are read from .sig files produced by
  * `tauri build` with `createUpdaterArtifacts: true`.
@@ -63,7 +63,7 @@ function parseArgs(): ManifestArgs {
     version,
     notes: flags['notes'] ?? '',
     output: flags['output'] ?? 'dist/latest.json',
-    urlBase: flags['url-base'] ?? `https://releases.llamenos.org/desktop/v${version}`,
+    urlBase: flags['url-base'] ?? `https://releases.llamenos-hotline.org/desktop/v${version}`,
     sigDir: flags['sig-dir'],
   }
 }

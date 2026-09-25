@@ -25,7 +25,7 @@ else
 fi
 
 REPO="${GITHUB_REPOSITORY:-rhonda-rodododo/llamenos-platform}"
-RUSTFS_PUBLIC_URL="${RUSTFS_PUBLIC_URL:-https://releases.llamenos.org}"
+RUSTFS_PUBLIC_URL="${RUSTFS_PUBLIC_URL:-https://releases.llamenos-hotline.org}"
 BASE_URL="${RUSTFS_PUBLIC_URL}/desktop/v${VERSION}"
 ARTIFACTS_DIR="${1:-artifacts}"
 
