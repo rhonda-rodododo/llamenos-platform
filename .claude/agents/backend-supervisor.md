@@ -100,7 +100,7 @@ $S/generate-pr-brief.sh <pr-number>
 DISPATCH_REPO=/path/to/repo WORKTREE_BASE=/path/to/projects $S/dispatch-one.sh ...
 ```
 
-**Flags:** `--template standard|kb|pr-comments` (standard=default) · `--no-template` · `--rules llamenos|skybuild|translatemd` (auto-detected from the repo path) · `--no-rules` · `--agent NAME` · `--effort low|medium|high|xhigh|max` (default `high`; Claude runtimes only — other runtimes warn and ignore) · `--max-budget-usd N` (Claude only) · `--owns 'path,path'` (FILE OWNERSHIP block — pass it whenever 2+ workers are live on one repo) · `--card <trello-card-id>` (mirror this worker onto a board card) · `--no-card` · `--dry-run` (print the assembled prompt and exit — creates nothing)
+**Flags:** `--template standard|kb|pr-comments` (standard=default) · `--no-template` · `--rules <name>` (auto-detected from the repo path) · `--no-rules` · `--agent NAME` · `--effort low|medium|high|xhigh|max` (default `high`; Claude runtimes only — other runtimes warn and ignore) · `--max-budget-usd N` (Claude only) · `--owns 'path,path'` (FILE OWNERSHIP block — pass it whenever 2+ workers are live on one repo) · `--card <trello-card-id>` (mirror this worker onto a board card) · `--no-card` · `--dry-run` (print the assembled prompt and exit — creates nothing)
 
 **Audit a template change without spending a dispatch:** `--dry-run` assembles the prompt, prints it and exits — no worktree, no branch, no tmux session. Verify a rule reaches the worker by grepping that output. Never "test" a prompt change by launching a real worker.
 
@@ -279,7 +279,7 @@ Pick the model per worker. Your Claude Max budget is precious — don't spend Op
 
 This table applies to **tmux workers only** (`dispatch-one.sh`). Native subagents (Task/Agent tool) always run the supervisor's own model — see "Subagents vs tmux workers" in SKILL.md.
 
-**gh auth is per-repo, automatic:** `~/.local/bin/gh` wraps the real CLI and injects the right account's token per repo (`~/.config/gh-per-repo/map`: rhonda-rodododo→llamenos*, acao→translatemd etc.). Never run `gh auth switch`; the wrapper makes it unnecessary and it's racy across concurrent workers.
+**gh auth is per-repo, automatic:** `~/.local/bin/gh` wraps the real CLI and injects the right account's token per repo (see `~/.config/gh-per-repo/map`). Never run `gh auth switch`; the wrapper makes it unnecessary and it's racy across concurrent workers.
 
 ## Supported models (token → CLI)
 
