@@ -16,15 +16,27 @@
 # Bun runs TypeScript natively — no esbuild transpilation step needed.
 
 # Stage 1: Install runtime deps
-FROM oven/bun:1.4.2@sha256:9114c058aeae42162ee16dd5084b95fe9473970bb6bcb5b232ab1630f0546895 AS deps
-# This runtime base is pinned independently of .mise.toml's `bun = "1.3.5"`.
-# .mise.toml pins the *developer/CI tool* version (kept in sync with
-# .github/workflows/ci.yml's bun-version input); this image is the
-# *production container* base and tracks its own Dependabot-driven minor
-# bumps on its own schedule. The two are allowed to diverge — Bun's runtime
-# compatibility across 1.3.x/1.4.x minors is not the same contract as "CI
-# uses the same tool version everywhere". Update via Dependabot or on a new
-# minor release.
+FROM oven/bun:1.3.13@sha256:87416c977a612a204eb54ab9f3927023c2a3c971f4f345a01da08ea6262ae30e AS deps
+# BUN PIN — do not bump without a green `image-db-auth` run (see below).
+#
+# A freshly built image on oven/bun:1.4.2 could not authenticate to PostgreSQL
+# on a clean production host, so `scripts/run-migrations.ts` never ran and the
+# container sat unhealthy forever:
+#   PostgresError: malformed SCRAM message
+#     errno: "08P01"  detail: "Malformed proof in client-final-message."
+# The same host ran the 1.3.13 image against postgres:17-alpine for months.
+# 1.3.13 is therefore the last version PROVEN on that host, and is what is
+# pinned here. (Every version 1.3.5 - 1.4.2 authenticates fine on an AVX2 dev
+# machine, so the fault is host-dependent: note the oven/bun 1.3.x x64 images
+# ship the *baseline* build while 1.4.x ships the non-baseline one. Root cause
+# upstream is NOT confirmed.) Lifting the pin later: move to a newer Bun only
+# after `.github/workflows/ci.yml`'s `image-db-auth` job (which builds THIS
+# image and runs scripts/verify-image-db-auth.sh against postgres:17-alpine)
+# is green on it AND a clean-host deploy has been smoke-tested.
+#
+# The pin is also independent of .mise.toml's `bun = "1.3.5"` (the dev/CI tool
+# version); the two may differ, which is exactly why nothing but the image
+# check above exercises the shipped runtime against a real PostgreSQL.
 WORKDIR /app
 COPY package.json bun.lockb ./
 # Copy workspace package.json stubs so bun can resolve the workspace graph from the
@@ -50,10 +62,9 @@ RUN cargo build --release --manifest-path packages/crypto/Cargo.toml --features 
     && cp packages/crypto/target/release/libllamenos_core.so packages/crypto/dist/server/
 
 # Stage 3: Production
-FROM oven/bun:1.4.2-slim@sha256:cb3bbbb08e13a4a2ff400f24c7a2a1d5efa83f6ef8544d52d95a519631e2fc61 AS app
-# Pinned independently of .mise.toml's dev/CI `bun = "1.3.5"` — see the
-# `deps` stage comment above for why the two are allowed to diverge. Update
-# via Dependabot.
+FROM oven/bun:1.3.13-slim@sha256:7e8ed3961db1cdedf17d516dda87948cfedbd294f53bf16462e5b57ed3fff0f1 AS app
+# Bun pin: see the "BUN PIN" comment in the `deps` stage above (SCRAM auth
+# failure on 1.4.2). Keep all three `oven/bun` stages on the same version.
 
 # Apply outstanding Debian security updates on top of the pinned base.
 # The base digest above is the newest published for the `1.4.0-slim` tag, so a
@@ -120,7 +131,7 @@ CMD []
 
 # Stage 4: Install full JS deps (incl. devDependencies) for the SPA build.
 # Separate from the `deps` stage above, which installs --production only.
-FROM oven/bun:1.4.2@sha256:9114c058aeae42162ee16dd5084b95fe9473970bb6bcb5b232ab1630f0546895 AS frontend-deps
+FROM oven/bun:1.3.13@sha256:87416c977a612a204eb54ab9f3927023c2a3c971f4f345a01da08ea6262ae30e AS frontend-deps
 WORKDIR /app
 COPY package.json bun.lockb ./
 COPY packages/crypto/package.json packages/crypto/package.json

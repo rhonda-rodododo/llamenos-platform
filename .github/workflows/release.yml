@@ -117,9 +117,46 @@ jobs:
           path: CHECKSUMS.txt
           retention-days: 7
 
+  # --- Shipped image must talk to a real PostgreSQL BEFORE the release publishes ---
+  # A Bun-runtime regression (1.4.2: SCRAM "Malformed proof in
+  # client-final-message") once produced an image that could not run a single
+  # migration. The `release` job below publishes the GitHub Release (draft ->
+  # published) and dispatches every downstream artifact workflow, so it must
+  # not run unless the image built from this exact commit authenticates and
+  # migrates. Builds locally (no push); docker-stable does the real push.
+  image-db-auth:
+    needs: check
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout merge commit
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ github.event.pull_request.merge_commit_sha }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - name: Build app image (local, not pushed)
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: deploy/docker/Dockerfile
+          target: app
+          load: true
+          push: false
+          tags: llamenos-image-db-auth:release
+          cache-from: type=registry,ref=ghcr.io/${{ github.repository }}:buildcache
+
+      - name: Image authenticates to PostgreSQL and applies migrations
+        run: scripts/verify-image-db-auth.sh llamenos-image-db-auth:release
+
   # --- Tag + GitHub Release, then attach signed artifacts ---
   release:
-    needs: [check, build]
+    needs: [check, build, image-db-auth]
     runs-on: ubuntu-latest
 
     permissions:

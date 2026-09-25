@@ -1368,6 +1368,46 @@ jobs:
       - name: Check migration drift
         run: bun run migration:check --ci
 
+  # ─── Shipped image ↔ real PostgreSQL ──────────────────────────
+  # The app image pins its OWN Bun runtime (deploy/docker/Dockerfile), separate
+  # from the Bun every other job here runs on. A runtime-only defect (Bun 1.4.2:
+  # "Malformed proof in client-final-message" on SCRAM-SHA-256) left a freshly
+  # built image unable to run one migration, and nothing exercised the built
+  # image against a real database. This job builds the image and runs its
+  # migration runner against the compose file's postgres image. Also runs in
+  # release.yml before a release is published.
+  image-db-auth:
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    timeout-minutes: 40
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      # Read-only registry cache (the release job writes it) so the Rust FFI
+      # stage is not recompiled on every run. No login: the package is public
+      # and a cache miss only costs time.
+      - name: Build app image (local, not pushed)
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: deploy/docker/Dockerfile
+          target: app
+          load: true
+          push: false
+          tags: llamenos-image-db-auth:ci
+          cache-from: type=registry,ref=ghcr.io/${{ github.repository }}:buildcache
+
+      - name: Image authenticates to PostgreSQL and applies migrations
+        run: scripts/verify-image-db-auth.sh llamenos-image-db-auth:ci
+
   docs-guard:
     runs-on: ubuntu-latest
     timeout-minutes: 3
@@ -1490,7 +1530,7 @@ jobs:
   # one refused.
 
   ci-status:
-    needs: [no-generated-files-in-git, verify-updater-config, build, audit, lint, crypto-tests, backend-bdd, backend-unit, desktop-unit, android-build-test, android-e2e, e2e, ios-build-test, crypto-guardrails, migration-drift, ansible-validate, docs-guard]
+    needs: [no-generated-files-in-git, verify-updater-config, build, audit, lint, crypto-tests, backend-bdd, backend-unit, desktop-unit, android-build-test, android-e2e, e2e, ios-build-test, crypto-guardrails, migration-drift, ansible-validate, docs-guard, image-db-auth]
     if: always()
     runs-on: ubuntu-latest
     permissions:
@@ -1523,6 +1563,7 @@ jobs:
           check_job "migration-drift" "${{ needs.migration-drift.result }}"
           check_job "ansible-validate" "${{ needs.ansible-validate.result }}"
           check_job "docs-guard" "${{ needs.docs-guard.result }}"
+          check_job "image-db-auth" "${{ needs.image-db-auth.result }}"
 
           if [[ -n "$FAILED" ]]; then
             echo "Failed jobs:$FAILED"
