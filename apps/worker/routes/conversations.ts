@@ -454,12 +454,12 @@ conversations.post('/:id/messages',
       failureReason,
     })
 
-    // Publish new message event to Nostr relay
+    // Publish new message event to the conversation's hub — clients subscribe per hub
     publishEvent(c.env, KIND_MESSAGE_NEW, {
       type: 'message:new',
       conversationId: id,
       channelType: 'outbound',
-    })
+    }, conv.hubId ?? undefined)
 
     audit(c.get('services').audit, 'messageSent', pubkey, {
       conversationId: id,
@@ -507,13 +507,13 @@ conversations.patch('/:id',
 
     const updated = await services.conversations.update(id, body)
 
-    // Publish status change to Nostr relay
+    // Publish status change to the conversation's hub — clients subscribe per hub
     const convEventType = body.status === 'closed' ? 'conversation:closed' : 'conversation:assigned'
     publishEvent(c.env, KIND_CONVERSATION_ASSIGNED, {
       type: convEventType,
       conversationId: id,
       assignedTo: body.assignedTo,
-    })
+    }, conv.hubId ?? undefined)
 
     audit(c.get('services').audit, body.status === 'closed' ? 'conversationClosed' : 'conversationUpdated', pubkey, {
       conversationId: id,
@@ -585,12 +585,12 @@ conversations.post('/:id/claim',
 
     const claimed = await services.conversations.claim(id, pubkey)
 
-    // Publish assignment to Nostr relay
+    // Publish assignment to the conversation's hub — clients subscribe per hub
     publishEvent(c.env, KIND_CONVERSATION_ASSIGNED, {
       type: 'conversation:assigned',
       conversationId: id,
       assignedTo: pubkey,
-    })
+    }, conv.hubId ?? undefined)
 
     // Push notification to assigned user (Epic 86)
     dispatchPushToUser(c.env, services, pubkey, {

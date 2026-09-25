@@ -928,14 +928,13 @@ dev.post('/test-simulate/incoming-message', async (c) => {
     timestamp: new Date().toISOString(),
   }, adminDecryptionPubkey, body.hubId)
 
-  // Publish Nostr event (mirrors real messaging webhook flow)
-  // Messaging events use empty hubId — conversations span all hubs
+  // Publish to the conversation's hub (mirrors real messaging webhook flow)
   publishEvent(c.env, KIND_MESSAGE_NEW, {
     type: 'message:new',
     conversationId: result.conversationId,
     messageId: result.messageId,
     channelType: channel,
-  })
+  }, body.hubId)
 
   return c.json({ ok: true, conversationId: result.conversationId, messageId: result.messageId })
 })

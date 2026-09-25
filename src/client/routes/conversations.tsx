@@ -32,7 +32,7 @@ function ConversationsPage() {
   const { isAdmin, hasDeviceKey, publicKey, adminDecryptionPubkey } = useAuth()
   const { channels, isLoading: configLoading } = useConfig()
   const { toast } = useToast()
-  const { conversations, waitingConversations } = useConversations()
+  const { conversations, waitingConversations, applyConversation } = useConversations()
 
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [messages, setMessages] = useState<ConversationMessage[]>([])
@@ -71,12 +71,12 @@ function ConversationsPage() {
 
   const handleClaim = useCallback(async (convId: string) => {
     try {
-      await claimConversation(convId)
+      applyConversation(await claimConversation(convId))
       toast(t('conversations.claimed', { defaultValue: 'Conversation claimed' }))
     } catch {
       toast(t('conversations.claimError', { defaultValue: 'Failed to claim conversation' }), 'error')
     }
-  }, [t, toast])
+  }, [applyConversation, t, toast])
 
   const handleClose = useCallback(async (convId: string) => {
     try {
@@ -90,12 +90,12 @@ function ConversationsPage() {
 
   const handleReopen = useCallback(async (convId: string) => {
     try {
-      await updateConversation(convId, { status: 'active' })
+      applyConversation(await updateConversation(convId, { status: 'active' }))
       toast(t('conversations.reopened', { defaultValue: 'Conversation reopened' }))
     } catch {
       toast(t('conversations.reopenError', { defaultValue: 'Failed to reopen conversation' }), 'error')
     }
-  }, [t, toast])
+  }, [applyConversation, t, toast])
 
   // Encrypt and send a message using envelope pattern
   const handleComposerSend = useCallback(async (plaintext: string) => {

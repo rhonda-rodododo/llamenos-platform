@@ -140,7 +140,7 @@ messaging.post('/:channel/webhook',
               messageId: result.messageId,
               status: statusUpdate.status,
               timestamp: statusUpdate.timestamp,
-            })
+            }, hubId)
           }
 
           // Also correlate with blast deliveries (non-blocking)
@@ -172,7 +172,7 @@ messaging.post('/:channel/webhook',
           isTyping: typing.isTyping,
           channelType: 'signal',
           timestamp: typing.timestamp,
-        })
+        }, hubId)
         return c.json({ ok: true })
       }
 
@@ -187,7 +187,7 @@ messaging.post('/:channel/webhook',
           isRemove: reaction.isRemove ?? false,
           sender: signalPayload.envelope.sourceUuid ?? signalPayload.envelope.source,
           channelType: 'signal',
-        })
+        }, hubId)
         return c.json({ ok: true })
       }
 
@@ -257,12 +257,12 @@ messaging.post('/:channel/webhook',
   // Forward to ConversationsService for processing
   const convResult = await services.conversations.handleIncoming(incoming, c.env.ADMIN_PUBKEY)
 
-  // Publish new inbound message event to WebSocket relay
+  // Publish new inbound message event to the webhook's hub — clients subscribe per hub
   publishEvent(c.env, KIND_MESSAGE_NEW, {
     type: 'message:new',
     conversationId: convResult.conversationId,
     channelType: channel,
-  })
+  }, hubId)
 
   // Auto-assignment for new conversations
   if (convResult.isNew && convResult.status === 'waiting') {
@@ -373,13 +373,13 @@ async function tryAutoAssign(
     // 6. Auto-assign the conversation via service
     await services.conversations.claim(conversationId, bestCandidate)
 
-    // Publish assignment to Nostr relay
+    // Publish assignment to the conversation's hub — clients subscribe per hub
     publishEvent(env, KIND_CONVERSATION_ASSIGNED, {
       type: 'conversation:assigned',
       conversationId,
       assignedTo: bestCandidate,
       autoAssigned: true,
-    })
+    }, hubId)
 
     logger.info('Auto-assigned conversation', { conversationId, assignedTo: bestCandidate.slice(0, 8) })
   } catch (err) {
