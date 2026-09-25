@@ -1,21 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <!--
-  ExportOptions for App Store distribution.
+  ExportOptions for App Store Connect / TestFlight distribution.
 
-  TODO (post account activation): Fill in `teamID` with the 10-character
-  Apple Developer Team ID, and add a `provisioningProfiles` dictionary that
-  maps the bundle identifier `org.llamenos.hotline` to the App Store
-  provisioning profile name once it is created in the developer portal.
-
-  Example once known:
-      <key>teamID</key>
-      <string>AB12CD34EF</string>
-      <key>provisioningProfiles</key>
-      <dict>
-          <key>org.llamenos.hotline</key>
-          <string>Llamenos App Store</string>
-      </dict>
+  teamID and the provisioningProfiles entry are real values. xcodebuild
+  -exportArchive resolves a provisioningProfiles value by the profile's
+  INTERNAL Name (as shown by `security cms -D -i <file> | plutil -extract Name
+  raw -`), not by its filename. Keep this in sync with fastlane/Fastfile.
 -->
 <plist version="1.0">
 <dict>
@@ -36,7 +27,7 @@
     <key>provisioningProfiles</key>
     <dict>
         <key>org.llamenos.hotline</key>
-        <string>match AppStore org.llamenos.hotline</string>
+        <string>org.llamenos.hotline AppStore</string>
     </dict>
 </dict>
 </plist>
