@@ -404,6 +404,61 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - add E2E tests for device linking and fix /link-device public path
 
 
+## 0.19.16 (2026-09-25)
+
+### Features
+
+- add review-and-merge operator command (#864)
+- TLS certificate pinning for the network proxy (#859)
+- add `llamenos-fleet board` — the deterministic gate decision table (#871)
+- per-hub IVR language override, constrained to provider speakability (#829)
+- make biometric enrollment reachable via Settings (#834)
+- chain-of-custody access log backed by the hash-chained audit trail (#835)
+- impact tiers — scale review ceremony to a diff's blast radius (#870)
+- run and verify the ntfy push relay on staging/demo (Android testers can be rung) (#964)
+
+### Fixes
+
+- keep apps/desktop/Cargo.lock in lockstep with knope releases (#919)
+- scope ci.yml jobs to the platforms a PR's changes actually touch (#862)
+- prevent partial tauri release from a failed metadata push (#884)
+- point the updater at the current signing keypair (#927)
+- updater pubkey must match the key CI signs with (#931)
+- let macOS release build succeed unsigned when no Apple cert is configured (#932)
+- remove redundant hono override that conflicts under npm (#933)
+- stop Playwright loading Bun test files and failing the whole run (#936)
+- classify lockfile-rail failures instead of blaming the lockfile (#929)
+- stop PIN entry being the suite's single biggest flake (#935)
+- digest and halt/resume report to GitHub, not only the journal (#841)
+- grant platform lanes owned access to packages/i18n/locales/ (#938)
+- stop the failure breaker counting REJECTED as a runaway failure (#942)
+- derive APNs topic from a single source, default to org.llamenos.hotline (#856)
+- narrow tests/steps/ ownership to tests/steps/backend/, extend baseline grant to backend (#943)
+- stop the tab-click step from racing panel mount (#678) (#917)
+- sweep isVisible probes in cms-cases-steps.ts (#785) (#853)
+- remove AUTO_RECEIVE_SCHEDULE from signal-cli (fatal with MODE=json-rpc) (#945)
+- close out the fixable-HIGH Trivy gate for issue #650 (#912)
+- replace remaining isVisible()/.first() control-flow probes (#681 sweep) (#776)
+- probe sweep — real waiting assertions in cms-events-steps (#784) (#854)
+- stop double-caching the Rust toolchain in desktop-e2e (#910)
+- sweep isVisible()/.first() control-flow probes in tests/steps (#916)
+- sweep remaining write-guarding probes in security/hub/calls/notes/reports/messaging steps (#897)
+- sweep isVisible probes in cases-area step files (#784 #785 #786) (#790)
+- gate api_config_clear behind a Rust-owned confirmation token (#822)
+- resolve fleet/verify lane-boundary scope for 4 blocked PRs (#947)
+- land three EP09 recovery-group errata items (#847)
+- show the specific passkey-required error on WEBAUTHN_CREDENTIAL_REQUIRED (#920)
+- mismatched content-key envelope broke seeded-contact decryption (#796) (#934)
+- stop tracking vendored bundler gem (#823)
+- clear the 9 baselined tsc errors at the tests/ root (#894)
+- clear all 71 baselined tsc errors under tests/steps/ (#887)
+- clear 8 baselined tsc errors in tests/steps/{admin,auth} (#950)
+- make API-seeded contacts decryptable; cms-assignment/contacts steps wait deterministically (#796) (#952)
+- take src/client and tests to zero (desktop third of #647) (#890)
+- encrypt evidence uploads client-side; derive hash/size from ciphertext (#951)
+- make mobile-release Android job complete and attach a verified installable APK (#958)
+- accept UnifiedPush endpoints only on configured ntfy origins (#960) (#963)
+
 ## 0.19.15 (2026-09-20)
 
 ### Fixes
