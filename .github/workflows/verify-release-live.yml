@@ -8,10 +8,12 @@
 # the SOURCE builds and tests, never that a tester can install anything.
 # This workflow is the missing check (#721).
 #
-# Four independent surfaces, four independent jobs:
-#   1. desktop-updater — the canonical Tauri updater manifest resolves,
-#      and every platform binary it points at downloads and matches the
-#      published CHECKSUMS.txt.
+# Five independent surfaces, five independent jobs:
+#   1. desktop-installer — the latest desktop GitHub Release (`desktop-v<ver>`,
+#      published by tauri-release.yml, and the version must match the latest
+#      `v<ver>` release) carries a signed installer (+ .sig) for every
+#      required platform, and each installer's SHA-256 matches CHECKSUMS.txt.
+#      This is how internal-beta testers actually install desktop.
 #   2. staging-backend — the staging backend's health probes are up,
 #      /api/config reports demoMode: true, and the self-hosted ntfy push
 #      relay Android testers are rung through (UnifiedPush, no FCM) is
@@ -23,6 +25,23 @@
 #      their own release because `v<version>` is immutable once published).
 #   4. testflight — same idea for the TestFlight build number, via
 #      ios-build-meta.json on the most recent `ios-v<version>` release.
+#   5. desktop-updater — the canonical Tauri updater manifest resolves,
+#      and every platform binary it points at downloads and matches the
+#      published CHECKSUMS.txt.
+#
+# RE-SCOPE (#956, milestone #769): on 2026-09-24 the first internal beta was
+# re-scoped to Android + desktop ONLY, with no production auto-update channel.
+# Surfaces 4 (iOS) and 5 (updater channel, #714/#715) assert things that beta
+# will never have, so the aggregate could never go green. Which surfaces gate
+# the aggregate is now data, in ONE reviewable place:
+#   .github/workflows/verify-release-live.surfaces.json
+# A surface with `required: false` is NOT silently skipped and NOT reported
+# green: its job does not run, and the Summary prints
+# "NOT REQUIRED (out of milestone scope)" with the recorded reason on every
+# run (also into the job summary), so descoping stays a visible, reviewable
+# decision. Every listed-required surface must finish `success` — a skipped
+# or cancelled required surface FAILS the aggregate. To re-require a surface,
+# flip its flag in that file (a code-owned, PR-reviewed change).
 #
 # Hard rule (project memory "audit gates by breaking them" + this issue's
 # AC): a check that cannot run because a credential or a required target
@@ -42,6 +61,14 @@ on:
     - cron: "23 */6 * * *"
   workflow_dispatch:
     inputs:
+      required_surfaces_override:
+        description: "Comma-separated surface ids that gate the aggregate, replacing the surfaces.json file (testing only — proves the gate goes red/green for the right surfaces; the Summary prints that an override is active)"
+        required: false
+        type: string
+      desktop_release_tag_override:
+        description: "Check this desktop GitHub Release tag (e.g. desktop-v0.19.15) instead of the one matching the latest v<ver> release (testing only)"
+        required: false
+        type: string
       updater_url:
         description: "Override the desktop updater manifest URL (testing only; a http://127.0.0.1 URL also spins up a matching local CHECKSUMS.txt fixture)"
         required: false
@@ -87,9 +114,190 @@ permissions:
   contents: read
 
 jobs:
-  # ─── Surface 1: Desktop updater ──────────────────────────────────
+  # ─── Which surfaces gate the aggregate ───────────────────────────
+  config:
+    name: Resolve required surfaces
+    runs-on: ubuntu-latest
+    outputs:
+      desktop-installer: ${{ steps.resolve.outputs.desktop-installer }}
+      staging-backend: ${{ steps.resolve.outputs.staging-backend }}
+      play-track: ${{ steps.resolve.outputs.play-track }}
+      testflight: ${{ steps.resolve.outputs.testflight }}
+      desktop-updater: ${{ steps.resolve.outputs.desktop-updater }}
+      platforms: ${{ steps.resolve.outputs.platforms }}
+    steps:
+      - name: Checkout (surfaces config only)
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          sparse-checkout: |
+            .github/workflows/verify-release-live.surfaces.json
+          sparse-checkout-cone-mode: false
+
+      - name: Validate and resolve .github/workflows/verify-release-live.surfaces.json
+        id: resolve
+        env:
+          OVERRIDE: ${{ inputs.required_surfaces_override }}
+        run: |
+          set -euo pipefail
+          CFG=.github/workflows/verify-release-live.surfaces.json
+          KNOWN="desktop-installer staging-backend play-track testflight desktop-updater"
+          jq -e . "$CFG" >/dev/null || { echo "::error::$CFG is not valid JSON"; exit 1; }
+
+          # Every known surface must be listed and every listed surface known:
+          # a surface that is merely absent must never read as "not required".
+          for id in $KNOWN; do
+            jq -e --arg id "$id" '.surfaces[$id] | type == "object" and (.required | type == "boolean")' "$CFG" >/dev/null \
+              || { echo "::error::$CFG must list surface '$id' with a boolean .required"; exit 1; }
+          done
+          UNKNOWN=$(jq -r --arg known "$KNOWN" '.surfaces | keys[] | select(. as $k | ($known | split(" ") | index($k)) | not)' "$CFG")
+          [ -z "$UNKNOWN" ] || { echo "::error::$CFG lists unknown surface(s): $UNKNOWN"; exit 1; }
+          # A descoped surface must say why.
+          MISSING_REASON=$(jq -r '.surfaces | to_entries[] | select(.value.required == false and ((.value.reason // "") | length) == 0) | .key' "$CFG")
+          [ -z "$MISSING_REASON" ] || { echo "::error::$CFG: surface(s) marked required=false with no .reason: $MISSING_REASON"; exit 1; }
+          # Same rule for desktop platforms.
+          jq -e '.desktopInstallerPlatforms | length > 0 and all(.[]; (.required | type == "boolean") and (.installerPattern | type == "string" and length > 0) and (.required or ((.reason // "") | length > 0)))' "$CFG" >/dev/null \
+            || { echo "::error::$CFG: desktopInstallerPlatforms must be non-empty; each needs .required (bool), .installerPattern, and a .reason when required=false"; exit 1; }
+          jq -e '.desktopInstallerPlatforms | any(.[]; .required)' "$CFG" >/dev/null \
+            || { echo "::error::$CFG: at least one desktop platform must be required"; exit 1; }
+
+          for id in $KNOWN; do
+            if [ -n "$OVERRIDE" ]; then
+              case ",${OVERRIDE// /}," in *",$id,"*) REQ=true ;; *) REQ=false ;; esac
+            else
+              REQ=$(jq -r --arg id "$id" '.surfaces[$id].required' "$CFG")
+            fi
+            echo "$id=$REQ" >> "$GITHUB_OUTPUT"
+            echo "$id required=$REQ"
+          done
+          echo "platforms=$(jq -c '.desktopInstallerPlatforms' "$CFG")" >> "$GITHUB_OUTPUT"
+
+  # ─── Surface 1: Desktop installers (GitHub Release) ──────────────
+  desktop-installer:
+    name: "Surface 1 — Desktop installers on the GitHub Release"
+    needs: config
+    if: ${{ needs.config.outputs.desktop-installer == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      # Matches how testers actually install desktop: tauri-release.yml
+      # publishes every installer + its minisign .sig + CHECKSUMS.txt to the
+      # `desktop-v<version>` GitHub Release (v<version> is immutable by the time
+      # the desktop build finishes, so it cannot carry them).
+      - name: Verify a signed installer per required platform, each matching CHECKSUMS.txt
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG_OVERRIDE: ${{ inputs.desktop_release_tag_override }}
+          PLATFORMS_JSON: ${{ needs.config.outputs.platforms }}
+        run: |
+          set -euo pipefail
+          REPO="$GITHUB_REPOSITORY"
+          SUMMARY="${GITHUB_STEP_SUMMARY:-/dev/null}"
+
+          if [ -n "$TAG_OVERRIDE" ]; then
+            TAG="$TAG_OVERRIDE"
+            echo "Using overridden desktop release tag: $TAG (testing only)"
+          else
+            # The desktop release for the LATEST product release must exist:
+            # a `v<ver>` release with no `desktop-v<ver>` is exactly the
+            # "dispatch swallowed / desktop build never published" failure.
+            LATEST_V=$(gh release list --repo "$REPO" --limit 50 --json tagName,isDraft \
+              --jq 'first(.[] | select((.isDraft | not) and (.tagName | test("^v[0-9]"))) | .tagName) // empty')
+            if [ -z "$LATEST_V" ]; then
+              echo "::error::SURFACE BROKEN: desktop installers — no published v<version> GitHub Release exists to compare against"
+              exit 1
+            fi
+            TAG="desktop-${LATEST_V}"
+          fi
+          echo "Checking desktop release: $TAG"
+
+          if ! gh release view "$TAG" --repo "$REPO" --json assets,isDraft > release.json 2>release.err; then
+            echo "::error::SURFACE BROKEN: desktop installers — GitHub Release $TAG does not exist (tauri-release.yml never published it for the latest release): $(tail -1 release.err)"
+            exit 1
+          fi
+          if [ "$(jq -r '.isDraft' release.json)" = "true" ]; then
+            echo "::error::SURFACE BROKEN: desktop installers — GitHub Release $TAG is still a draft; testers cannot see it"
+            exit 1
+          fi
+          jq -r '.assets[].name' release.json > assets.txt
+
+          mkdir -p dl
+          if ! gh release download "$TAG" --repo "$REPO" --pattern CHECKSUMS.txt --dir dl --clobber 2>dl.err; then
+            echo "::error::SURFACE BROKEN: desktop installers — $TAG has no CHECKSUMS.txt: $(tail -1 dl.err)"
+            exit 1
+          fi
+
+          FAILED=0
+          {
+            echo "### Surface 1 — Desktop installers (\`$TAG\`)"
+            echo
+            echo "| Platform | Requirement | Result |"
+            echo "|---|---|---|"
+          } >> "$SUMMARY"
+
+          # Excluded platforms are named (never silently dropped).
+          while IFS=$'\t' read -r PLAT REASON; do
+            echo "NOT REQUIRED (out of milestone scope): desktop platform $PLAT — $REASON"
+            echo "| $PLAT | NOT REQUIRED (out of milestone scope) | $REASON |" >> "$SUMMARY"
+          done < <(jq -r 'to_entries[] | select(.value.required | not) | "\(.key)\t\(.value.reason)"' <<< "$PLATFORMS_JSON")
+
+          while IFS=$'\t' read -r PLAT PATTERN; do
+            mapfile -t INSTALLERS < <(grep -E "$PATTERN" assets.txt || true)
+            if [ "${#INSTALLERS[@]}" -eq 0 ]; then
+              echo "::error::SURFACE BROKEN: desktop installers — $TAG has no $PLAT installer (no asset matching /$PATTERN/)"
+              echo "| $PLAT | required | ❌ no installer asset |" >> "$SUMMARY"
+              FAILED=1
+              continue
+            fi
+            PLAT_OK=1
+            for F in "${INSTALLERS[@]}"; do
+              if ! grep -qxF "${F}.sig" assets.txt; then
+                echo "::error::SURFACE BROKEN: desktop installers — $PLAT installer $F has no ${F}.sig (unsigned)"
+                PLAT_OK=0
+                continue
+              fi
+              EXPECTED=$(awk -v f="$F" '$2==f {print $1; exit}' dl/CHECKSUMS.txt)
+              if [ -z "$EXPECTED" ]; then
+                echo "::error::SURFACE BROKEN: desktop installers — no CHECKSUMS.txt entry for $PLAT installer $F"
+                PLAT_OK=0
+                continue
+              fi
+              if ! gh release download "$TAG" --repo "$REPO" --pattern "$F" --pattern "${F}.sig" --dir dl --clobber 2>dl.err; then
+                echo "::error::SURFACE BROKEN: desktop installers — could not download $F or its .sig from $TAG: $(tail -1 dl.err)"
+                PLAT_OK=0
+                continue
+              fi
+              if [ ! -s "dl/${F}.sig" ]; then
+                echo "::error::SURFACE BROKEN: desktop installers — ${F}.sig is empty"
+                PLAT_OK=0
+                rm -f "dl/$F" "dl/${F}.sig"
+                continue
+              fi
+              ACTUAL=$(sha256sum "dl/$F" | awk '{print $1}')
+              rm -f "dl/$F" "dl/${F}.sig"
+              if [ "$ACTUAL" != "$EXPECTED" ]; then
+                echo "::error::SURFACE BROKEN: desktop installers — $PLAT installer $F sha256 mismatch (CHECKSUMS.txt $EXPECTED, downloaded $ACTUAL)"
+                PLAT_OK=0
+                continue
+              fi
+              echo "OK: [$PLAT] $F signed (.sig present) and sha256 matches CHECKSUMS.txt"
+            done
+            if [ "$PLAT_OK" = 1 ]; then
+              echo "| $PLAT | required | ✅ ${#INSTALLERS[@]} installer(s) signed + checksum-verified |" >> "$SUMMARY"
+            else
+              echo "| $PLAT | required | ❌ see errors |" >> "$SUMMARY"
+              FAILED=1
+            fi
+          done < <(jq -r 'to_entries[] | select(.value.required) | "\(.key)\t\(.value.installerPattern)"' <<< "$PLATFORMS_JSON")
+
+          if [ "$FAILED" != "0" ]; then
+            exit 1
+          fi
+          echo "All required-platform installers on $TAG are signed and match CHECKSUMS.txt."
+
+  # ─── Surface 5: Desktop updater (auto-update channel) ────────────
   desktop-updater:
-    name: "Surface 1 — Desktop updater artifacts"
+    name: "Surface 5 — Desktop updater artifacts"
+    needs: config
+    if: ${{ needs.config.outputs.desktop-updater == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - name: Start local fixture server (testing only)
@@ -200,6 +408,8 @@ jobs:
   # ─── Surface 2: Staging backend ──────────────────────────────────
   staging-backend:
     name: "Surface 2 — Staging backend health + demo mode + ntfy push relay"
+    needs: config
+    if: ${{ needs.config.outputs.staging-backend == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - name: Start local fixture server (testing only)
@@ -314,6 +524,8 @@ jobs:
   # ─── Surface 3: Play Console internal track ──────────────────────
   play-track:
     name: "Surface 3 — Play internal track versionCode"
+    needs: config
+    if: ${{ needs.config.outputs.play-track == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout (package name only)
@@ -492,6 +704,8 @@ jobs:
   # ─── Surface 4: TestFlight ────────────────────────────────────────
   testflight:
     name: "Surface 4 — TestFlight build number"
+    needs: config
+    if: ${{ needs.config.outputs.testflight == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout (bundle identifier only)
@@ -696,25 +910,74 @@ jobs:
   report:
     name: Summary
     runs-on: ubuntu-latest
-    needs: [desktop-updater, staging-backend, play-track, testflight]
+    needs: [config, desktop-installer, staging-backend, play-track, testflight, desktop-updater]
     if: always()
     steps:
-      - name: Name which surface(s) broke
+      - name: Checkout (surfaces config, for the exclusion reasons)
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          sparse-checkout: |
+            .github/workflows/verify-release-live.surfaces.json
+          sparse-checkout-cone-mode: false
+
+      - name: Name which surface(s) broke, and which are excluded and why
         env:
-          DESKTOP_RESULT: ${{ needs.desktop-updater.result }}
-          STAGING_RESULT: ${{ needs.staging-backend.result }}
-          PLAY_RESULT: ${{ needs.play-track.result }}
-          TESTFLIGHT_RESULT: ${{ needs.testflight.result }}
+          NEEDS_JSON: ${{ toJSON(needs) }}
+          OVERRIDE: ${{ inputs.required_surfaces_override }}
         run: |
           set -euo pipefail
+          SUMMARY="${GITHUB_STEP_SUMMARY:-/dev/null}"
+
+          # If the config itself could not be resolved we cannot know what is
+          # required — fail, never guess.
+          CONFIG_RESULT=$(jq -r '.config.result' <<< "$NEEDS_JSON")
+          if [ "$CONFIG_RESULT" != "success" ]; then
+            echo "::error::Internal Availability BROKEN: could not resolve the required-surfaces config (config=$CONFIG_RESULT)"
+            exit 1
+          fi
+
+          # Whether a surface is required is read from the config job's outputs;
+          # a required surface passes ONLY on `success` (skipped/cancelled fail).
           BROKEN=()
-          [ "$DESKTOP_RESULT" != "success" ] && BROKEN+=("desktop-updater=$DESKTOP_RESULT")
-          [ "$STAGING_RESULT" != "success" ] && BROKEN+=("staging-backend=$STAGING_RESULT")
-          [ "$PLAY_RESULT" != "success" ] && BROKEN+=("play-track=$PLAY_RESULT")
-          [ "$TESTFLIGHT_RESULT" != "success" ] && BROKEN+=("testflight=$TESTFLIGHT_RESULT")
+          EXCLUDED=()
+          VERIFIED=()
+          echo "## Internal Availability — verify-release-live" >> "$SUMMARY"
+          echo >> "$SUMMARY"
+          if [ -n "$OVERRIDE" ]; then
+            echo "::warning::required_surfaces_override is ACTIVE ($OVERRIDE) — the surfaces.json file was NOT used (testing only)"
+            echo "> ⚠️ \`required_surfaces_override\` is active (\`$OVERRIDE\`): the surfaces.json file was **not** used (testing only)." >> "$SUMMARY"
+            echo >> "$SUMMARY"
+          fi
+          {
+            echo "| Surface | Required | Result |"
+            echo "|---|---|---|"
+          } >> "$SUMMARY"
+
+          for ID in desktop-installer staging-backend play-track testflight desktop-updater; do
+            REQUIRED=$(jq -r --arg id "$ID" '.config.outputs[$id]' <<< "$NEEDS_JSON")
+            RESULT=$(jq -r --arg id "$ID" '.[$id].result' <<< "$NEEDS_JSON")
+            if [ "$REQUIRED" = "true" ]; then
+              if [ "$RESULT" = "success" ]; then
+                VERIFIED+=("$ID")
+                echo "| $ID | yes | ✅ verified live |" >> "$SUMMARY"
+              else
+                BROKEN+=("$ID=$RESULT")
+                echo "| $ID | yes | ❌ $RESULT |" >> "$SUMMARY"
+              fi
+            else
+              if [ -n "$OVERRIDE" ]; then
+                REASON="not listed in required_surfaces_override"
+              else
+                REASON=$(jq -r --arg id "$ID" '.surfaces[$id].reason' .github/workflows/verify-release-live.surfaces.json 2>/dev/null || true)
+              fi
+              EXCLUDED+=("$ID")
+              echo "NOT REQUIRED (out of milestone scope): $ID — ${REASON:-see .github/workflows/verify-release-live.surfaces.json}"
+              echo "| $ID | no | NOT REQUIRED (out of milestone scope) — ${REASON:-see surfaces.json} |" >> "$SUMMARY"
+            fi
+          done
 
           if [ "${#BROKEN[@]}" -eq 0 ]; then
-            echo "Internal Availability: all 4 surfaces verified live (desktop updater, staging backend, Play internal track, TestFlight)."
+            echo "Internal Availability: ${#VERIFIED[@]} required surface(s) verified live (${VERIFIED[*]}). Excluded, NOT verified: ${EXCLUDED[*]:-none}."
             exit 0
           fi
 
