@@ -1,0 +1,9 @@
+# Real deployment inputs — never commit. The tracked vars.yml / inventory.yml are
+# templates/placeholders; put real values in the *-production files below.
+vars-production.yml
+inventory-production.yml
+# Decrypted vault material / editor leftovers
+*.vault-pass
+.vault-pass
+vars-production.yml.*
+inventory-production.yml.*

@@ -1,0 +1,39 @@
+---
+# Production inventory template — a single VPS running every service.
+#
+#   cp inventory-production.example.yml inventory-production.yml   # gitignored
+#   $EDITOR inventory-production.yml
+#
+# Pass it with `-i inventory-production.yml` (deploy-official.sh and the
+# deploy-prod workflow do). Never commit the filled-in copy.
+all:
+  vars:
+    ansible_python_interpreter: /usr/bin/python3
+  children:
+    llamenos_servers:
+      hosts:
+        vps1:
+          # The VPS PUBLIC IPv4 address (not a hostname): preflight's DNS check
+          # compares every public hostname against this value.
+          ansible_host: REPLACE_WITH_VPS_IPV4
+          # Created by the FDE installer ISO (scripts/build-iso.sh --user, default "deploy").
+          ansible_user: deploy
+          # The key you passed to build-iso.sh --ssh-key (private half).
+          ansible_ssh_private_key_file: ~/.ssh/REPLACE_WITH_KEY_NAME
+          # FIRST RUN (playbooks/harden.yml): 22 — the installer's sshd.
+          # AFTER harden.yml: change to the `ssh_port` in vars-production.yml,
+          # then run everything else. harden.yml moves sshd; Ansible cannot
+          # follow it by itself on a re-run.
+          ansible_port: 22
+    llamenos_app:
+      hosts:
+        vps1: {}
+    llamenos_db:
+      hosts:
+        vps1: {}
+    llamenos_proxy:
+      hosts:
+        vps1: {}
+    llamenos_storage:
+      hosts:
+        vps1: {}

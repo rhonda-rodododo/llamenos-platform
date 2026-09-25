@@ -282,8 +282,9 @@
 
     - name: Check update server health (official only)
       ansible.builtin.uri:
-        url: "http://localhost:3080/health"
+        url: "https://{{ updates_domain }}/health"
         return_content: true
+        validate_certs: true
       register: update_health
       failed_when: update_health.content != "ok"
       ignore_errors: true

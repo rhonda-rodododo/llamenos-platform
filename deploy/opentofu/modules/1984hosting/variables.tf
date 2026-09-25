@@ -1,5 +1,5 @@
 variable "server_ip" {
-  description = "IPv4 address assigned by 1984 Hosting after manual provisioning"
+  description = "IPv4 address assigned by the host (1984 Hosting or any hand-ordered VPS) after manual provisioning"
   type        = string
 }
 

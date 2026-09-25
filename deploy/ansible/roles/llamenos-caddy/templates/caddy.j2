@@ -12,6 +12,20 @@
 #   domain: "192-168-1-100.nip.io", api_subdomain: ""
 #     → API served at https://192-168-1-100.nip.io
 
+# Global options.
+#
+# acme_ca pins issuance to Let's Encrypt ONLY. Without it Caddy's default
+# issuer list falls back to ZeroSSL when Let's Encrypt fails or rate-limits,
+# and a ZeroSSL certificate chains to a root the Android client does NOT pin:
+# apps/android/app/src/main/res/xml/network_security_config.xml hard-fails on
+# anything not chained to ISRG Root X1/X2. A silent fallback would look like a
+# healthy deploy on the web and be a total outage on Android. Fail loudly at
+# issuance instead. TLS must terminate here, on this box — never on a CDN.
+{
+    email {{ acme_email }}
+    acme_ca https://acme-v02.api.letsencrypt.org/directory
+}
+
 # Security headers for threat model: nation states, right-wing groups, private hacking firms
 (security_headers) {
     header {
@@ -36,20 +50,17 @@
 # Subdomain mode: API served from {{ api_subdomain }}.{{ domain }}
 {{ api_subdomain }}.{{ domain }} {
     reverse_proxy app:3000
-    tls {{ acme_email }}
     import security_headers
 }
 
 # Root domain redirects to API subdomain
 {{ domain }} {
     redir https://{{ api_subdomain }}.{{ domain }}{uri}
-    tls {{ acme_email }}
 }
 {% else %}
 # Single-domain mode: API served directly from {{ domain }}
 {{ domain }} {
     reverse_proxy app:3000
-    tls {{ acme_email }}
     import security_headers
 }
 {% endif %}
@@ -61,7 +72,47 @@
 # Caddy proxies WebSocket upgrades automatically; no extra config needed.
 {{ ntfy_domain }} {
     reverse_proxy ntfy:80
-    tls {{ acme_email }}
     import security_headers
+}
+{% endif %}
+
+{% if llamenos_update_server_enabled | default(false) | bool %}
+# Desktop auto-updater origin (official profile). Serves the read-only artifacts
+# directory bind-mounted at /srv/updates (see compose/caddy.j2):
+#   /desktop/latest.json          <- tauri.conf.json plugins.updater.endpoints
+#   /desktop/v<version>/<file>    <- URLs inside latest.json
+# Both hostnames serve the same tree (tauri.conf.json lists both as endpoints).
+# Terminated here — same box, same ISRG-chained certificate policy as the API —
+# because a second Caddy could not complete ACME on ports 80/443.
+{{ updates_domain }}, {{ releases_domain }} {
+    root * /srv/updates
+
+    handle /health {
+        respond "ok" 200
+    }
+
+    # Short cache on the manifest so a new release is seen quickly; installers
+    # live under a versioned path and can be cached a little longer.
+    handle /desktop/latest.json {
+        header Cache-Control "public, max-age=30"
+        file_server
+    }
+
+    handle /desktop/* {
+        header Cache-Control "public, max-age=60"
+        file_server
+    }
+
+    handle {
+        respond "Not found" 404
+    }
+
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        Referrer-Policy "no-referrer"
+        -Server
+    }
 }
 {% endif %}
