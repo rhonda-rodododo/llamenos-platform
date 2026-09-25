@@ -81,8 +81,8 @@ bun run build:iso \
 The output ISO appears in `dist/iso/`:
 
 ```
-dist/iso/llamenos-debian13-dropbear.iso       # ~500 MB
-dist/iso/llamenos-debian13-dropbear.iso.sha256
+dist/iso/debian13-fde-dropbear.iso       # ~500 MB
+dist/iso/debian13-fde-dropbear.iso.sha256
 ```
 
 ### Verifying reproducibility (optional)
@@ -92,7 +92,7 @@ the same arguments must produce a byte-identical ISO. If you want to
 verify this yourself:
 
 ```bash
-./scripts/verify-iso.sh dist/iso/llamenos-debian13-dropbear.iso -- \
+./scripts/verify-iso.sh dist/iso/debian13-fde-dropbear.iso -- \
   --hostname llamenos-01 --ssh-key ~/.ssh/id_ed25519.pub
 ```
 
@@ -203,7 +203,7 @@ bun run build:iso \
 
    - Subject: **Please attach custom ISO to my VPS**
    - Body: your VPS ID, the public HTTPS URL of your ISO, and its SHA-256 from
-     `llamenos-debian13-dropbear.iso.sha256`
+     `debian13-fde-dropbear.iso.sha256`
 
    They typically respond within a business day (Iceland business hours, GMT).
 
@@ -256,7 +256,7 @@ This path uses Hetzner's Rescue System to run the Llamenos installer inside
 ```bash
 # In Hetzner rescue system
 apt-get update && apt-get install -y qemu-system-x86 qemu-utils
-wget -O /tmp/llamenos.iso https://<your-iso-host>/llamenos-debian13-dropbear.iso
+wget -O /tmp/llamenos.iso https://<your-iso-host>/debian13-fde-dropbear.iso
 echo "<expected-sha256>  /tmp/llamenos.iso" | sha256sum -c -
 
 qemu-system-x86_64 \
