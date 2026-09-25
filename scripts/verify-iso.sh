@@ -5,7 +5,7 @@
 # Usage: scripts/verify-iso.sh <iso-path> -- <build-iso flags...>
 #
 # Example:
-#   scripts/verify-iso.sh dist/iso/llamenos-fde-debian13-dropbear.iso \
+#   scripts/verify-iso.sh dist/iso/debian13-fde-dropbear.iso \
 #     -- --hostname test --ssh-key ~/.ssh/id_ed25519.pub --unlock dropbear
 
 set -euo pipefail
@@ -39,7 +39,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 echo "==> Rebuilding into $VERIFY_OUT"
 "${SCRIPT_DIR}/build-iso.sh" "$@" --out "$VERIFY_OUT" --no-cache
 
-REBUILT_ISO="$(find "$VERIFY_OUT" -name 'llamenos-fde-debian13-*.iso' | head -1)"
+REBUILT_ISO="$(find "$VERIFY_OUT" -name 'debian13-fde-*.iso' | head -1)"
 if [ -z "$REBUILT_ISO" ]; then
   echo "verify-iso: rebuild produced no ISO" >&2
   exit 1

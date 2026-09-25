@@ -28,8 +28,9 @@ updates_domain: "updates.{{ domain }}"
 acme_email: admin@yourdomain.org
 
 # ─── SSH Hardening ───────────────────────────────────────────────
-# Port to move SSH to (default 22 is heavily targeted by bots)
-ssh_port: 2222
+# Port to move SSH to (default 22 is heavily targeted by bots). Avoid 2222: the FDE
+# unlock shell (dropbear-initramfs) uses it with a different host key.
+ssh_port: 22022
 
 # CIDR ranges allowed to connect via SSH
 # Restrict to your admin IP addresses for maximum security

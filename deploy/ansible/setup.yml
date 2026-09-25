@@ -9,6 +9,12 @@
 #   ansible-playbook setup.yml --tags harden       # Hardening only
 #   ansible-playbook setup.yml --tags deploy       # Deploy only
 #   ansible-playbook setup.yml --ask-vault-pass    # If vars.yml is encrypted
+#
+# FIRST RUN ON A FRESH VPS: harden.yml moves sshd from port 22 to `ssh_port`,
+# so the inventory's `ansible_port` must change between hardening and every run
+# after it. Do not use this one-shot entry point for the very first run — run
+# playbooks/harden.yml, edit ansible_port, then run setup.yml (or deploy.yml).
+# See docs/deployment/first-deploy.md.
 
 - name: Preflight validation
   ansible.builtin.import_playbook: playbooks/preflight.yml

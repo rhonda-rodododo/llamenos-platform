@@ -8,6 +8,9 @@
     update_cache: true
     cache_valid_time: 3600
 
+# software-properties-common is deliberately NOT installed: it does not exist in
+# Debian 13 (the FDE installer's OS) and nothing here needs add-apt-repository
+# (apt_repository with a plain `deb` line only needs python3-apt).
 - name: Install base packages
   ansible.builtin.apt:
     name:
@@ -15,7 +18,6 @@
       - gnupg
       - apt-transport-https
       - ca-certificates
-      - software-properties-common
       - unattended-upgrades
       - apt-listchanges
       - chrony
@@ -50,6 +52,13 @@
     enabled: true
     state: started
 
+# Debian's apt "archive" field is the SUITE ("stable", "stable-security"), not the
+# codename, so the Ubuntu-style "${distro_id}:${distro_codename}" patterns match
+# nothing on Debian and unattended SECURITY upgrades silently never run
+# (`unattended-upgrade --dry-run --debug` on Debian 13 shows allowed origins
+# a=trixie / a=trixie-security against packages tagged a=stable). Debian gets
+# the origin+codename+label form Debian's own default config uses, which lives
+# under Origins-Pattern (the legacy Allowed-Origins key cannot parse it).
 - name: Configure unattended-upgrades
   ansible.builtin.copy:
     dest: /etc/apt/apt.conf.d/50unattended-upgrades
@@ -57,12 +66,19 @@
     group: root
     mode: "0644"
     content: |
+      {% if ansible_facts.distribution == 'Debian' %}
+      Unattended-Upgrade::Origins-Pattern {
+          "origin=Debian,codename=${distro_codename},label=Debian";
+          "origin=Debian,codename=${distro_codename}-security,label=Debian-Security";
+      };
+      {% else %}
       Unattended-Upgrade::Allowed-Origins {
           "${distro_id}:${distro_codename}";
           "${distro_id}:${distro_codename}-security";
           "${distro_id}ESMApps:${distro_codename}-apps-security";
           "${distro_id}ESM:${distro_codename}-infra-security";
       };
+      {% endif %}
 
       Unattended-Upgrade::Package-Blacklist {
           "docker-ce";

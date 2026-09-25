@@ -4,28 +4,27 @@
  *
  * Each active firehose connection gets an in-memory agent instance that:
  * 1. Periodically fetches unextracted buffer messages
- * 2. Decrypts them using the agent's sealed nsec
+ * 2. Decrypts them using the agent's sealed Ed25519 key
  * 3. Clusters by time proximity (heuristic) and optionally refines via LLM
  * 4. Extracts structured reports via LLM inference
  * 5. Submits reports as E2EE conversations
  *
  * Circuit breaker: 3 consecutive extraction failures auto-pause the connection.
  */
-import { hexToBytes, bytesToHex, utf8ToBytes } from '@shared/encoding'
+import { hexToBytes, utf8ToBytes } from '@shared/encoding'
 import { hpkeOpen, symmetricDecrypt } from '@llamenos/crypto/ffi'
 import {
   LABEL_FIREHOSE_AGENT_SEAL,
   LABEL_FIREHOSE_BUFFER_ENCRYPT,
-  LABEL_FIREHOSE_REPORT_WRAP,
   LABEL_MESSAGE,
 } from '@shared/crypto-labels'
 import { KIND_FIREHOSE_REPORT } from '@shared/event-kinds'
 import { bufferEnvelopeJsonSchema } from '@protocol/schemas/firehose'
 import type { RecipientEnvelope } from '@shared/types'
 import type { Database } from '../db'
-import { unsealAgentNsec } from '../lib/agent-identity'
+import { unsealAgentKey } from '../lib/agent-identity'
 import { encryptMessageForStorage } from '../lib/crypto'
-import { CircuitBreaker, type CircuitBreakerOptions } from '../lib/circuit-breaker'
+import { CircuitBreaker } from '../lib/circuit-breaker'
 import { createLogger } from '../lib/logger'
 import { clearWindowKeyCache } from '../messaging/firehose-observer'
 import { publishEvent } from '../lib/ws-events'
@@ -48,7 +47,7 @@ interface AgentInstance {
   connectionId: string
   hubId: string
   agentPubkey: string
-  nsecBytes: Uint8Array
+  agentSecretKey: Uint8Array
   intervalHandle: ReturnType<typeof setInterval>
   inferenceClient: FirehoseInferenceClient
   circuitBreaker: CircuitBreaker
@@ -122,14 +121,14 @@ export class FirehoseAgentService {
       throw new Error(`Connection ${connectionId} is not active (status: ${conn.status})`)
     }
 
-    // Unseal the agent's nsec
-    const nsecHex = unsealAgentNsec(
+    // Unseal the agent's Ed25519 secret key
+    const agentSecretKeyHex = unsealAgentKey(
       connectionId,
-      conn.encryptedAgentNsec,
+      conn.sealedAgentKey,
       this.sealKey,
       LABEL_FIREHOSE_AGENT_SEAL,
     )
-    const nsecBytes = hexToBytes(nsecHex)
+    const agentSecretKey = hexToBytes(agentSecretKeyHex)
 
     // Get or create inference client for this endpoint
     const endpoint = conn.inferenceEndpoint || DEFAULT_INFERENCE_ENDPOINT
@@ -164,7 +163,7 @@ export class FirehoseAgentService {
       connectionId,
       hubId: conn.hubId,
       agentPubkey: conn.agentPubkey,
-      nsecBytes,
+      agentSecretKey,
       intervalHandle,
       inferenceClient,
       circuitBreaker,
@@ -178,8 +177,8 @@ export class FirehoseAgentService {
     if (!agent) return
 
     clearInterval(agent.intervalHandle)
-    // Zero nsec from memory
-    agent.nsecBytes.fill(0)
+    // Zero the agent secret key from memory
+    agent.agentSecretKey.fill(0)
     this.agents.delete(connectionId)
 
     log.info('Stopped agent', { connectionId })
@@ -220,7 +219,7 @@ export class FirehoseAgentService {
           // Window-key path: decrypt with the unsealed window key
           let windowKey = unsealedWindowKeys.get(msg.windowKeyId)
           if (!windowKey) {
-            windowKey = await this.unsealWindowKey(msg.windowKeyId, agent.nsecBytes)
+            windowKey = await this.unsealWindowKey(msg.windowKeyId, agent.agentSecretKey)
             unsealedWindowKeys.set(msg.windowKeyId, windowKey)
           }
 
@@ -256,13 +255,13 @@ export class FirehoseAgentService {
           const content = this.decryptEnvelope(
             parsed.encrypted,
             contentEnvelope as RecipientEnvelope,
-            agent.nsecBytes,
+            agent.agentSecretKey,
           )
 
           const senderJson = this.decryptEnvelope(
             senderParsed.encrypted,
             senderEnvelope as RecipientEnvelope,
-            agent.nsecBytes,
+            agent.agentSecretKey,
           )
 
           const sender = JSON.parse(senderJson) as {

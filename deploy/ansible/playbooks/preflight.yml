@@ -50,7 +50,7 @@
 
     - name: Check SSH connectivity to target hosts
       ansible.builtin.wait_for:
-        host: "{{ inventory_hostname }}"
+        host: "{{ ansible_host | default(inventory_hostname) }}"
         port: "{{ ansible_port | default(22) }}"
         timeout: 10
       delegate_to: localhost
@@ -390,6 +390,43 @@
       when: not (llamenos_asterisk_enabled | default(false) | bool) and not (llamenos_sip_bridge_enabled | default(false) | bool) and (bridge_secret is not
         defined or bridge_secret | length == 0)
 
+    - name: Assert ssh_port is a valid port and differs from the FDE unlock port
+      ansible.builtin.assert:
+        that:
+          - ssh_port is defined
+          - (ssh_port | int) >= 1
+          - (ssh_port | int) <= 65535
+        fail_msg: |
+          INVALID: 'ssh_port' must be an integer between 1 and 65535 (got: {{ ssh_port | default('NOT SET') }}).
+        success_msg: "ssh_port: {{ ssh_port }}"
+
+    - name: Warn if ssh_port collides with the dropbear unlock port
+      ansible.builtin.debug:
+        msg: >-
+          WARNING: ssh_port is 2222, the port dropbear-initramfs uses for the FDE
+          unlock shell. The two have DIFFERENT host keys, so your SSH client will
+          report a changed host key after every reboot. Use a different port.
+      when: (ssh_port | int) == 2222
+
+    - name: Assert ssh_allowed_cidrs holds real CIDR ranges (a placeholder would lock you out or fail mid-hardening)
+      ansible.builtin.assert:
+        that:
+          - ssh_allowed_cidrs is defined
+          - ssh_allowed_cidrs | length > 0
+          - >-
+            ssh_allowed_cidrs
+            | reject('match', '^([0-9]{1,3}\.){3}[0-9]{1,3}/[0-9]{1,2}$')
+            | reject('match', '^[0-9a-fA-F:]+:[0-9a-fA-F:]*/[0-9]{1,3}$')
+            | list | length == 0
+        fail_msg: |
+          INVALID: every entry of 'ssh_allowed_cidrs' must be an IPv4/IPv6 CIDR such as 203.0.113.7/32.
+
+          Current value: {{ ssh_allowed_cidrs | default('NOT SET') }}
+
+          These are the ONLY addresses UFW will let reach SSH after hardening. Use your
+          admin machine's public egress address(es).
+        success_msg: "ssh_allowed_cidrs: {{ ssh_allowed_cidrs }}"
+
     - name: Warn if SSH is open to the world
       ansible.builtin.debug:
         msg: |
@@ -420,42 +457,56 @@
       when: backup_age_public_key | default('') | length > 0
 
     # DNS validation (official profile only)
+    #
+    # Resolved from the CONTROL node with getent (glibc — always present), NOT on
+    # the target: a fresh box has no `dig`, and asking a third-party "what is my
+    # IP" service from the server would leak its address for no reason. The
+    # expected address is the inventory's ansible_host, so it must be the VPS's
+    # public IPv4 (not a hostname) for this check to be meaningful.
+    #
+    # (In subdomain mode the apex is included: Caddy also requests a certificate
+    # for it, to serve the redirect to the API host.)
+    # Every name that Caddy will request a certificate for must already resolve
+    # to this box: Let's Encrypt validates over HTTP-01/TLS-ALPN, so a missing
+    # record means no certificate, and no certificate means the pinned Android
+    # client cannot connect at all.
     - name: Validate DNS records point to this server
       when:
         - llamenos_dns_validation_enabled | default(false) | bool
       block:
-        - name: Resolve API domain
-          ansible.builtin.command: dig +short {{ api_subdomain }}.{{ domain }} A
-          register: api_dns
-          changed_when: false
+        - name: Build the list of hostnames Caddy will serve
+          ansible.builtin.set_fact:
+            _dns_names: >-
+              {{
+                [ (api_subdomain ~ '.' ~ domain) if (api_subdomain | default('') | length > 0) else domain,
+                  updates_domain, releases_domain ]
+                + ([ domain ] if (api_subdomain | default('') | length > 0) else [])
+                + ([ ntfy_domain ] if (llamenos_ntfy_enabled | default(false) | bool) else [])
+              }}
 
-        - name: Resolve updates domain
-          ansible.builtin.command: dig +short {{ updates_domain }} A
-          register: updates_dns
+        - name: Resolve each hostname (IPv4) from the control node
+          ansible.builtin.command: getent ahostsv4 {{ item }}
+          loop: "{{ _dns_names }}"
+          register: _dns_lookups
           changed_when: false
+          failed_when: false
+          delegate_to: localhost
+          become: false
 
-        - name: Resolve releases domain
-          ansible.builtin.command: dig +short {{ releases_domain }} A
-          register: releases_dns
-          changed_when: false
-
-        - name: Get server public IP
-          ansible.builtin.command: curl -s https://ifconfig.me
-          register: server_ip
-          changed_when: false
-
-        - name: Assert DNS records match server IP
+        - name: Assert every hostname resolves to this server
           ansible.builtin.assert:
             that:
-              - api_dns.stdout | trim == server_ip.stdout | trim
-              - updates_dns.stdout | trim == server_ip.stdout | trim
-              - releases_dns.stdout | trim == server_ip.stdout | trim
+              - (ansible_host | default(inventory_hostname)) in (item.stdout_lines | map('split') | map('first') | list)
             fail_msg: >-
-              DNS mismatch detected. Expected all domains to resolve to {{ server_ip.stdout | trim }}.
-              api={{ api_dns.stdout | trim }},
-              updates={{ updates_dns.stdout | trim }},
-              releases={{ releases_dns.stdout | trim }}.
-              Check 1984 DNS configuration.
+              DNS mismatch: {{ item.item }} resolves to
+              {{ (item.stdout_lines | map('split') | map('first') | unique | list) or 'nothing' }},
+              expected this server's address {{ ansible_host | default(inventory_hostname) }}.
+              Create/fix the A record at your DNS host and wait for propagation
+              (ansible_host in the inventory must be the VPS public IPv4, not a hostname).
+            quiet: true
+          loop: "{{ _dns_lookups.results }}"
+          loop_control:
+            label: "{{ item.item }}"
 
     - name: Preflight checks passed
       ansible.builtin.debug:

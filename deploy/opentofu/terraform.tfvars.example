@@ -13,7 +13,7 @@
 # Hosting provider selection
 provider_name = "1984hosting"  # or "hetzner"
 
-# For 1984 Hosting (manual provisioning required)
+# For a hand-ordered VPS, e.g. 1984 Hosting (manual provisioning required — see docs/deployment/first-deploy.md)
 server_ip = "203.0.113.10"  # Fill in after ordering VPS
 
 # For Hetzner (automated provisioning)

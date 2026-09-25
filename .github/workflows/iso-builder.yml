@@ -66,13 +66,13 @@ jobs:
       - name: Verify output
         run: |
           ls -lh ${{ runner.temp }}/out/
-          test -f ${{ runner.temp }}/out/llamenos-fde-debian13-dropbear.iso
-          test -f ${{ runner.temp }}/out/llamenos-fde-debian13-dropbear.iso.sha256
-          ( cd ${{ runner.temp }}/out && sha256sum -c llamenos-fde-debian13-dropbear.iso.sha256 )
-          test "$(stat -c%s ${{ runner.temp }}/out/llamenos-fde-debian13-dropbear.iso)" -gt 100000000
+          test -f ${{ runner.temp }}/out/debian13-fde-dropbear.iso
+          test -f ${{ runner.temp }}/out/debian13-fde-dropbear.iso.sha256
+          ( cd ${{ runner.temp }}/out && sha256sum -c debian13-fde-dropbear.iso.sha256 )
+          test "$(stat -c%s ${{ runner.temp }}/out/debian13-fde-dropbear.iso)" -gt 100000000
       - name: Reproducibility check
         run: |
-          ./scripts/verify-iso.sh ${{ runner.temp }}/out/llamenos-fde-debian13-dropbear.iso -- \
+          ./scripts/verify-iso.sh ${{ runner.temp }}/out/debian13-fde-dropbear.iso -- \
             --hostname ci-test-host \
             --ssh-key ${{ runner.temp }}/key/test_ed25519.pub \
             --unlock dropbear

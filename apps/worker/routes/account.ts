@@ -16,7 +16,7 @@ const accountRoutes = new Hono<AppEnv>()
 /**
  * POST /api/account/lockdown
  * Emergency lockdown: terminate all other sessions, return hub IDs for key rotation.
- * Requires elevated auth (Schnorr device-key signature — session token not accepted).
+ * Requires elevated auth (Ed25519 device-key signature — session token not accepted).
  */
 accountRoutes.post('/lockdown', requireFreshAuth, async (c) => {
   const pubkey = c.get('pubkey')

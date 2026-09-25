@@ -79,7 +79,7 @@ pub const SAS_INFO: &str = "llamenos:provisioning-sas";
 
 // --- Auth Token ---
 
-/// Auth token message prefix (Ed25519 or legacy Schnorr)
+/// Auth token message prefix (Ed25519)
 pub const AUTH_PREFIX: &str = "llamenos:auth:";
 
 // --- HMAC Domain Separation ---

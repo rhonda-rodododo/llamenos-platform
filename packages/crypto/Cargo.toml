@@ -73,8 +73,6 @@ openmls = { version = "0.9", features = ["openmls_rust_crypto"], optional = true
 openmls_rust_crypto = { version = "0.6", optional = true }
 openmls_basic_credential = { version = "0.6", optional = true }
 
-# BIP-340 Schnorr / secp256k1 (for sign_prehash / verify_prehash)
-k256 = { version = "0.13", features = ["schnorr"] }
 [features]
 default = []
 server = []

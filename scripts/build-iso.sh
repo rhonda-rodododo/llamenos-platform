@@ -201,6 +201,36 @@ if ! printf '%s' "$DEBIAN_VERSION" | grep -qE '^13\.[0-9]+\.[0-9]+$'; then
   err "--debian-version: only Debian 13 supported in this builder (got: $DEBIAN_VERSION)"
 fi
 
+# --- Silent-failure guards (warn, never fail; defaults unchanged) ---
+# Both defaults are correct for some targets (DHCP-capable hosts, /dev/sda
+# hosts such as Hetzner), so hard-failing would break legitimate callers.
+# But on paravirt VPS hosts each one only surfaces at INSTALL time on the
+# remote console, so say so loudly at build time.
+if [ "$STATIC_IP" = "dhcp" ]; then
+  cat >&2 <<'WARN'
+
+!!! WARNING: --static-ip not given; the preseed will use DHCP. !!!
+    If the target network does not serve DHCP during install (e.g. 1984
+    Hosting), the installer STOPS SILENTLY at "Configure the network" with
+    no auto-recovery. Rebuild with --static-ip <CIDR> --gateway <ip> unless
+    you know the target runs DHCP.
+    See docs/deployment/iso-install.md, "Required build parameters for 1984".
+
+WARN
+fi
+if [ "$DISK" = "/dev/sda" ]; then
+  cat >&2 <<'WARN'
+
+!!! WARNING: --disk is /dev/sda (the default). !!!
+    Paravirt KVM VPS hosts (1984, FlokiNET, Scaleway, ...) expose /dev/vda;
+    installing with the wrong device fails at install time on the remote
+    console. Pass --disk /dev/vda for those hosts.
+    See docs/deployment/iso-install.md, Troubleshooting:
+    "Disk shows up as /dev/vda not /dev/sda and install fails".
+
+WARN
+fi
+
 # Validate network + identity inputs to prevent shell injection in late_command
 if ! validate_dns_list "$DNS"; then
   err "invalid --dns: $DNS (must be comma-separated IPv4 addresses)"
@@ -293,4 +323,5 @@ docker run --rm \
 
 echo
 echo "==> Done. Output:"
-ls -lh "${OUT_DIR_ABS}/llamenos-fde-debian13-${UNLOCK}.iso"{,.sha256}
+ISO_NAME="debian${DEBIAN_VERSION%%.*}-fde-${UNLOCK}.iso"
+ls -lh "${OUT_DIR_ABS}/${ISO_NAME}"{,.sha256}

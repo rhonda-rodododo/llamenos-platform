@@ -102,7 +102,7 @@ describe('FirehoseAgentService', () => {
         status: 'active',
         hubId: 'hub-1',
         agentPubkey: 'pk1',
-        encryptedAgentNsec: 'enc-nsec',
+        sealedAgentKey: 'sealed-agent-key',
         extractionIntervalSec: 60,
       })
 

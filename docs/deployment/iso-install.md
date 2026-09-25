@@ -81,8 +81,8 @@ bun run build:iso \
 The output ISO appears in `dist/iso/`:
 
 ```
-dist/iso/llamenos-debian13-dropbear.iso       # ~500 MB
-dist/iso/llamenos-debian13-dropbear.iso.sha256
+dist/iso/debian13-fde-dropbear.iso       # ~500 MB
+dist/iso/debian13-fde-dropbear.iso.sha256
 ```
 
 ### Verifying reproducibility (optional)
@@ -92,7 +92,7 @@ the same arguments must produce a byte-identical ISO. If you want to
 verify this yourself:
 
 ```bash
-./scripts/verify-iso.sh dist/iso/llamenos-debian13-dropbear.iso -- \
+./scripts/verify-iso.sh dist/iso/debian13-fde-dropbear.iso -- \
   --hostname llamenos-01 --ssh-key ~/.ssh/id_ed25519.pub
 ```
 
@@ -203,7 +203,7 @@ bun run build:iso \
 
    - Subject: **Please attach custom ISO to my VPS**
    - Body: your VPS ID, the public HTTPS URL of your ISO, and its SHA-256 from
-     `llamenos-debian13-dropbear.iso.sha256`
+     `debian13-fde-dropbear.iso.sha256`
 
    They typically respond within a business day (Iceland business hours, GMT).
 
@@ -256,7 +256,7 @@ This path uses Hetzner's Rescue System to run the Llamenos installer inside
 ```bash
 # In Hetzner rescue system
 apt-get update && apt-get install -y qemu-system-x86 qemu-utils
-wget -O /tmp/llamenos.iso https://<your-iso-host>/llamenos-debian13-dropbear.iso
+wget -O /tmp/llamenos.iso https://<your-iso-host>/debian13-fde-dropbear.iso
 echo "<expected-sha256>  /tmp/llamenos.iso" | sha256sum -c -
 
 qemu-system-x86_64 \
@@ -330,16 +330,17 @@ You'll see the welcome banner with next-step instructions.
 
 ## Hand-off to Ansible
 
-From your workstation, with the Llamenos checkout still open:
+From your workstation, with the Llamenos checkout still open, follow
+[`first-deploy.md`](first-deploy.md) from step 3 (DNS) onward. In short:
+DNS records → `inventory-production.yml` + `vars-production.yml` →
+`playbooks/preflight.yml` → `playbooks/harden.yml` → update `ansible_port` →
+`playbooks/deploy.yml` → `playbooks/smoke-check.yml`. See
+`deploy/ansible/vars-production.example.yml` for every value you must supply.
 
-```bash
-cd deploy/ansible
-just bootstrap                # one-time
-ansible-playbook setup.yml -i '<vps-ip>,'
-```
-
-This runs the full hardening + Llamenos deployment playbook against your
-new VPS. See `deploy/ansible/README.md` for vars configuration.
+> Do not run `ansible-playbook setup.yml -i '<ip>,'` (an older version of this
+> section, and the installed motd, suggested it): an ad-hoc `<ip>,` inventory
+> puts the host in no group, so the deploy plays match nothing and skip, and it
+> carries none of the required variables.
 
 ## Troubleshooting
 
