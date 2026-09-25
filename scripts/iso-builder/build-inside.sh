@@ -123,12 +123,12 @@ chmod -R u+w "${WORK_DIR}/iso-root"
 
 # --- 3. Stage helper scripts on ISO root ---
 echo "==> Staging helper scripts on ISO root"
-mkdir -p "${WORK_DIR}/iso-root/llamenos"
+mkdir -p "${WORK_DIR}/iso-root/fde"
 cp /usr/local/share/llamenos-iso/late-command.sh \
    /usr/local/share/llamenos-iso/dropbear-setup.sh \
-   "${WORK_DIR}/iso-root/llamenos/"
-chmod +x "${WORK_DIR}/iso-root/llamenos/late-command.sh" \
-         "${WORK_DIR}/iso-root/llamenos/dropbear-setup.sh"
+   "${WORK_DIR}/iso-root/fde/"
+chmod +x "${WORK_DIR}/iso-root/fde/late-command.sh" \
+         "${WORK_DIR}/iso-root/fde/dropbear-setup.sh"
 
 # --- 4. Render preseed ---
 echo "==> Rendering preseed"
@@ -190,7 +190,7 @@ if [ -f "${WORK_DIR}/iso-root/isolinux/txt.cfg" ]; then
 default install
 label install
   menu default
-  menu label ^Install Llamenos (Debian 13 + LUKS)
+  menu label ^Install Debian 13 (LUKS full-disk encryption)
   kernel /install.amd/vmlinuz
   append vga=788 initrd=/install.amd/initrd.gz auto=true priority=critical preseed/file=/preseed.cfg --- quiet
 EOF
@@ -255,7 +255,7 @@ DEBIAN_MAJOR="${DEBIAN_VERSION%%.*}"
 OUT_ISO="${OUT_DIR}/debian${DEBIAN_MAJOR}-fde-${UNLOCK_MODE}.iso"
 echo "==> Repacking ISO -> ${OUT_ISO}"
 xorriso -as mkisofs \
-  -r -V 'Llamenos Debian 13' \
+  -r -V 'debian13-fde' \
   -o "$OUT_ISO" \
   -J -joliet-long -cache-inodes \
   -isohybrid-mbr "${WORK_DIR}/isohdpfx.bin" \
