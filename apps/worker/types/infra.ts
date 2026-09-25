@@ -59,7 +59,7 @@ export interface Env {
   METRICS_SCRAPE_TOKEN?: string
   E2E_TEST_SECRET?: string
   DEV_RESET_SECRET?: string
-  DEV_AUTH_BYPASS?: string           // "true" to skip Schnorr signature verification (dev only)
+  DEV_AUTH_BYPASS?: string           // "true" to skip Ed25519 signature verification (dev only)
   DEV_ROUTES_ENABLED?: string        // "true" to enable /test-* dev routes (dev only)
 
   // Demo mode (scheduled resets all data on a cron schedule)

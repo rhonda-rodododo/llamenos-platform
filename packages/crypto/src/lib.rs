@@ -63,9 +63,6 @@ pub mod provisioning;
 // === SAS emoji verification (HKDF-SHA256) ===
 pub mod sas;
 
-// === BIP-340 Schnorr signatures (secp256k1) ===
-pub mod schnorr;
-
 #[cfg(feature = "mobile")]
 mod ffi;
 #[cfg(feature = "mobile")]
