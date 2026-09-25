@@ -79,6 +79,7 @@ describe('renderMarkdown — per-function table row integrity', () => {
     // applied only to notes, with everything else interpolated raw.
     function vulnerableRenderRow(row: BindingRow): string {
       const notes = [row.body.note, row.response.note, row.unresolvedReason].filter(Boolean).join('<br>')
+      // codeql[js/incomplete-sanitization] Intentional: this reproduces the known-vulnerable (backslash-unaware) escape on purpose so the mutation check below proves the real escapeMarkdownCell fix is what catches it.
       return `| \`${row.functionName}\` | ${row.file}:${row.line} | ${row.method} | \`${row.pathPattern || '?'}\` | ${row.body.verdict} | ${row.response.verdict} | ${notes.replace(/\|/g, '\\|')} |`
     }
 
