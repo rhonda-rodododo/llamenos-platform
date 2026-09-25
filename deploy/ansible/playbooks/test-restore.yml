@@ -23,6 +23,10 @@
     test_service: all # all, postgres, config
 
   tasks:
+    - name: Skip hosts without disk encryption (this play keeps data at rest)
+      ansible.builtin.include_tasks: tasks/skip-unencrypted-host.yml
+      tags: always
+
     - name: "Test restore (with guaranteed cleanup)"
       block:
         # ── PostgreSQL restore test ────────────────────────────────────

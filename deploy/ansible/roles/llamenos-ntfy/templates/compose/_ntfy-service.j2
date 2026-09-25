@@ -38,6 +38,14 @@ healthcheck:
 logging:
   driver: json-file
   options:
+{% if llamenos_disk_encrypted | default(false) | bool %}
     max-size: "10m"
     max-file: "3"
+{% else %}
+    # Unencrypted disk: keep one small file, not 30MB of history. At INFO ntfy
+    # logs no per-request line (measured against v2.11.0: publish, subscribe
+    # and a rejected token all log nothing), so this holds startup/error lines.
+    max-size: "1m"
+    max-file: "1"
+{% endif %}
     tag: "llamenos-ntfy"

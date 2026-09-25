@@ -1,0 +1,32 @@
+---
+# Ends the current play for a host whose disk is not encrypted.
+#
+# Backups, restores, updates/rollbacks of the app and the observability stack
+# all write data at rest (database dumps, config archives holding the .env,
+# log and metric stores). None of that may land on a host marked
+# `llamenos_disk_encrypted: false` — see playbooks/tasks/guard-disk-tier.yml,
+# which is the deploy-time half of the same rule.
+#
+# An undeclared host fails instead of being skipped or processed: silently
+# guessing either way is the wrong default for this decision.
+
+- name: Assert this host declares whether its disk is encrypted
+  ansible.builtin.assert:
+    that:
+      - llamenos_disk_encrypted is defined
+      - llamenos_disk_encrypted is boolean
+    fail_msg: >-
+      Set `llamenos_disk_encrypted: true|false` on {{ inventory_hostname }} in the
+      inventory (see docs/deployment/first-deploy.md, "Two hosts, two tiers").
+    quiet: true
+
+- name: Report hosts skipped because their disk is not encrypted
+  ansible.builtin.debug:
+    msg: >-
+      Skipping {{ inventory_hostname }}: llamenos_disk_encrypted is false, and this
+      play writes data at rest.
+  when: not (llamenos_disk_encrypted | bool)
+
+- name: Skip hosts without disk encryption
+  ansible.builtin.meta: end_host
+  when: not (llamenos_disk_encrypted | bool)

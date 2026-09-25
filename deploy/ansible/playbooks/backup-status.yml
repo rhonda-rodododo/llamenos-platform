@@ -19,6 +19,10 @@
     output_json: false
 
   tasks:
+    - name: Skip hosts without disk encryption (this play keeps data at rest)
+      ansible.builtin.include_tasks: tasks/skip-unencrypted-host.yml
+      tags: always
+
     - name: Check if monitor script exists
       ansible.builtin.stat:
         path: "{{ app_dir }}/scripts/backup-monitor.sh"

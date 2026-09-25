@@ -57,6 +57,20 @@
         app
       {%- endif -%}
 
+# ntfy is the one service a split deployment deliberately puts on a DIFFERENT
+# host (the push relay on an unencrypted, no-secrets-at-rest box; see
+# docs/deployment/first-deploy.md). The app then cannot use the Docker-network
+# name `ntfy` — it publishes through the relay's public TLS vhost instead.
+# The bearer token follows from roles/llamenos-ntfy, which hands it to the app
+# hosts once it has minted it.
+- name: Determine ntfy publish URL (relay on another host)
+  ansible.builtin.set_fact:
+    ntfy_url: "https://{{ ntfy_domain }}"
+  when:
+    - llamenos_ntfy_enabled | default(false) | bool
+    - groups.get('llamenos_ntfy', []) | length > 0
+    - inventory_hostname not in groups.get('llamenos_ntfy', [])
+
 - name: Compute DATABASE_URL for app service
   ansible.builtin.set_fact:
     llamenos_database_url: "postgresql://llamenos:{{ pg_password }}@{{ llamenos_pg_host | trim }}:{{ llamenos_pg_port | trim }}/llamenos"
@@ -67,7 +81,7 @@
       Service topology for {{ inventory_hostname }}:
         PostgreSQL:    {{ llamenos_pg_host | trim }}:{{ llamenos_pg_port | trim }}
         RustFS:        {{ llamenos_rustfs_endpoint | trim }}
-        Relay:         {{ llamenos_relay_url | trim }}
+        ntfy:          {{ (ntfy_url | default('disabled')) if (llamenos_ntfy_enabled | default(false) | bool) else 'disabled' }}
         Whisper:       {{ llamenos_whisper_url | trim | default('disabled', true) }}
         App:           {{ llamenos_app_host | trim }}
         DATABASE_URL:  postgresql://llamenos:***@{{ llamenos_pg_host | trim }}:{{ llamenos_pg_port | trim }}/llamenos

@@ -1,0 +1,15 @@
+---
+# In a split deployment each host's Caddy serves only the services placed on
+# it (an empty group means "every llamenos_servers host", as everywhere else):
+# the app host serves the API and the updater origin, the relay host serves
+# ntfy. Sets _caddy_serves_app / _caddy_serves_ntfy for templates/caddy.j2 and
+# templates/compose/caddy.j2.
+- name: Decide which vhosts this host serves
+  ansible.builtin.set_fact:
+    _caddy_serves_app: >-
+      {{ groups.get('llamenos_app', []) | length == 0
+         or inventory_hostname in groups.get('llamenos_app', []) }}
+    _caddy_serves_ntfy: >-
+      {{ (llamenos_ntfy_enabled | default(false) | bool)
+         and (groups.get('llamenos_ntfy', []) | length == 0
+              or inventory_hostname in groups.get('llamenos_ntfy', [])) }}

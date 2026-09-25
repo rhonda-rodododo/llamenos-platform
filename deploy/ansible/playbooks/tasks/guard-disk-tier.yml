@@ -1,0 +1,98 @@
+---
+# Shared guard: a host whose disk is not encrypted may not hold secrets at rest.
+#
+# Every llamenos_servers host declares `llamenos_disk_encrypted: true|false` in
+# the inventory. A host without full-disk encryption is a "no secrets at rest"
+# tier: anything that accumulates on it is readable by whoever later holds the
+# disk (the provider under compulsion, a hypervisor-level adversary, a seized or
+# cloned image). The rule is about the property, not a provider: the reference
+# deployment's FlokiNET box (push relay) is such a host, but so is any
+# self-hoster's box without LUKS.
+#
+# What may run on such a host: the ntfy push relay and the Caddy in front of it
+# (roles/llamenos-ntfy and roles/llamenos-caddy carry their own checks that
+# nothing accumulates there). Everything listed in _disk_tier_secret_groups
+# below may not, and "placed" includes the empty-group fallback every service
+# role uses: an empty group means "every llamenos_servers host".
+#
+# Included from playbooks/preflight.yml. Backups, restores, updates and the
+# observability stack skip unencrypted hosts instead
+# (playbooks/tasks/skip-unencrypted-host.yml).
+
+- name: Assert this host declares whether its disk is encrypted
+  ansible.builtin.assert:
+    that:
+      - llamenos_disk_encrypted is defined
+      - llamenos_disk_encrypted is boolean
+    fail_msg: |
+      REQUIRED: set `llamenos_disk_encrypted: true` or `false` (a YAML boolean) on
+      {{ inventory_hostname }} in the inventory.
+
+      Current value: {{ llamenos_disk_encrypted | default('NOT SET') }}
+
+      true  = the host was installed with full-disk encryption (LUKS; the FDE
+              installer ISO, docs/deployment/iso-install.md). It may hold the
+              database, object storage and application secrets.
+      false = no disk encryption. The host may only run the push relay; preflight
+              refuses to place anything that keeps secrets at rest on it.
+    success_msg: "{{ inventory_hostname }}: llamenos_disk_encrypted={{ llamenos_disk_encrypted | default('NOT SET') }}"
+  when: inventory_hostname in groups.get('llamenos_servers', [])
+
+- name: Refuse to place secret-bearing services on a host without disk encryption
+  ansible.builtin.assert:
+    that:
+      - >-
+        not (item.enabled | bool
+             and (inventory_hostname in groups.get(item.group, [])
+                  or groups.get(item.group, []) | length == 0))
+    fail_msg: |
+      REFUSING TO DEPLOY: {{ inventory_hostname }} is marked llamenos_disk_encrypted: false,
+      but it would run the `{{ item.group }}` service, which keeps {{ item.holds }} at rest.
+
+      {% if groups.get(item.group, []) | length == 0 -%}
+      The `{{ item.group }}` inventory group is empty, and an empty group means
+      "every llamenos_servers host" — including this one. List the encrypted
+      host(s) in `{{ item.group }}` explicitly.
+      {%- else -%}
+      Remove {{ inventory_hostname }} from the `{{ item.group }}` inventory group.
+      {%- endif %}
+
+      A host without full-disk encryption may only run the ntfy push relay.
+      See docs/deployment/first-deploy.md ("Two hosts, two tiers").
+    quiet: true
+  loop: "{{ _disk_tier_secret_groups }}"
+  loop_control:
+    label: "{{ item.group }}"
+  vars:
+    _disk_tier_secret_groups:
+      - group: llamenos_app
+        enabled: "{{ llamenos_app_enabled | default(true) }}"
+        holds: "the app .env (every application secret, the APNs key)"
+      - group: llamenos_db
+        enabled: "{{ llamenos_postgres_enabled | default(true) }}"
+        holds: "the PostgreSQL database"
+      - group: llamenos_storage
+        enabled: "{{ llamenos_rustfs_enabled | default(true) }}"
+        holds: "RustFS object storage and its access keys"
+      - group: llamenos_signal
+        enabled: "{{ llamenos_signal_enabled | default(false) }}"
+        holds: "the Signal account keys and notifier bearer token"
+      - group: llamenos_asterisk
+        enabled: "{{ llamenos_asterisk_enabled | default(false) }}"
+        holds: "the PBX configuration and bridge secret"
+  when:
+    - inventory_hostname in groups.get('llamenos_servers', [])
+    - not (llamenos_disk_encrypted | bool)
+
+- name: Refuse internal TLS key material on a host without disk encryption
+  ansible.builtin.assert:
+    that:
+      - not (llamenos_internal_tls_enabled | default(false) | bool)
+    fail_msg: |
+      REFUSING TO DEPLOY: llamenos_internal_tls_enabled is true, and roles/internal-tls
+      issues every llamenos_servers host a private key (the CA key lives on the first
+      one). {{ inventory_hostname }} is marked llamenos_disk_encrypted: false.
+    quiet: true
+  when:
+    - inventory_hostname in groups.get('llamenos_servers', [])
+    - not (llamenos_disk_encrypted | bool)

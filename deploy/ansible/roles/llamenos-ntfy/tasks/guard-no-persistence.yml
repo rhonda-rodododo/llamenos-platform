@@ -1,0 +1,32 @@
+---
+# Refuses an ntfy service definition that would persist notification data.
+#
+# Included by tasks/main.yml on hosts marked llamenos_disk_encrypted: false.
+# `ntfy_rendered_compose` may be passed in to check a given compose body
+# (playbooks/check-disk-tier-guards.yml uses it to prove the guard fires);
+# otherwise the role's own compose template is rendered and checked.
+
+# A push relay's payloads are opaque, but its metadata is not: topic + time is
+# a record of which volunteer device was woken, and when. On an unencrypted
+# disk anything that accumulates is readable by whoever later holds the disk,
+# so the notification cache, attachments, web-push subscriptions, a log file
+# and a mounted server.yml (which could set any of those) are refused outright.
+# Checked against the rendered compose body, so it holds however the setting
+# gets there (template edit, image default change, extra env).
+- name: Refuse ntfy persistence settings on a host without disk encryption
+  ansible.builtin.assert:
+    that:
+      - _ntfy_rendered_service is not regex(_ntfy_persistence_pattern)
+    fail_msg: |
+      REFUSING TO DEPLOY: the ntfy service on {{ inventory_hostname }} would persist
+      notification data, but this host is marked llamenos_disk_encrypted: false.
+
+      Offending setting(s): {{ _ntfy_rendered_service | regex_findall(_ntfy_persistence_pattern) | unique | join(', ') }}
+
+      On an unencrypted disk ntfy may keep only auth.db. Leave NTFY_CACHE_FILE,
+      NTFY_ATTACHMENT_CACHE_DIR, NTFY_WEB_PUSH_FILE and NTFY_LOG_FILE unset and do
+      not mount a server.yml (roles/llamenos-ntfy/templates/compose/_ntfy-service.j2).
+    success_msg: "ntfy on {{ inventory_hostname }}: no persistent cache, attachments or log file"
+  vars:
+    _ntfy_rendered_service: "{{ ntfy_rendered_compose | default(lookup('ansible.builtin.template', playbook_dir ~ '/../roles/llamenos-ntfy/templates/compose/ntfy.j2')) }}"
+    _ntfy_persistence_pattern: '(?i)(cache[-_]file|attachment[-_]cache[-_]dir|web[-_]push[-_]file|log[-_]file|/etc/ntfy)'

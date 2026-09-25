@@ -88,6 +88,9 @@
       when:
         - llamenos_update_server_enabled | default(false) | bool
         - inventory_hostname in groups.get('llamenos_proxy', [])
+        # The updater vhosts live with the API (roles/llamenos-caddy), not on
+        # a proxy that only fronts the push relay.
+        - groups.get('llamenos_app', []) | length == 0 or inventory_hostname in groups.get('llamenos_app', [])
 
 - name: Deploy auto-healing and maintenance
   hosts: llamenos_servers

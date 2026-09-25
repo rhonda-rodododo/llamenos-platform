@@ -24,6 +24,25 @@
 {
     email {{ acme_email }}
     acme_ca https://acme-v02.api.letsencrypt.org/directory
+{% if not (llamenos_disk_encrypted | default(false) | bool) %}
+    # This host's disk is NOT encrypted (llamenos_disk_encrypted: false). No
+    # site below enables an access log; this filter covers the lines Caddy
+    # writes anyway (http.log.error on a failed proxy carries the full
+    # request). Client address and URI are dropped: on the push relay the URI
+    # is a device topic, so IP + topic + timestamp would be a per-volunteer
+    # wake record sitting on a plaintext disk.
+    log default {
+        output stderr
+        format filter {
+            wrap json
+            request>remote_ip delete
+            request>remote_port delete
+            request>client_ip delete
+            request>uri delete
+            request>headers>X-Forwarded-For delete
+        }
+    }
+{% endif %}
 }
 
 # Security headers for threat model: nation states, right-wing groups, private hacking firms
@@ -46,6 +65,12 @@
     }
 }
 
+{#
+  Split deployments run one Caddy per host, each serving only what runs on it:
+  the app host serves the API (+ updater origin), the relay host serves ntfy.
+  _caddy_serves_app / _caddy_serves_ntfy are set in tasks/main.yml.
+#}
+{% if _caddy_serves_app | bool %}
 {% if api_subdomain | default("") | length > 0 %}
 # Subdomain mode: API served from {{ api_subdomain }}.{{ domain }}
 {{ api_subdomain }}.{{ domain }} {
@@ -64,19 +89,22 @@
     import security_headers
 }
 {% endif %}
+{% endif %}
 
-{% if llamenos_ntfy_enabled | default(false) | bool and ntfy_domain | default("") | length > 0 %}
+{% if _caddy_serves_ntfy | bool and ntfy_domain | default("") | length > 0 %}
 # ntfy/UnifiedPush push broker (issue #717) — reached by the Android app to
 # subscribe (anonymous, read-only, keyed by an unguessable topic name) and
 # used as this box's own reference for where the backend publishes to.
 # Caddy proxies WebSocket upgrades automatically; no extra config needed.
+# Deliberately NO `log` directive: an access log line here is
+# client IP + device topic + timestamp.
 {{ ntfy_domain }} {
     reverse_proxy ntfy:80
     import security_headers
 }
 {% endif %}
 
-{% if llamenos_update_server_enabled | default(false) | bool %}
+{% if _caddy_serves_app | bool and llamenos_update_server_enabled | default(false) | bool %}
 # Desktop auto-updater origin (official profile). Serves the read-only artifacts
 # directory bind-mounted at /srv/updates (see compose/caddy.j2):
 #   /desktop/latest.json          <- tauri.conf.json plugins.updater.endpoints
