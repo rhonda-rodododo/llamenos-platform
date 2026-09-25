@@ -29,7 +29,8 @@ def build_ipa(export_method: "app-store-connect")
       compileBitcode: false,
       stripSwiftSymbols: true,
       provisioningProfiles: {
-        APP_IDENTIFIER => "match AppStore #{APP_IDENTIFIER}"
+        # Internal profile Name (not the filename) — xcodebuild resolves by Name.
+        APP_IDENTIFIER => "#{APP_IDENTIFIER} AppStore"
       }
     },
     output_directory: "#{BUILD_DIR}/export",
