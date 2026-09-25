@@ -1,4 +1,4 @@
-#--- Llamenos FDE ISO preseed template ---
+#--- FDE ISO preseed template ---
 # Rendered from scripts/iso-builder/preseed.cfg.template by build-inside.sh
 # via envsubst. All ${...} placeholders must be set in the environment.
 
@@ -93,10 +93,10 @@ d-i grub-installer/with_other_os boolean false
 d-i grub-installer/bootdev string ${DISK}
 
 #--- Late command ---
-# Both helper scripts live on the ISO root under /llamenos/ and are copied
+# Both helper scripts live on the ISO root under /fde/ and are copied
 # into the installer chroot before being run.
 d-i preseed/late_command string \
-  cp /cdrom/llamenos/late-command.sh /cdrom/llamenos/dropbear-setup.sh /target/tmp/ && \
+  cp /cdrom/fde/late-command.sh /cdrom/fde/dropbear-setup.sh /target/tmp/ && \
   in-target chmod +x /tmp/late-command.sh /tmp/dropbear-setup.sh && \
   in-target /tmp/late-command.sh "${USERNAME}" "${UNLOCK_MODE}" "${SSH_PUBKEY_B64}" "${STATIC_IP}" "${GATEWAY}" "${DNS}" && \
   in-target rm /tmp/late-command.sh /tmp/dropbear-setup.sh

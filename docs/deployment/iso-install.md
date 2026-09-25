@@ -211,7 +211,10 @@ bun run build:iso \
    boot/reboot the VPS from the ISO.
 
 5. Open the noVNC console in the 1984 panel. The installer boot menu appears
-   automatically. Wait for the auto-select (or press Enter immediately).
+   automatically with a single entry, `Install Debian 13 (LUKS full-disk
+   encryption)`. Wait for the auto-select (or press Enter immediately). The ISO
+   volume label is `debian13-fde`; neither string names this project, by design —
+   the hosting provider can read both.
 
 6. After about a minute, the installer asks for the LUKS encryption passphrase.
    Type a strong passphrase (30+ chars, 5+ random words). Confirm.

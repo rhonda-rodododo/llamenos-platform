@@ -37,7 +37,7 @@ chmod 440 "/etc/sudoers.d/${USERNAME}"
 
 # 3. Hardened sshd baseline (full hardening happens in Ansible)
 mkdir -p /etc/ssh/sshd_config.d
-cat > /etc/ssh/sshd_config.d/00-llamenos-baseline.conf <<'EOF'
+cat > /etc/ssh/sshd_config.d/00-baseline.conf <<'EOF'
 PermitRootLogin no
 PasswordAuthentication no
 PubkeyAuthentication yes
@@ -52,14 +52,14 @@ EOF
 # Called explicitly on critical failures (POSIX sh has no ERR trap).
 fail_sentinel() {
   reason="${1:-unknown}"
-  printf 'late-command: FAILED: %s\n' "$reason" > /var/lib/llamenos-iso-build-failed
-  chmod 644 /var/lib/llamenos-iso-build-failed
+  printf 'late-command: FAILED: %s\n' "$reason" > /var/lib/fde-iso-build-failed
+  chmod 644 /var/lib/fde-iso-build-failed
   cat > /etc/motd <<'FAILMOTD'
 
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  WARNING: Llamenos ISO late-command FAILED during install!
+  WARNING: ISO late-command FAILED during install!
   Remote LUKS unlock (dropbear) may NOT work correctly.
-  Check /var/lib/llamenos-iso-build-failed for details.
+  Check /var/lib/fde-iso-build-failed for details.
   Re-image the system before putting it into service.
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
@@ -77,22 +77,22 @@ fi
 systemctl enable systemd-timesyncd 2>&1 || echo "WARNING: systemd-timesyncd enable failed (non-fatal)" >&2
 
 # 6. Write success sentinel
-touch /var/lib/llamenos-iso-build-ok
-chmod 644 /var/lib/llamenos-iso-build-ok
+touch /var/lib/fde-iso-build-ok
+chmod 644 /var/lib/fde-iso-build-ok
 
 # 7. First-boot welcome banner with next steps
 cat > /etc/motd <<EOF
 
-  Llamenos — fresh install (Debian 13)
+  Fresh install (Debian 13, LUKS)
   ──────────────────────────────────────────────
   Disk encryption:  LUKS2 + LVM (active)
   Unlock mode:      ${UNLOCK_MODE}
   SSH user:         ${USERNAME} (sudo, key-only)
-  Install status:   OK (see /var/lib/llamenos-iso-build-ok)
+  Install status:   OK (see /var/lib/fde-iso-build-ok)
 
   NEXT STEP — from your workstation:
 
-    cd <llamenos-checkout>/deploy/ansible
+    cd <repo-checkout>/deploy/ansible
     just bootstrap   # if not already done
     ansible-playbook setup.yml -i 'this-host,'
 
