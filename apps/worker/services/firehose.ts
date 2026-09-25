@@ -26,7 +26,7 @@ export interface CreateConnectionData {
   encryptedDisplayName?: unknown
   reportTypeId: string
   agentPubkey: string
-  encryptedAgentNsec: string
+  sealedAgentKey: string
   geoContext?: string | null
   geoContextCountryCodes?: string[] | null
   inferenceEndpoint?: string | null
@@ -39,7 +39,7 @@ export interface CreateConnectionData {
 
 export type UpdateConnectionData = Omit<
   Partial<CreateConnectionData>,
-  'agentPubkey' | 'encryptedAgentNsec'
+  'agentPubkey' | 'sealedAgentKey'
 >
 
 export interface AddBufferMessageData {
@@ -77,7 +77,7 @@ export class FirehoseService {
         encryptedDisplayName: data.encryptedDisplayName ?? null,
         reportTypeId: data.reportTypeId,
         agentPubkey: data.agentPubkey,
-        encryptedAgentNsec: data.encryptedAgentNsec,
+        sealedAgentKey: data.sealedAgentKey,
         geoContext: data.geoContext ?? null,
         geoContextCountryCodes: data.geoContextCountryCodes ?? null,
         inferenceEndpoint: data.inferenceEndpoint ?? null,
@@ -158,12 +158,12 @@ export class FirehoseService {
   async setAgentKeypair(
     id: string,
     pubkey: string,
-    encryptedNsec: string,
+    sealedAgentKey: string,
   ): Promise<FirehoseConnection | null> {
     const now = new Date()
     const rows = await this.db
       .update(firehoseConnections)
-      .set({ agentPubkey: pubkey, encryptedAgentNsec: encryptedNsec, updatedAt: now })
+      .set({ agentPubkey: pubkey, sealedAgentKey, updatedAt: now })
       .where(eq(firehoseConnections.id, id))
       .returning()
     return rows[0] ?? null

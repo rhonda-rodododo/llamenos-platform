@@ -55,7 +55,7 @@ describe('POST /account/lockdown — elevated auth', () => {
     expect(body.code).toBe('ELEVATED_AUTH_REQUIRED')
   })
 
-  it('allows requests authenticated via Schnorr (no session token set)', async () => {
+  it('allows requests authenticated via Ed25519 (no session token set)', async () => {
     const { app, services } = makeApp({ sessionToken: undefined })
 
     const res = await app.request('/account/lockdown', { method: 'POST' })
@@ -71,13 +71,13 @@ describe('POST /account/lockdown — elevated auth', () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ pukRotated: true, hubKeysRotated: ['hub-1'], hubKeysFailed: [] }),
     })
-    // HIGH-W5: lockdown/complete now requires elevated auth (Schnorr device-key signature)
+    // HIGH-W5: lockdown/complete now requires elevated auth (Ed25519 device-key signature)
     expect(res.status).toBe(401)
     const body = await res.json() as { code: string }
     expect(body.code).toBe('ELEVATED_AUTH_REQUIRED')
   })
 
-  it('lockdown/complete allows Schnorr-signed auth', async () => {
+  it('lockdown/complete allows Ed25519-signed auth', async () => {
     const { app } = makeApp({ sessionToken: undefined })
 
     const res = await app.request('/account/lockdown/complete', {

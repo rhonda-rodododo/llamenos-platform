@@ -13,7 +13,7 @@ import firehoseRoutes from '@worker/routes/firehose'
 vi.mock('@worker/lib/agent-identity', () => ({
   generateAgentKeypair: vi.fn().mockReturnValue({
     pubkey: 'agent-pubkey-hex',
-    encryptedNsec: 'encrypted-nsec-hex',
+    sealedAgentKey: 'sealed-agent-key-hex',
   }),
 }))
 
@@ -90,7 +90,7 @@ const baseConn = {
   encryptedDisplayName: null,
   reportTypeId: 'rpt-type-1',
   agentPubkey: 'agent-pubkey-hex',
-  encryptedAgentNsec: 'encrypted-nsec-hex',
+  sealedAgentKey: 'sealed-agent-key-hex',
   geoContext: null,
   geoContextCountryCodes: null,
   inferenceEndpoint: null,
@@ -144,8 +144,8 @@ describe('GET /firehose', () => {
     const connections = json.connections as Array<Record<string, unknown>>
     expect(connections).toHaveLength(1)
     expect(connections[0].id).toBe('conn-1')
-    // encryptedAgentNsec should be stripped from response
-    expect(connections[0].encryptedAgentNsec).toBeUndefined()
+    // sealedAgentKey should be stripped from response
+    expect(connections[0].sealedAgentKey).toBeUndefined()
     expect(mockFirehose.listConnections).toHaveBeenCalledWith('hub-1')
   })
 
@@ -189,7 +189,7 @@ describe('POST /firehose', () => {
     // Verify createConnection received the real keypair, not 'pending'
     const createCall = mockFirehose.createConnection.mock.calls[0]
     expect(createCall[1].agentPubkey).toBe('agent-pubkey-hex')
-    expect(createCall[1].encryptedAgentNsec).toBe('encrypted-nsec-hex')
+    expect(createCall[1].sealedAgentKey).toBe('sealed-agent-key-hex')
   })
 
   it('returns 503 when seal key not configured', async () => {

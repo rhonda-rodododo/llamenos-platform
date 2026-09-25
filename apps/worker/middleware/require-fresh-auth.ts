@@ -2,7 +2,7 @@
  * requireFreshAuth — blocks session-token auth for sensitive operations.
  *
  * For operations like account lockdown, proof of current device key possession
- * is required. Session tokens can be stolen or long-lived. A Schnorr-signed
+ * is required. Session tokens can be stolen or long-lived. An Ed25519-signed
  * request proves the user's device key is still in their possession at the
  * moment of the request.
  *
@@ -10,7 +10,7 @@
  *
  * When session token auth is detected (c.get('sessionToken') is set),
  * this middleware returns 401 ELEVATED_AUTH_REQUIRED. Clients must
- * re-authenticate using a fresh Ed25519/Schnorr signature.
+ * re-authenticate using a fresh Ed25519 signature.
  */
 import { createMiddleware } from 'hono/factory'
 import type { AppEnv } from '../types'

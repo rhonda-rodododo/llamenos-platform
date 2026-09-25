@@ -24,7 +24,7 @@ const log = createLogger('routes.firehose')
 
 type FirehoseConnectionRow = typeof import('../db/schema/firehose').firehoseConnections.$inferSelect
 
-/** Map a DB row to the API response shape (strips encryptedAgentNsec). */
+/** Map a DB row to the API response shape (strips sealedAgentKey). */
 function mapConnection(row: FirehoseConnectionRow) {
   return {
     id: row.id,
@@ -129,7 +129,7 @@ firehose.post('/',
     const connectionId = data.id ?? crypto.randomUUID()
 
     // Generate keypair before persisting — avoids orphaned 'pending' rows on failure
-    const { pubkey: agentPubkey, encryptedNsec } = generateAgentKeypair(
+    const { pubkey: agentPubkey, sealedAgentKey } = generateAgentKeypair(
       connectionId,
       sealKey,
       LABEL_FIREHOSE_AGENT_SEAL,
@@ -141,7 +141,7 @@ firehose.post('/',
       encryptedDisplayName: data.encryptedDisplayName?.trim(),
       reportTypeId: data.reportTypeId,
       agentPubkey,
-      encryptedAgentNsec: encryptedNsec,
+      sealedAgentKey,
       geoContext: data.geoContext ?? null,
       geoContextCountryCodes: data.geoContextCountryCodes ?? null,
       inferenceEndpoint: data.inferenceEndpoint ?? null,

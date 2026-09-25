@@ -1082,11 +1082,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f6e3919bbaa2945715f0bb6d3934a173d1e9a59ac23767fbaaef277265a7411b"
 dependencies = [
  "cfg-if",
- "ecdsa",
  "elliptic-curve",
- "once_cell",
- "sha2 0.10.9",
- "signature 2.2.0",
 ]
 
 [[package]]
@@ -1370,7 +1366,6 @@ dependencies = [
  "hkdf 0.12.4",
  "hmac 0.12.1",
  "hpke",
- "k256",
  "openmls",
  "openmls_basic_credential",
  "openmls_rust_crypto",
