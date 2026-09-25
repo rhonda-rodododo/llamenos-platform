@@ -6,14 +6,17 @@
 #   - This host is not in the llamenos_proxy group (when the group has members)
 
 - name: Skip if caddy not enabled
-  ansible.builtin.meta: end_play
+  ansible.builtin.meta: end_role
   when: not (llamenos_caddy_enabled | default(true))
 
 - name: Skip if not assigned to this host
-  ansible.builtin.meta: end_play
+  ansible.builtin.meta: end_role
   when: >
     groups.get('llamenos_proxy', []) | length > 0 and
     inventory_hostname not in groups.get('llamenos_proxy', [])
+
+- name: Decide which vhosts this host serves
+  ansible.builtin.include_tasks: placement.yml
 
 - name: Create caddy service directory
   ansible.builtin.file:
@@ -36,7 +39,9 @@
   loop:
     - "{{ update_artifacts_dir }}"
     - "{{ update_artifacts_dir }}/desktop"
-  when: llamenos_update_server_enabled | default(false) | bool
+  when:
+    - _caddy_serves_app | bool
+    - llamenos_update_server_enabled | default(false) | bool
 
 - name: Template caddy compose file
   ansible.builtin.template:
@@ -68,3 +73,30 @@
     project_src: "{{ app_dir }}/services/caddy"
     state: present
   register: caddy_compose
+
+# On an unencrypted disk, prove the log policy against the config Caddy
+# actually runs — the deployed Caddyfile adapted by Caddy itself, not the
+# template text: no server may carry an access log, and the default logger
+# must drop client addresses and URIs. The file is fed on stdin because the
+# container's single-file bind mount still shows the previous version until
+# the restart handler runs.
+- name: Read the deployed Caddyfile
+  ansible.builtin.slurp:
+    src: "{{ app_dir }}/services/caddy/Caddyfile"
+  register: caddy_deployed_caddyfile
+  when: not (llamenos_disk_encrypted | default(false) | bool)
+
+- name: Adapt the deployed Caddyfile
+  community.docker.docker_container_exec:
+    container: llamenos-caddy-caddy-1
+    command: caddy adapt --adapter caddyfile --config /dev/stdin
+    stdin: "{{ caddy_deployed_caddyfile.content | b64decode }}"
+  register: caddy_adapted
+  changed_when: false
+  when: not (llamenos_disk_encrypted | default(false) | bool)
+
+- name: Assert no access log and IP/URI stripping on an unencrypted disk
+  ansible.builtin.include_tasks: assert-log-policy.yml
+  vars:
+    caddy_adapted_config: "{{ caddy_adapted.stdout | from_json }}"
+  when: not (llamenos_disk_encrypted | default(false) | bool)

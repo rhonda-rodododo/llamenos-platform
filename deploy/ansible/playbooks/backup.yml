@@ -20,6 +20,10 @@
     - ../vars.yml
 
   pre_tasks:
+    - name: Skip hosts without disk encryption (this play keeps data at rest)
+      ansible.builtin.include_tasks: tasks/skip-unencrypted-host.yml
+      tags: always
+
     - name: Ensure backup base directory exists
       ansible.builtin.file:
         path: "{{ app_dir }}/backups"

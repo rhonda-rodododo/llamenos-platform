@@ -17,10 +17,47 @@ Deploy a standalone Llamenos instance on your own server. This guide covers firs
 
 ## Prerequisites
 
-- **Server:** Debian 12+ or Ubuntu 22.04/24.04, 2+ CPU cores, 4GB+ RAM, 40GB+ disk
+- **Server:** Debian 12+ or Ubuntu 22.04/24.04, 2+ CPU cores, 4GB+ RAM, 40GB+ disk,
+  **installed with full-disk encryption** (see [Disk tier](#disk-tier-required))
 - **DNS:** A record pointing your domain to the server IP (e.g., `llamenos.example.com`)
 - **SSH:** Key-based access to the server as a non-root user with sudo
-- **Local tools:** `ansible` (2.15+), `ssh`, `openssl`
+- **Local tools:** `ansible` (ansible-core **2.18+**; preflight checks), `ssh`, `openssl`
+
+## Disk tier (required)
+
+Every host in the inventory must declare whether its disk is encrypted:
+
+```yaml
+llamenos_servers:
+  hosts:
+    hub1:
+      ansible_host: 203.0.113.10
+      llamenos_disk_encrypted: true    # installed with LUKS full-disk encryption
+```
+
+Preflight fails if the marker is missing or is not a YAML boolean. A host marked
+`false` is a **no-secrets-at-rest** host: preflight refuses to place the app,
+PostgreSQL, RustFS, the Signal sidecar, the PBX or internal-TLS keys on it — also
+through an **empty** inventory group, which means "every host" — and backups,
+restores, updates and observability skip it. A single-host deployment therefore
+needs `true`: a box without disk encryption cannot hold the database.
+
+### Optional: the push relay on a second, cheaper host
+
+The ntfy push relay (Android wake-ups) is the one service that may run on a host
+**without** disk encryption, e.g. to put it with a different provider for
+reachability. Add the host with `llamenos_disk_encrypted: false`, put it in the
+`llamenos_ntfy` and `llamenos_proxy` groups, list your encrypted host explicitly
+in `llamenos_app`, `llamenos_db` and `llamenos_storage`, and point
+`push.<your domain>` at the relay's IP (preflight checks each host's names). See
+the two-tier example at the end of `deploy/ansible/inventory.example.yml`, and
+[`docs/deployment/first-deploy.md` → Two hosts, two tiers](../deployment/first-deploy.md#2-two-hosts-two-tiers)
+for what that host holds and the checks that keep it that way.
+
+On such a host ntfy keeps no message cache on disk, logs at `warn` into a single
+1 MB file, and Caddy writes no access log and strips client addresses and topics
+from its error log. Splitting the app from PostgreSQL/RustFS across hosts is not
+supported (the app's `.env` addresses them by Docker-network name).
 
 ## Steps
 

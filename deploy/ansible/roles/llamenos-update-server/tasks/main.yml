@@ -16,7 +16,7 @@
 # Populate it as documented in docs/runbooks/desktop-update-release.md.
 
 - name: Skip update-server if not enabled
-  ansible.builtin.meta: end_play
+  ansible.builtin.meta: end_role
   when: not (llamenos_update_server_enabled | default(false) | bool)
 
 - name: Create update server directories

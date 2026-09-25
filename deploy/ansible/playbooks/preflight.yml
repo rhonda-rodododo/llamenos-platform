@@ -48,6 +48,26 @@
           - noble
       tags: always
 
+    # The service roles skip hosts outside their inventory group with
+    # `meta: end_role`, which is per-host. It exists from ansible-core 2.18;
+    # the older `end_play` it replaced was evaluated for the FIRST host only
+    # and then ended the play for all of them — in a two-host inventory that
+    # put PostgreSQL on every host whenever the first one was in llamenos_db.
+    - name: Assert the control node runs ansible-core 2.18 or newer
+      ansible.builtin.assert:
+        that:
+          - ansible_version.full is version('2.18', '>=')
+        fail_msg: |
+          ansible-core {{ ansible_version.full }} is too old: the roles rely on
+          `meta: end_role` (ansible-core >= 2.18) to place each service only on its
+          own hosts. Upgrade: pipx upgrade ansible (CI pins ansible==14.1.0).
+        success_msg: "ansible-core {{ ansible_version.full }}"
+        quiet: true
+      run_once: true
+      delegate_to: localhost
+      become: false
+      tags: always
+
     - name: Check SSH connectivity to target hosts
       ansible.builtin.wait_for:
         host: "{{ ansible_host | default(inventory_hostname) }}"
@@ -323,6 +343,11 @@
       ansible.builtin.include_tasks: tasks/guard-demo-mode.yml
       tags: always
 
+    # Hosts without full-disk encryption may run only the push relay.
+    - name: Include shared disk-tier guard (no secrets at rest on unencrypted hosts)
+      ansible.builtin.include_tasks: tasks/guard-disk-tier.yml
+      tags: always
+
     - name: Assert bridge_secret is set when SIP bridge or Asterisk is enabled
       ansible.builtin.assert:
         that:
@@ -470,19 +495,36 @@
     # to this box: Let's Encrypt validates over HTTP-01/TLS-ALPN, so a missing
     # record means no certificate, and no certificate means the pinned Android
     # client cannot connect at all.
+    #
+    # Checked per host, for the names THIS host's Caddy serves (same placement
+    # rule as roles/llamenos-caddy): in a split deployment the API names must
+    # resolve to the app host and ntfy_domain to the relay host — so a push.
+    # record left pointing at the app host fails here.
     - name: Validate DNS records point to this server
       when:
         - llamenos_dns_validation_enabled | default(false) | bool
+        - groups.get('llamenos_proxy', []) | length == 0 or inventory_hostname in groups.get('llamenos_proxy', [])
       block:
-        - name: Build the list of hostnames Caddy will serve
+        - name: Build the list of hostnames this host's Caddy will serve
           ansible.builtin.set_fact:
             _dns_names: >-
               {{
-                [ (api_subdomain ~ '.' ~ domain) if (api_subdomain | default('') | length > 0) else domain,
-                  updates_domain, releases_domain ]
-                + ([ domain ] if (api_subdomain | default('') | length > 0) else [])
-                + ([ ntfy_domain ] if (llamenos_ntfy_enabled | default(false) | bool) else [])
+                (
+                  ( [ (api_subdomain ~ '.' ~ domain) if (api_subdomain | default('') | length > 0) else domain ]
+                    + ([ domain ] if (api_subdomain | default('') | length > 0) else [])
+                    + ([ updates_domain, releases_domain ] if (llamenos_update_server_enabled | default(false) | bool) else []) )
+                  if (_dns_serves_app | bool) else []
+                )
+                + ([ ntfy_domain ] if (_dns_serves_ntfy | bool) else [])
               }}
+          vars:
+            _dns_serves_app: >-
+              {{ groups.get('llamenos_app', []) | length == 0
+                 or inventory_hostname in groups.get('llamenos_app', []) }}
+            _dns_serves_ntfy: >-
+              {{ (llamenos_ntfy_enabled | default(false) | bool)
+                 and (groups.get('llamenos_ntfy', []) | length == 0
+                      or inventory_hostname in groups.get('llamenos_ntfy', [])) }}
 
         - name: Resolve each hostname (IPv4) from the control node
           ansible.builtin.command: getent ahostsv4 {{ item }}

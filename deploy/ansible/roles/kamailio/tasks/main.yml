@@ -8,11 +8,11 @@
 # Conditional: only runs when kamailio_enabled: true
 
 - name: Skip if Kamailio not enabled
-  ansible.builtin.meta: end_play
+  ansible.builtin.meta: end_role
   when: not (kamailio_enabled | default(false))
 
 - name: Skip if not assigned to this host
-  ansible.builtin.meta: end_play
+  ansible.builtin.meta: end_role
   when: >
     groups.get('llamenos_kamailio', []) | length > 0 and
     inventory_hostname not in groups.get('llamenos_kamailio', [])

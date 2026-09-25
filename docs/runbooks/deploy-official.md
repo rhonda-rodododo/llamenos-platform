@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Deploy the Llamenos project's production server on 1984 Hosting (Iceland). Includes the app, RustFS, Caddy, the ntfy push relay and the desktop update origin (`updates.`/`releases.`). Monitoring and the Signal notifier are opt-in (`observability_enabled`, `llamenos_signal_enabled`).
+Deploy the Llamenos project's production servers: the platform host on 1984 Hosting (Iceland; full-disk encryption) with the app, PostgreSQL, RustFS, Caddy and the desktop update origin (`updates.`/`releases.`), and the ntfy push relay on its own unencrypted FlokiNET host (see [Two hosts, two tiers](../deployment/first-deploy.md#2-two-hosts-two-tiers)). Monitoring and the Signal notifier are opt-in (`observability_enabled`, `llamenos_signal_enabled`).
 
 > **First deploy on a fresh VPS?** Follow [`docs/deployment/first-deploy.md`](../deployment/first-deploy.md)
 > — the full ordered sequence (FDE install → DNS → config → preflight → harden →
@@ -11,8 +11,8 @@ Deploy the Llamenos project's production server on 1984 Hosting (Iceland). Inclu
 
 ## Prerequisites
 
-- **VPS:** provisioned per [`iso-install.md`](../deployment/iso-install.md) (Debian 13, FDE, dropbear unlock), `playbooks/harden.yml` already run
-- **DNS:** DNS-only (unproxied) `A` records for `api.`, the apex, `updates.`, `releases.` and `push.` under your domain, pointing at the VPS. TLS terminates on the VPS with a Let's Encrypt cert — the Android client hard-fails on any other chain (see first-deploy.md §1, §4)
+- **Platform VPS:** provisioned per [`iso-install.md`](../deployment/iso-install.md) (Debian 13, FDE, dropbear unlock), `llamenos_disk_encrypted: true`; **relay VPS:** stock Debian, `llamenos_disk_encrypted: false`; `playbooks/harden.yml` already run on both
+- **DNS:** DNS-only (unproxied) `A` records for `api.`, the apex, `updates.` and `releases.` under your domain pointing at the **platform** VPS, and `push.llamenos-hotline.org` pointing at the **relay** VPS (preflight checks each host's names). TLS terminates on the VPS with a Let's Encrypt cert — the Android client hard-fails on any other chain (see first-deploy.md §1, §4)
 - **App image:** `llamenos_app_image` set to an image that exists (the vars.yml default `docker.io/llamenos/llamenos:latest` is not published — first-deploy.md, "Getting the app image onto the server")
 - **Ansible Vault:** password shared among maintainers via a secure channel
 
@@ -20,10 +20,10 @@ Deploy the Llamenos project's production server on 1984 Hosting (Iceland). Inclu
 
 | Secret | Description |
 |---|---|
-| `PROD_INVENTORY_YML` | Content of `inventory-production.yml` (server IP, SSH port/user) |
+| `PROD_INVENTORY_YML` | Content of `inventory-production.yml` (both hosts: IPs, SSH port/user, `llamenos_disk_encrypted`) |
 | `PROD_VARS_YML_ENCRYPTED` | Content of the vault-encrypted `vars-production.yml` |
 | `ANSIBLE_VAULT_PASSWORD` | Vault decryption password |
-| `PROD_SSH_PRIVATE_KEY` | SSH key for the deploy user |
+| `PROD_SSH_PRIVATE_KEY` | SSH key for the deploy user — the workflow installs this one key, so it must be authorized on **both** hosts |
 
 ## Steps
 

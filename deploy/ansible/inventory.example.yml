@@ -10,13 +10,20 @@
 #
 # ── Single-Host (default) ──────────────────────────────────────
 # Put your server in [llamenos_servers] and all services deploy there.
-# No other groups needed — everything runs on one machine.
+#
+# ── Disk tier (required on every host) ─────────────────────────
+# `llamenos_disk_encrypted: true` only if the host was installed with
+# full-disk encryption (the FDE installer ISO, docs/deployment/iso-install.md).
+# A host marked false may run ONLY the ntfy push relay: preflight refuses to
+# place the app, database or storage on it (including via an empty group —
+# see below), and backups/restores/updates/observability skip it.
 #
 # ── Multi-Host (split services across machines) ────────────────
 # Add hosts to specific service groups to control placement.
 # A host can be in multiple groups. Services deploy only to hosts
 # in their group. If a service group is empty, that service deploys
-# to all llamenos_servers hosts (backward compatible).
+# to all llamenos_servers hosts — so with more than one host, list
+# every group explicitly.
 #
 # For multiple deployments (e.g., staging + production), create
 # separate inventory files and pass them with -i:
@@ -46,6 +53,9 @@ all:
           # Set this to 22 for the first run, then change to match ssh_port
           ansible_port: 22
 
+          # Installed with full-disk encryption? (see "Disk tier" above)
+          llamenos_disk_encrypted: true
+
     # ── Service Groups ──────────────────────────────────────────
     # Assign hosts to control where each service runs.
     # If a group is empty or undefined, that service runs on all
@@ -64,9 +74,6 @@ all:
     llamenos_storage:
       hosts:
         hub1: {}
-    llamenos_relay:
-      hosts:
-        hub1: {}
     # Optional service groups — only deployed if the service is enabled
     # in vars.yml (llamenos_*_enabled: true)
     llamenos_transcription:
@@ -78,36 +85,45 @@ all:
     llamenos_ntfy:
       hosts: {}
 
-# ── Multi-Host Example ──────────────────────────────────────────
+# ── Two-Tier Example (the reference deployment) ─────────────────
 #
-# To split services across two machines, add a second host:
+# An encrypted host runs everything that holds data or secrets; a second,
+# unencrypted host runs only the ntfy push relay (for reachability and
+# takedown resistance — its payloads are HPKE ciphertext). push.<domain>
+# must resolve to the relay host, every other name to the encrypted one.
+#
+# (Splitting the app from PostgreSQL/RustFS is NOT supported: the shared
+# .env template addresses them by Docker-network name.)
 #
 # all:
 #   children:
 #     llamenos_servers:
 #       hosts:
-#         app-server:
+#         platform1:
 #           ansible_host: 203.0.113.10
 #           ansible_user: deploy
 #           ansible_ssh_private_key_file: ~/.ssh/llamenos_deploy
 #           ansible_port: 22
-#         db-server:
-#           ansible_host: 203.0.113.11
+#           llamenos_disk_encrypted: true
+#         relay1:
+#           ansible_host: 198.51.100.20
 #           ansible_user: deploy
 #           ansible_ssh_private_key_file: ~/.ssh/llamenos_deploy
 #           ansible_port: 22
+#           llamenos_disk_encrypted: false
 #     llamenos_app:
 #       hosts:
-#         app-server: {}
+#         platform1: {}
 #     llamenos_db:
 #       hosts:
-#         db-server: {}
-#     llamenos_proxy:
-#       hosts:
-#         app-server: {}
+#         platform1: {}
 #     llamenos_storage:
 #       hosts:
-#         db-server: {}
-#     llamenos_relay:
+#         platform1: {}
+#     llamenos_proxy:
 #       hosts:
-#         app-server: {}
+#         platform1: {}
+#         relay1: {}
+#     llamenos_ntfy:
+#       hosts:
+#         relay1: {}

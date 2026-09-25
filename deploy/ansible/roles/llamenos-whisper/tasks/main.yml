@@ -6,11 +6,11 @@
 #   - This host is not in the llamenos_transcription group (when the group has members)
 
 - name: Skip if whisper not enabled
-  ansible.builtin.meta: end_play
+  ansible.builtin.meta: end_role
   when: not (llamenos_transcription_enabled | default(false))
 
 - name: Skip if not assigned to this host
-  ansible.builtin.meta: end_play
+  ansible.builtin.meta: end_role
   when: >
     groups.get('llamenos_transcription', []) | length > 0 and
     inventory_hostname not in groups.get('llamenos_transcription', [])
