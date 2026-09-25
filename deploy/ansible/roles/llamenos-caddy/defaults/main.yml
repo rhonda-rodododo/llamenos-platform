@@ -1,0 +1,5 @@
+---
+# Where the desktop updater artifacts live on the host (official profile).
+# Bind-mounted read-only into Caddy at /srv/updates. Must match the default in
+# roles/llamenos-update-server/defaults/main.yml.
+update_artifacts_dir: "{{ app_dir }}/services/update-server/artifacts"

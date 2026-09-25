@@ -73,22 +73,20 @@ See [Disaster Recovery](../docs/runbooks/disaster-recovery.md) for backup and re
 ## RustFS (Object Storage)
 
 - [ ] RustFS container running and healthy
-- [ ] `llamenos-files` bucket created (for app uploads)
-- [ ] `llamenos-staging` bucket created (for pre-release builds)
-- [ ] `llamenos-releases` bucket created (for release artifacts)
-- [ ] `llamenos-releases` bucket has public read policy (for downloads domain)
+- [ ] `llamenos-files` bucket exists (the app creates it on first start; confirm in the app logs)
 - [ ] `STORAGE_ACCESS_KEY` and `STORAGE_SECRET_KEY` are unique and >= 24 chars
-- [ ] SSE (server-side encryption) enabled on all buckets
+- [ ] SSE (server-side encryption) enabled (`storage_sse_enabled: true`)
+- [ ] RustFS is **not** published on a host port (Docker network only) — desktop updates are served from the box's filesystem, not from RustFS (see below and `docs/deployment/first-deploy.md` §5)
 
 ## Desktop Distribution
 
-See [Desktop Update Release](../docs/runbooks/desktop-update-release.md) for release artifact upload and updater configuration.
+See [Desktop Update Release](../docs/runbooks/desktop-update-release.md) for release artifact upload and updater configuration, and [First deploy §5](../docs/deployment/first-deploy.md#5-serving-desktop-updates-from-this-box) for the current status of the updater channel.
 
-- [ ] `downloads.{{ domain }}` DNS A record points to server IP
-- [ ] `updates.{{ domain }}` DNS A record points to server IP
-- [ ] Caddy vhosts for downloads and updates are active
-- [ ] Release artifacts uploaded to RustFS /releases/ bucket
-- [ ] Tauri updater JSON (`latest.json`) accessible at `https://updates.{{ domain }}/latest.json`
+- [ ] `updates.<domain>` and `releases.<domain>` DNS A records (DNS-only, unproxied) point to the server IP
+- [ ] `llamenos_update_server_enabled: true` (official profile); Caddy serves both hostnames from `/opt/llamenos/services/update-server/artifacts`
+- [ ] `https://updates.<domain>/health` returns `ok`
+- [ ] Release artifacts + `latest.json` uploaded under `artifacts/desktop/` (layout in the runbook)
+- [ ] Tauri updater manifest reachable at `https://updates.<domain>/desktop/latest.json` and lists every shipped platform
 - [ ] Code signing certificates configured (Windows: Authenticode, macOS: Developer ID)
 - [ ] SLSA provenance attestation generated for each release
 - [ ] CHECKSUMS.txt published with each release

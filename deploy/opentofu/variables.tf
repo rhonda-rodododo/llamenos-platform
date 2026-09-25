@@ -1,5 +1,5 @@
 variable "provider_name" {
-  description = "Hosting provider: hetzner or 1984hosting"
+  description = "Hosting provider: hetzner (automated) or 1984hosting (manual runbook; use for any provider ordered by hand)"
   type        = string
   default     = "hetzner"
 
