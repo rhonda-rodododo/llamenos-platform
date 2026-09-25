@@ -8,7 +8,7 @@
 #
 # GitHub Releases: each platform publishes to its OWN release —
 # `android-v<version>` (signed APK + SHA-256 + android-build-meta.json) and
-# `ios-v<version>` (ios-build-meta.json) — never to `v<version>`. release.yml
+# `ios-v<version>` (exported IPA + SHA-256 + ios-build-meta.json) — never to `v<version>`. release.yml
 # publishes `v<version>` BEFORE dispatching this workflow and the repo has
 # immutable releases enabled, so assets cannot be added to it. Same scheme as
 # tauri-release.yml's `desktop-v<version>` (#957). verify-release-live.yml reads
@@ -595,6 +595,25 @@ jobs:
             -allowProvisioningUpdates \
             2>&1 | "$FORMATTER"
 
+          # ExportOptions.plist has destination=export, so an .ipa MUST exist here.
+          # (destination=upload would ship it to App Store Connect and leave none.)
+          IPA_COUNT=$(find build/export -maxdepth 1 -name "*.ipa" | wc -l | tr -d ' ')
+          if [ "$IPA_COUNT" -ne 1 ]; then
+            echo "::error::expected exactly one .ipa in apps/ios/build/export, found ${IPA_COUNT}"
+            ls -la build/export || true
+            exit 1
+          fi
+
+      - name: Generate IPA checksum
+        working-directory: apps/ios
+        run: |
+          IPA=$(find build/export -maxdepth 1 -name "*.ipa" | head -1)
+          # Hash from inside the IPA's directory so the .sha256 records the bare
+          # file name — `shasum -c` then works next to a downloaded copy.
+          (cd "$(dirname "$IPA")" && shasum -a 256 "$(basename "$IPA")" > "$(basename "$IPA").sha256")
+          echo "IPA checksum:"
+          cat "${IPA}.sha256"
+
       - name: Upload IPA artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: success()
@@ -609,17 +628,23 @@ jobs:
       # release.yml publishes `v<version>` BEFORE dispatching this workflow and
       # the repo has immutable releases enabled, so `gh release upload
       # v<version>` is rejected. Same approach (and naming) as tauri-release.yml's
-      # `desktop-v<version>` (#957). No IPA is attached — the signed IPA is the
-      # `ios-release` workflow artifact; this release carries the build metadata only.
+      # `desktop-v<version>` (#957) and this file's `android-v<version>` job.
       #
-      # Runs only when every step above succeeded (no `if: always()` any more).
-      # Publishing is irreversible, and a run that failed to archive/export
-      # now fails the job loudly on its own — recording metadata for it would only
-      # freeze the version's release and block the retry. CI never submits to
-      # TestFlight; the recorded build number is what the run built, which
-      # verify-release-live.yml (#721) compares against the live TestFlight
-      # build number.
-      - name: Publish iOS build metadata to GitHub Release
+      # Draft-first, then publish: the release is created as a draft with its full
+      # asset set (IPA + SHA-256 + ios-build-meta.json), the set is verified, and
+      # only then made public (and so immutable). Any failure to create, attach or
+      # publish fails the job — nothing is masked. The dSYMs stay a workflow
+      # artifact (`ios-release`, above); they are for symbolication, not release assets.
+      #
+      # Runs only when every step above succeeded (no `if: always()`): publishing is
+      # irreversible, and a run that failed to archive/export fails the job loudly on
+      # its own — recording it would only freeze the version's release and block the
+      # retry. CI never submits to TestFlight/App Store Connect (#969).
+      #
+      # An IPA here is NOT necessarily installable. With ExportOptions
+      # `method = app-store-connect` it is signed for App Store distribution and iOS
+      # will only run it via TestFlight/App Store; see docs/deployment/ios-distribution.md.
+      - name: Publish iOS GitHub Release (IPA + checksum + build metadata)
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RUN_NUMBER: ${{ github.run_number }}
@@ -629,14 +654,29 @@ jobs:
           VERSION="$RESOLVED_VERSION"
           TAG="ios-v${VERSION}"
 
+          IPA=$(find apps/ios/build/export -maxdepth 1 -name "*.ipa" | head -1)
+          CHECKSUM=$(find apps/ios/build/export -maxdepth 1 -name "*.sha256" | head -1)
+          # A release with no IPA is a failed run, not a green one: the export
+          # step guarantees these exist.
+          if [ -z "$IPA" ] || [ -z "$CHECKSUM" ]; then
+            echo "::error::release IPA/checksum missing at upload time"
+            exit 1
+          fi
+          IPA_NAME=$(basename "$IPA")
+
           mkdir -p release-assets
+          cp "$IPA" "$CHECKSUM" release-assets/
           jq -n --arg version "$VERSION" --argjson buildNumber "$RUN_NUMBER" \
             '{version: $version, buildNumber: $buildNumber}' > release-assets/ios-build-meta.json
 
           {
-            echo "## iOS v${VERSION} — build record"
+            echo "## iOS v${VERSION} — release artifact"
             echo
-            echo "Build number (CFBundleVersion): \`${RUN_NUMBER}\`. CI does not submit to the App Store; the signed IPA is the \`ios-release\` workflow artifact and is submitted locally with fastlane. This release records what the run built (\`ios-build-meta.json\`)."
+            echo "Exported IPA (\`${IPA_NAME}\`), its SHA-256 checksum and the build metadata. Verify the checksum before you use it: \`shasum -a 256 -c ${IPA_NAME}.sha256\`."
+            echo
+            echo "**This is not a sideload-installable app.** CI never submits to App Store Connect. Whether this IPA can be installed on a device depends on the export method in \`apps/ios/ExportOptions.plist\`: with \`app-store-connect\` it is only submittable (via TestFlight, locally with fastlane), not installable from this page. See \`docs/deployment/ios-distribution.md\`."
+            echo
+            echo "Build number (CFBundleVersion): \`${RUN_NUMBER}\`."
             echo
             echo "This is a separate \`ios-v${VERSION}\` release because the \`v${VERSION}\` release is immutable once published and cannot accept iOS assets."
           } > release-body.md
