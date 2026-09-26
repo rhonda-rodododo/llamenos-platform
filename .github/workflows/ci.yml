@@ -317,6 +317,13 @@ jobs:
     permissions:
       contents: read
     timeout-minutes: 15
+    env:
+      # packages/crypto/rust-toolchain.toml pins `stable` plus eleven extra
+      # targets (mobile, wasm, macOS, Windows) that rustup would install on
+      # the first `cargo` call — ~1.3 GB of the runner's persistent disk, per
+      # runner, for tests that only ever build the host target. Naming the
+      # channel here overrides that file; the compiler is the same `stable`.
+      RUSTUP_TOOLCHAIN: stable
 
     steps:
       - name: Checkout
@@ -329,7 +336,7 @@ jobs:
           # Bounded growth: a stale `target/` for every past rustc would
           # otherwise only ever grow. Past the cap, drop the lot and let this
           # run rebuild cold once.
-          cap_mb=10240
+          cap_mb=6144
           if [ -d "$root" ] && [ "$(du -sm "$root" | cut -f1)" -gt "$cap_mb" ]; then
             echo "::warning::$root passed ${cap_mb} MB; wiping it so the cache stays bounded"
             rm -rf "$root"

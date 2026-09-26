@@ -84,6 +84,13 @@ jobs:
     permissions:
       contents: read
     timeout-minutes: 15
+    env:
+      # `cargo audit` reads Cargo.lock; it compiles nothing. But running it
+      # from apps/desktop makes rustup honour that directory's
+      # rust-toolchain.toml and install a second, pinned toolchain (1.88.0
+      # plus rustfmt, clippy and four cross targets — ~1.7 GB) just to run a
+      # lockfile scan. Naming the channel here skips that.
+      RUSTUP_TOOLCHAIN: stable
 
     steps:
       - name: Checkout
@@ -94,7 +101,7 @@ jobs:
           set -euo pipefail
           root="${HOME}/.cache/llamenos-ci/${RUNNER_NAME}"
           # Bounded growth — past the cap, drop the lot and rebuild cold once.
-          cap_mb=10240
+          cap_mb=6144
           if [ -d "$root" ] && [ "$(du -sm "$root" | cut -f1)" -gt "$cap_mb" ]; then
             echo "::warning::$root passed ${cap_mb} MB; wiping it so the cache stays bounded"
             rm -rf "$root"
@@ -237,7 +244,8 @@ jobs:
     #     of scans cannot starve the Rust jobs that share the pool;
     #   - the built image is removed afterwards (see the last step) — layers
     #     stay cached, the tagged image does not pile up. Total BuildKit cache
-    #     is capped by runner-maintenance.yml.
+    #     is capped after every scan (last step) and weekly by
+    #     runner-maintenance.yml.
     # No docker/setup-buildx-action: it would create a throwaway
     # docker-container builder whose cache dies with the job. The default
     # builder is enough for `load: true`, and gha cache import/export does
@@ -277,6 +285,32 @@ jobs:
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
+      # trivy-action's built-in setup restores the Trivy binary from the
+      # Actions cache, and actions/cache stores paths RELATIVE to the
+      # workspace: a binary cached from a hosted runner
+      # (/home/runner/work/<repo>/<repo>) lands at the wrong place when
+      # restored into a self-hosted workspace of different depth
+      # (`<runner>/_work/<repo>/<repo>`). The restore reports success, the
+      # binary is not on PATH, and the scan dies with `trivy: command not
+      # found` (exit 127) — the failure that used to keep this job hosted.
+      # So install Trivy per job, into the job's own temp dir (no shared
+      # $HOME/.local/bin for three runners to race over), and tell
+      # trivy-action to skip its setup. The DB cache is kept on this runner's
+      # disk instead of the Actions cache.
+      - name: Install Trivy
+        uses: aquasecurity/setup-trivy@3fb12ec12f41e471780db15c232d5dd185dcb514 # v0.2.6
+        with:
+          version: v0.70.0
+          cache: false
+          path: ${{ runner.temp }}/trivy
+
+      - name: Keep the Trivy DB on this runner's disk
+        run: |
+          set -euo pipefail
+          dir="${HOME}/.cache/llamenos-ci/${RUNNER_NAME}/trivy"
+          mkdir -p "$dir"
+          echo "TRIVY_CACHE_DIR=$dir" >> "$GITHUB_ENV"
+
       - name: Build image for scanning
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
@@ -292,6 +326,8 @@ jobs:
       - name: Scan image with Trivy
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
+          skip-setup-trivy: true
+          cache: false
           image-ref: ${{ env.SCAN_IMAGE }}
           format: 'sarif'
           output: 'image-results.sarif'
@@ -317,6 +353,8 @@ jobs:
       - name: Fail on fixable CRITICAL vulnerabilities
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
+          skip-setup-trivy: true
+          cache: false
           image-ref: ${{ env.SCAN_IMAGE }}
           format: 'table'
           severity: 'CRITICAL'
@@ -353,6 +391,8 @@ jobs:
       - name: Fail on fixable HIGH/CRITICAL OS-package vulnerabilities
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
+          skip-setup-trivy: true
+          cache: false
           image-ref: ${{ env.SCAN_IMAGE }}
           format: 'table'
           severity: 'CRITICAL,HIGH'
@@ -370,6 +410,8 @@ jobs:
       - name: Scan image with Trivy (table output for review)
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
+          skip-setup-trivy: true
+          cache: false
           image-ref: ${{ env.SCAN_IMAGE }}
           format: 'table'
           severity: 'CRITICAL,HIGH'
@@ -380,6 +422,16 @@ jobs:
       - name: Remove scanned image
         if: always()
         run: docker image rm --force "$SCAN_IMAGE"
+
+      # Bound the shared BuildKit cache after every scan, not just on
+      # runner-maintenance.yml's weekly schedule: a run that changes bun.lock
+      # or the Rust sources adds a few GB of new layers, and a week is long
+      # enough for that to fill the disk. Keep the figure in step with
+      # BUILDKIT_CACHE_MAX there. Layers a concurrent build is using are left
+      # alone by `builder prune`.
+      - name: Cap BuildKit layer cache
+        if: always()
+        run: docker builder prune --force --max-used-space 10GB
 
   # ─── Crypto Guardrails (informational) ─────────────────────
   crypto-guardrails:
@@ -481,7 +533,7 @@ jobs:
           set -euo pipefail
           root="${HOME}/.cache/llamenos-ci/${RUNNER_NAME}"
           # Bounded growth — past the cap, drop the lot and rebuild cold once.
-          cap_mb=10240
+          cap_mb=6144
           if [ -d "$root" ] && [ "$(du -sm "$root" | cut -f1)" -gt "$cap_mb" ]; then
             echo "::warning::$root passed ${cap_mb} MB; wiping it so the cache stays bounded"
             rm -rf "$root"

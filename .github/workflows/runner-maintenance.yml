@@ -41,10 +41,13 @@ concurrency:
 permissions: {}  # deny-all; per-job permissions below
 
 env:
-  # Ceiling for BuildKit's layer cache. A cold `deploy/docker/Dockerfile` app
-  # build is ~5 GB of cache; this leaves room for the three scanned targets
-  # plus headroom while staying well inside the box's free space.
-  BUILDKIT_CACHE_MAX: 15GB
+  # Ceiling for BuildKit's layer cache. The three image-scan targets together
+  # come to ~14 GB when fully cached, so this evicts the least recently used
+  # layers rather than letting them all stay. Sized against the box's disk
+  # (75 GB, ~32 GB baseline): 10 GB here + three Rust caches capped at 6 GB
+  # each (see the persistent-cache step in ci.yml / security-audit.yml) stays
+  # under ~80% even if every cache sits at its ceiling.
+  BUILDKIT_CACHE_MAX: 10GB
 
 jobs:
   prune:
