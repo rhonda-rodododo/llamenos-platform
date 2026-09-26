@@ -51,14 +51,17 @@ export async function startParallelRinging(
     // Get user details (including call preference)
     const { users: allUsers } = await services.identity.getUsers()
 
-    // Availability rules: a volunteer must be active and not on break.
+    // Busy = answering an in-progress call in ANY hub (one phone, one pair of ears).
+    const busyPubkeys = await services.calls.getBusyPubkeys()
+
+    // Availability rules: a volunteer must be active, not on break, and not on a live call.
     const pickAvailable = (pubkeys: string[]) =>
-      allUsers.filter(v => pubkeys.includes(v.pubkey) && v.active && !v.onBreak)
+      allUsers.filter(v => pubkeys.includes(v.pubkey) && v.active && !v.onBreak && !busyPubkeys.has(v.pubkey))
 
     // All available on-shift users (for Nostr relay notification)
     let available = pickAvailable(onShiftPubkeys)
 
-    // Everyone on shift is unavailable (inactive / on break) — try the fallback
+    // Everyone on shift is unavailable (inactive / on break / on a call) — try the fallback
     // group with the same availability rules before giving up. The fallback is
     // meant for exactly this case, not only for an empty roster.
     if (available.length === 0 && !usedFallback) {
