@@ -226,7 +226,7 @@ erasure.delete(
     const services = c.get('services')
     const pubkey = c.get('pubkey')
     await services.erasure.cancelSelfRequest(pubkey)
-    await audit(services.audit, 'erasureCancelled', pubkey, {})
+    await audit(services.audit, 'erasureCancelled', pubkey, {}, undefined, c.get('hubId') ?? null)
     return c.json({ ok: true })
   },
 )
@@ -451,7 +451,7 @@ erasure.post(
     await audit(services.audit, 'deviceWipeSent', pubkey, {
       targetUserId,
       targetDevicePubkey,
-    })
+    }, undefined, c.get('hubId') ?? null)
 
     return c.json({ ok: true })
   },

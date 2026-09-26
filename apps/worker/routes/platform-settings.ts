@@ -66,7 +66,7 @@ platformSettings.patch(
 
     await audit(services.audit, 'platformSettingsUpdated', pubkey, {
       updatedSections: Object.keys(body),
-    })
+    }, undefined, null)
 
     return c.json({ settings: updated })
   },

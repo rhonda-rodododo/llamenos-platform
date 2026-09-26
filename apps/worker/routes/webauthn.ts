@@ -107,7 +107,7 @@ webauthn.post('/login/verify',
         lastUsedAt: new Date().toISOString(),
       })
       const session = await services.identity.createSession(matched.ownerPubkey)
-      await audit(services.audit, 'webauthnLogin', matched.ownerPubkey, { credId: matched.id }, { request: c.req.raw, hmacSecret: c.env.HMAC_SECRET })
+      await audit(services.audit, 'webauthnLogin', matched.ownerPubkey, { credId: matched.id }, { request: c.req.raw, hmacSecret: c.env.HMAC_SECRET }, null)
       return c.json({ token: session.token, pubkey: session.pubkey })
     } catch {
       return c.json({ error: 'Authentication failed' }, 401)
@@ -205,7 +205,7 @@ webauthn.post('/register/verify',
         lastUsedAt: new Date().toISOString(),
       }
       await services.identity.addWebAuthnCredential(pubkey, newCred)
-      await audit(services.audit, 'webauthnRegistered', pubkey, { credId: newCred.id, label: body.label }, { request: c.req.raw, hmacSecret: c.env.HMAC_SECRET })
+      await audit(services.audit, 'webauthnRegistered', pubkey, { credId: newCred.id, label: body.label }, { request: c.req.raw, hmacSecret: c.env.HMAC_SECRET }, null)
       return c.json({ ok: true })
     } catch {
       return c.json({ error: 'Verification failed' }, 400)
@@ -296,7 +296,7 @@ webauthn.delete('/credentials/:credId',
     }
 
     await services.identity.deleteWebAuthnCredential(pubkey, credId)
-    await audit(services.audit, 'webauthnDeleted', pubkey, { credId }, { request: c.req.raw, hmacSecret: c.env.HMAC_SECRET })
+    await audit(services.audit, 'webauthnDeleted', pubkey, { credId }, { request: c.req.raw, hmacSecret: c.env.HMAC_SECRET }, null)
     return c.json({ ok: true })
   })
 

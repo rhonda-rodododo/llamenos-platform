@@ -80,7 +80,7 @@ entitySchema.put('/case-management',
     const services = c.get('services')
     const hubId = c.get('hubId') as string | undefined
     const result = await services.settings.setCaseManagementEnabled(body, hubId)
-    await audit(services.audit, 'caseManagementToggled', c.get('pubkey'), body)
+    await audit(services.audit, 'caseManagementToggled', c.get('pubkey'), body, undefined, c.get('hubId') ?? null)
     return c.json(result)
   },
 )
@@ -127,7 +127,7 @@ entitySchema.put('/auto-assignment',
     const services = c.get('services')
     const hubId = c.get('hubId') ?? ''
     await services.settings.updateHubSettings(hubId, { autoAssignment: body.enabled })
-    await audit(services.audit, 'autoAssignmentToggled', c.get('pubkey'), body)
+    await audit(services.audit, 'autoAssignmentToggled', c.get('pubkey'), body, undefined, c.get('hubId') ?? null)
     return c.json({ enabled: body.enabled })
   },
 )
@@ -172,7 +172,7 @@ entitySchema.put('/cross-hub',
     const body = c.req.valid('json')
     const services = c.get('services')
     const result = await services.settings.setCrossHubSharingEnabled(body)
-    await audit(services.audit, 'crossHubSharingToggled', c.get('pubkey'), body)
+    await audit(services.audit, 'crossHubSharingToggled', c.get('pubkey'), body, undefined, c.get('hubId') ?? null)
     return c.json(result)
   },
 )
@@ -256,7 +256,7 @@ entitySchema.patch('/entity-types/:id/customize',
     const services = c.get('services')
     const pubkey = c.get('pubkey')
     const updated = await services.settings.updateEntityType(id, body as Record<string, unknown>)
-    await audit(services.audit, 'entityTypeCustomized', pubkey, { entityTypeId: id, fields: Object.keys(body) })
+    await audit(services.audit, 'entityTypeCustomized', pubkey, { entityTypeId: id, fields: Object.keys(body) }, undefined, c.get('hubId') ?? null)
     return c.json(updated)
   },
 )
@@ -484,7 +484,7 @@ entitySchema.post('/templates/apply',
       entityTypesCreated: result.entityTypes.length,
       relationshipTypesCreated: result.relationshipTypes.length,
       reportTypesCreated: result.reportTypes.length,
-    })
+    }, undefined, c.get('hubId') ?? null)
 
     return c.json({
       applied: true,
@@ -552,7 +552,7 @@ entitySchema.post('/roles/from-template',
       await audit(services.audit, 'roleCreatedFromTemplate', pubkey, {
         roleId: role.id,
         roleName: role.name,
-      })
+      }, undefined, c.get('hubId') ?? null)
     }
 
     return c.json({ created, count: created.length }, 201)

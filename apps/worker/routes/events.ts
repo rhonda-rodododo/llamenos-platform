@@ -165,7 +165,7 @@ events.post('/',
       eventId: event.id,
       entityTypeId: event.entityTypeId,
       caseNumber: event.caseNumber,
-    })
+    }, undefined, c.get('hubId') ?? null)
 
     return c.json(event, 201)
   },
@@ -204,7 +204,7 @@ events.patch('/:id',
       eventId: id,
     })
 
-    await audit(services.audit, 'eventUpdated', pubkey, { eventId: id })
+    await audit(services.audit, 'eventUpdated', pubkey, { eventId: id }, undefined, c.get('hubId') ?? null)
 
     return c.json(updated)
   },
@@ -236,7 +236,7 @@ events.delete('/:id',
 
     await services.cases.deleteEvent(id)
 
-    await audit(services.audit, 'eventDeleted', pubkey, { eventId: id })
+    await audit(services.audit, 'eventDeleted', pubkey, { eventId: id }, undefined, c.get('hubId') ?? null)
 
     return c.json({ ok: true })
   },
@@ -312,7 +312,7 @@ events.post('/:id/records',
     await audit(services.audit, 'recordLinkedToEvent', pubkey, {
       eventId: id,
       recordId: body.recordId,
-    })
+    }, undefined, c.get('hubId') ?? null)
 
     return c.json(result, 201)
   },
@@ -348,7 +348,7 @@ events.delete('/:id/records/:recordId',
     await audit(services.audit, 'recordUnlinkedFromEvent', pubkey, {
       eventId: id,
       recordId,
-    })
+    }, undefined, c.get('hubId') ?? null)
 
     return c.json({ ok: true })
   },
@@ -417,7 +417,7 @@ events.post('/:id/reports',
     await audit(services.audit, 'reportLinkedToEvent', pubkey, {
       eventId: id,
       reportId: body.reportId,
-    })
+    }, undefined, c.get('hubId') ?? null)
 
     return c.json(result, 201)
   },
@@ -453,7 +453,7 @@ events.delete('/:id/reports/:reportId',
     await audit(services.audit, 'reportUnlinkedFromEvent', pubkey, {
       eventId: id,
       reportId,
-    })
+    }, undefined, c.get('hubId') ?? null)
 
     return c.json({ ok: true })
   },

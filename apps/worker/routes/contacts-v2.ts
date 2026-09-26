@@ -158,7 +158,7 @@ contactsV2.post('/',
       hubId: c.get('hubId') ?? body.hubId,
     })
 
-    await audit(services.audit, 'contactCreated', c.get('pubkey'), { contactId: contact.id })
+    await audit(services.audit, 'contactCreated', c.get('pubkey'), { contactId: contact.id }, undefined, c.get('hubId') ?? null)
     return c.json(contact, 201)
   },
 )
@@ -215,7 +215,7 @@ contactsV2.post('/groups',
     await audit(services.audit, 'groupCreated', pubkey, {
       groupId: group.id,
       memberCount: body.members.length,
-    })
+    }, undefined, c.get('hubId') ?? null)
     return c.json(group, 201)
   },
 )
@@ -271,7 +271,7 @@ contactsV2.patch('/groups/:groupId',
     const updated = await services.contacts.updateGroup(groupId, body)
     if (!updated) return c.json({ error: 'Group not found' }, 404)
 
-    await audit(services.audit, 'groupUpdated', c.get('pubkey'), { groupId })
+    await audit(services.audit, 'groupUpdated', c.get('pubkey'), { groupId }, undefined, c.get('hubId') ?? null)
     return c.json(updated)
   },
 )
@@ -297,7 +297,7 @@ contactsV2.delete('/groups/:groupId',
 
     await services.contacts.deleteGroup(groupId)
 
-    await audit(services.audit, 'groupDeleted', c.get('pubkey'), { groupId })
+    await audit(services.audit, 'groupDeleted', c.get('pubkey'), { groupId }, undefined, c.get('hubId') ?? null)
     return c.json({ ok: true })
   },
 )
@@ -328,7 +328,7 @@ contactsV2.post('/groups/:groupId/members',
     await audit(services.audit, 'groupMemberAdded', c.get('pubkey'), {
       groupId,
       contactId: body.contactId,
-    })
+    }, undefined, c.get('hubId') ?? null)
     return c.json(result, 201)
   },
 )
@@ -355,7 +355,7 @@ contactsV2.delete('/groups/:groupId/members/:contactId',
 
     const result = await services.contacts.removeMember(groupId, contactId)
 
-    await audit(services.audit, 'groupMemberRemoved', c.get('pubkey'), { groupId, contactId })
+    await audit(services.audit, 'groupMemberRemoved', c.get('pubkey'), { groupId, contactId }, undefined, c.get('hubId') ?? null)
     return c.json(result)
   },
 )
@@ -412,7 +412,7 @@ contactsV2.patch('/:id',
     const updated = await services.contacts.update(id, body)
     if (!updated) return c.json({ error: 'Contact not found' }, 404)
 
-    await audit(services.audit, 'contactUpdated', c.get('pubkey'), { contactId: id })
+    await audit(services.audit, 'contactUpdated', c.get('pubkey'), { contactId: id }, undefined, c.get('hubId') ?? null)
     return c.json(updated)
   },
 )
@@ -438,7 +438,7 @@ contactsV2.delete('/:id',
 
     await services.contacts.delete(id)
 
-    await audit(services.audit, 'contactDeleted', c.get('pubkey'), { contactId: id })
+    await audit(services.audit, 'contactDeleted', c.get('pubkey'), { contactId: id }, undefined, c.get('hubId') ?? null)
     return c.json({ ok: true })
   },
 )
@@ -479,7 +479,7 @@ contactsV2.post('/:id/relationships',
       contactIdA,
       contactIdB: body.contactIdB,
       relationshipType: body.relationshipType,
-    })
+    }, undefined, c.get('hubId') ?? null)
     return c.json(relationship, 201)
   },
 )
@@ -509,7 +509,7 @@ contactsV2.delete('/:id/relationships/:relId',
     await audit(services.audit, 'relationshipDeleted', c.get('pubkey'), {
       relationshipId: relId,
       contactId,
-    })
+    }, undefined, c.get('hubId') ?? null)
     return c.json({ ok: true })
   },
 )
@@ -631,7 +631,7 @@ contactsV2.post('/merge',
     await audit(services.audit, 'contactMerged', c.get('pubkey') ?? '', {
       primaryId: result.primaryId,
       secondaryId: result.secondaryId,
-    })
+    }, undefined, c.get('hubId') ?? null)
     return c.json(result)
   },
 )
@@ -661,7 +661,7 @@ contactsV2.post('/bulk',
     await audit(services.audit, 'contactBulkAction', c.get('pubkey') ?? '', {
       action: body.action,
       count: result.affected,
-    })
+    }, undefined, c.get('hubId') ?? null)
     return c.json(result)
   },
 )
@@ -688,7 +688,7 @@ contactsV2.post('/bulk-create',
 
     const result = await services.contacts.bulkCreate(hubId, batch)
 
-    await audit(services.audit, 'contactBulkCreate', c.get('pubkey') ?? '', { count: result.created })
+    await audit(services.audit, 'contactBulkCreate', c.get('pubkey') ?? '', { count: result.created }, undefined, c.get('hubId') ?? null)
     return c.json(result, 201)
   },
 )
