@@ -4,6 +4,8 @@ import { hashPhone } from '../../lib/crypto'
 import type { Env } from '../../types'
 import type { Services } from '../../services'
 import * as serviceFactories from '../../lib/service-factories'
+import { DEFAULT_ROLES } from '@shared/permissions'
+import type { Role } from '@shared/permissions'
 
 const TEST_HMAC_SECRET = 'a'.repeat(64)
 
@@ -58,6 +60,9 @@ function makeUser(overrides: {
   onBreak?: boolean
   callPreference?: string
   phone?: string | null
+  /** Global role ids. Default: the instance-wide volunteer role. */
+  roles?: string[]
+  hubRoles?: { hubId: string; roleIds: string[] }[]
 }) {
   return {
     pubkey: overrides.pubkey,
@@ -66,7 +71,8 @@ function makeUser(overrides: {
     onBreak: overrides.onBreak ?? false,
     callPreference: overrides.callPreference ?? 'phone',
     phone: 'phone' in overrides ? overrides.phone : '+15551234567',
-    roles: ['role-volunteer'],
+    roles: overrides.roles ?? ['role-volunteer'],
+    hubRoles: overrides.hubRoles ?? [],
   }
 }
 
@@ -90,6 +96,7 @@ function makeServices(overrides: {
     },
     settings: {
       getFallbackGroup: vi.fn().mockResolvedValue({ userPubkeys: fallbackPubkeys }),
+      getRoles: vi.fn().mockResolvedValue({ roles: DEFAULT_ROLES as unknown as Role[] }),
     },
     identity: {
       getUsers: vi.fn().mockResolvedValue({ users: allUsers }),
@@ -134,8 +141,72 @@ describe('startParallelRinging', () => {
 
     await startParallelRinging('CA-2', '+15551234567', 'http://localhost', makeEnv(), services, 'hub-1')
 
-    expect(services.settings.getFallbackGroup).toHaveBeenCalled()
+    // The hub's own group — not the instance-wide one (#1017).
+    expect(services.settings.getFallbackGroup).toHaveBeenCalledWith('hub-1')
     expect(services.calls.addCall).toHaveBeenCalled()
+  })
+
+  describe('hub membership (#1017)', () => {
+    it("rings the called hub's fallback group and nobody from another hub", async () => {
+      // hub-B's group is configured; the instance/hub-A group must never be consulted for it.
+      const services = makeServices({
+        onShiftPubkeys: [],
+        fallbackPubkeys: ['pk-hubB-fallback'],
+        allUsers: [
+          makeUser({ pubkey: 'pk-hubB-fallback', roles: [], hubRoles: [{ hubId: 'hub-B', roleIds: ['role-volunteer'] }] }),
+          makeUser({ pubkey: 'pk-hubA-only', roles: [], hubRoles: [{ hubId: 'hub-A', roleIds: ['role-volunteer'] }] }),
+        ],
+      })
+
+      const result = await startParallelRinging('CA-hb1', '+15551234567', 'http://localhost', makeEnv(), services, 'hub-B')
+
+      expect(services.settings.getFallbackGroup).toHaveBeenCalledWith('hub-B')
+      expect(result).toEqual({ ringing: true, volunteersNotified: 1 })
+      const rung = (services.calls.createCallToken as ReturnType<typeof vi.fn>).mock.calls.map(c => c[0].volunteerPubkey)
+      expect(rung).toEqual(['pk-hubB-fallback'])
+    })
+
+    it('does not ring a fallback volunteer who is not a member of the called hub', async () => {
+      const services = makeServices({
+        onShiftPubkeys: [],
+        fallbackPubkeys: ['pk-hubA-only'],
+        allUsers: [
+          makeUser({ pubkey: 'pk-hubA-only', roles: [], hubRoles: [{ hubId: 'hub-A', roleIds: ['role-volunteer'] }] }),
+        ],
+      })
+
+      const result = await startParallelRinging('CA-hb2', '+15551234567', 'http://localhost', makeEnv(), services, 'hub-B')
+
+      expect(result).toEqual({ ringing: false, reason: 'no-available-volunteers', volunteersNotified: 0 })
+      expect(services.calls.addCall).not.toHaveBeenCalled()
+      expect(mockAdapter.ringVolunteers).not.toHaveBeenCalled()
+    })
+
+    it('does not ring an on-shift entry whose user has left the hub', async () => {
+      const services = makeServices({
+        onShiftPubkeys: ['pk-left', 'pk-member'],
+        allUsers: [
+          makeUser({ pubkey: 'pk-left', roles: [], hubRoles: [] }),
+          makeUser({ pubkey: 'pk-member', roles: [], hubRoles: [{ hubId: 'hub-B', roleIds: ['role-volunteer'] }] }),
+        ],
+      })
+
+      const result = await startParallelRinging('CA-hb3', '+15551234567', 'http://localhost', makeEnv(), services, 'hub-B')
+
+      expect(result).toEqual({ ringing: true, volunteersNotified: 1 })
+    })
+
+    it('rings a super admin who has no hub-scoped role (all-hub access)', async () => {
+      const services = makeServices({
+        onShiftPubkeys: [],
+        fallbackPubkeys: ['pk-admin'],
+        allUsers: [makeUser({ pubkey: 'pk-admin', roles: ['role-super-admin'], hubRoles: [] })],
+      })
+
+      const result = await startParallelRinging('CA-hb4', '+15551234567', 'http://localhost', makeEnv(), services, 'hub-B')
+
+      expect(result).toEqual({ ringing: true, volunteersNotified: 1 })
+    })
   })
 
   it('rings the fallback group when everyone on shift is on break (#1055)', async () => {
