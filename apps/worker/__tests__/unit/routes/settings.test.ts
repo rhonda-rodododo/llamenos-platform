@@ -7,8 +7,14 @@ function createTestApp(opts: {
   permissions?: string[]
   pubkey?: string
   services?: Record<string, unknown>
+  /** Set when the request is routed under /hubs/:hubId (hubContext sets it). */
+  hubId?: string
+  /** Permissions granted only at hub scope (set by hubContext for hub members). */
+  hubPermissions?: string[]
 } = {}) {
   const {
+    hubId,
+    hubPermissions,
     permissions = ['*'],
     pubkey = 'test-pubkey-' + '0'.repeat(50),
     services = {},
@@ -76,6 +82,8 @@ function createTestApp(opts: {
     c.set('services', mergedServices as unknown as AppEnv['Variables']['services'])
     c.set('allRoles', [])
     c.set('requestId', 'test-req-1')
+    if (hubId) c.set('hubId', hubId)
+    if (hubPermissions) c.set('hubPermissions', hubPermissions)
     Object.defineProperty(c, 'executionCtx', {
       value: { waitUntil: vi.fn() },
       writable: true,
@@ -186,7 +194,37 @@ describe('settings route', () => {
         body: JSON.stringify({ voiceCaptchaEnabled: true }),
       })
       expect(res.status).toBe(200)
-      expect(updateSpy).toHaveBeenCalledWith(expect.objectContaining({ voiceCaptchaEnabled: true }))
+      expect(updateSpy).toHaveBeenCalledWith(expect.objectContaining({ voiceCaptchaEnabled: true }), undefined)
+    })
+
+    it('PATCH /spam under a hub writes that hub only, never the platform values (#1051)', async () => {
+      const updateSpy = vi.fn().mockResolvedValue({ voiceCaptchaEnabled: true })
+      const app = createTestApp({
+        permissions: [],
+        hubPermissions: ['settings:manage-spam'],
+        hubId: 'hub-a',
+        services: { settings: { updateSpamSettings: updateSpy } },
+      })
+      const res = await app.request('/spam?hubId=hub-b', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ voiceCaptchaEnabled: true }),
+      })
+      expect(res.status).toBe(200)
+      // hub context wins over a ?hubId= query aimed at another hub
+      expect(updateSpy).toHaveBeenCalledWith(expect.objectContaining({ voiceCaptchaEnabled: true }), 'hub-a')
+    })
+
+    it('GET /spam under a hub reads that hub', async () => {
+      const getSpy = vi.fn().mockResolvedValue({ voiceCaptchaEnabled: false })
+      const app = createTestApp({
+        permissions: ['settings:manage-spam'],
+        hubId: 'hub-a',
+        services: { settings: { getSpamSettings: getSpy } },
+      })
+      const res = await app.request('/spam')
+      expect(res.status).toBe(200)
+      expect(getSpy).toHaveBeenCalledWith('hub-a')
     })
   })
 
@@ -209,7 +247,23 @@ describe('settings route', () => {
         body: JSON.stringify({ queueTimeoutSeconds: 120 }),
       })
       expect(res.status).toBe(200)
-      expect(updateSpy).toHaveBeenCalledWith(expect.objectContaining({ queueTimeoutSeconds: 120 }))
+      expect(updateSpy).toHaveBeenCalledWith(expect.objectContaining({ queueTimeoutSeconds: 120 }), undefined)
+    })
+
+    it('PATCH /call under a hub writes that hub only (#1051)', async () => {
+      const updateSpy = vi.fn().mockResolvedValue({ queueTimeoutSeconds: 120 })
+      const app = createTestApp({
+        permissions: ['settings:manage-calls'],
+        hubId: 'hub-a',
+        services: { settings: { updateCallSettings: updateSpy } },
+      })
+      const res = await app.request('/call?hubId=hub-b', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ queueTimeoutSeconds: 120 }),
+      })
+      expect(res.status).toBe(200)
+      expect(updateSpy).toHaveBeenCalledWith(expect.objectContaining({ queueTimeoutSeconds: 120 }), 'hub-a')
     })
   })
 

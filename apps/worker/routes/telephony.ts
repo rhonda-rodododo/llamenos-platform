@@ -180,12 +180,15 @@ telephony.post('/language-selected',
     callerLanguage = languageFromDigit(digits, hubLanguages) ?? detectLanguageFromPhone(callerNumber)
   }
 
-  const spamSettings = await services.settings.getSpamSettings()
+  // Spam settings and the per-caller rate-limit window are per hub: a caller
+  // dialling hub A must not consume hub B's budget, and each hub's toggles
+  // apply only to its own calls.
+  const spamSettings = await services.settings.getSpamSettings(hubId)
 
   let rateLimited = false
   if (spamSettings.rateLimitEnabled) {
     const rlResult = await services.settings.checkRateLimit({
-      key: `phone:${hashPhone(callerNumber, c.env.HMAC_SECRET)}`,
+      key: `phone:${hubId ? `${hubId}:` : ''}${hashPhone(callerNumber, c.env.HMAC_SECRET)}`,
       maxPerMinute: spamSettings.maxCallsPerMinute,
     })
     rateLimited = rlResult.limited
@@ -385,7 +388,7 @@ telephony.all('/wait-music', validateWebhook, async (c) => {
     ? (await adapter.parseQueueWaitWebhook(c.req.raw)).queueTime
     : 0
   const audioUrls = await buildAudioUrlMap(services.settings, new URL(c.req.url).origin)
-  const callSettings = await services.settings.getCallSettings()
+  const callSettings = await services.settings.getCallSettings(hubId)
   const response = await adapter.handleWaitMusic(lang, audioUrls, queueTime, callSettings.queueTimeoutSeconds)
   return telephonyResponse(response)
 })
@@ -410,7 +413,7 @@ telephony.post('/queue-exit', validateWebhook, async (c) => {
   if (queueResult === 'leave' || queueResult === 'queue-full' || queueResult === 'error') {
     const audioUrls = await buildAudioUrlMap(services.settings, new URL(c.req.url).origin)
     const origin = new URL(c.req.url).origin
-    const callSettings = await services.settings.getCallSettings()
+    const callSettings = await services.settings.getCallSettings(hubId)
     const response = await adapter.handleVoicemail({
       callSid,
       callerLanguage: lang,

@@ -1,5 +1,5 @@
 import { safeFetch } from '../lib/safe-fetch'
-import { Hono } from 'hono'
+import { Hono, type Context } from 'hono'
 import { describeRoute, resolver, validator } from 'hono-openapi'
 import { z } from 'zod'
 import type { AppEnv } from '../types'
@@ -45,6 +45,17 @@ import { validateExternalUrlWithDns } from '../lib/ssrf-guard'
 import { getMessagingAdapterFromService } from '../lib/service-factories'
 
 const settings = new Hono<AppEnv>()
+
+/**
+ * Which hub a settings request targets. The hub the request was routed under
+ * (`/hubs/:hubId/settings/...`, membership-checked by hubContext) always wins —
+ * a `?hubId=` query must never redirect a hub-scoped request at another hub.
+ * The query is only honoured on the platform-mounted route, where the caller
+ * already needed the global permission. `undefined` = platform-wide values.
+ */
+function targetHubId(c: Context<AppEnv>): string | undefined {
+  return (c.get('hubId') as string | undefined) || c.req.query('hubId') || undefined
+}
 
 // --- Transcription settings: readable + writable by settings:manage-transcription ---
 settings.get('/transcription',
@@ -174,7 +185,7 @@ settings.get('/spam',
   requirePermission('settings:manage-spam'),
   async (c) => {
     const services = c.get('services')
-    const result = await services.settings.getSpamSettings()
+    const result = await services.settings.getSpamSettings(targetHubId(c))
     return c.json(result)
   },
 )
@@ -201,8 +212,9 @@ settings.patch('/spam',
     const pubkey = c.get('pubkey')
     const body = c.req.valid('json')
     const services = c.get('services')
-    const result = await services.settings.updateSpamSettings(body)
-    await audit(services.audit, 'spamMitigationToggled', pubkey, body as Record<string, unknown>)
+    const hubId = targetHubId(c)
+    const result = await services.settings.updateSpamSettings(body, hubId)
+    await audit(services.audit, 'spamMitigationToggled', pubkey, body as Record<string, unknown>, undefined, hubId)
     return c.json(result)
   },
 )
@@ -226,7 +238,7 @@ settings.get('/call',
   requirePermission('settings:manage-calls'),
   async (c) => {
     const services = c.get('services')
-    const result = await services.settings.getCallSettings()
+    const result = await services.settings.getCallSettings(targetHubId(c))
     return c.json(result)
   },
 )
@@ -253,8 +265,9 @@ settings.patch('/call',
     const pubkey = c.get('pubkey')
     const body = c.req.valid('json')
     const services = c.get('services')
-    const result = await services.settings.updateCallSettings(body)
-    await audit(services.audit, 'callSettingsUpdated', pubkey, body as Record<string, unknown>)
+    const hubId = targetHubId(c)
+    const result = await services.settings.updateCallSettings(body, hubId)
+    await audit(services.audit, 'callSettingsUpdated', pubkey, body as Record<string, unknown>, undefined, hubId)
     return c.json(result)
   },
 )
@@ -278,7 +291,7 @@ settings.get('/ivr-languages',
   requirePermission('settings:manage-ivr'),
   async (c) => {
     const services = c.get('services')
-    const hubId = c.req.query('hubId') || (c.get('hubId') as string | undefined)
+    const hubId = targetHubId(c)
     const result = await services.settings.getIvrLanguages(hubId)
     return c.json(result)
   },
@@ -306,7 +319,7 @@ settings.patch('/ivr-languages',
     const pubkey = c.get('pubkey')
     const body = c.req.valid('json')
     const services = c.get('services')
-    const hubId = c.req.query('hubId') || (c.get('hubId') as string | undefined)
+    const hubId = targetHubId(c)
     const result = await services.settings.updateIvrLanguages(body as Parameters<typeof services.settings.updateIvrLanguages>[0], hubId)
     await audit(services.audit, 'ivrLanguagesUpdated', pubkey, { ...(body as Record<string, unknown>), hubId })
     return c.json(result)

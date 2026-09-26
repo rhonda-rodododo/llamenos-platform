@@ -131,6 +131,19 @@ export class ServiceError extends Error {
 
 const SINGLETON_ID = 1
 
+/** Built-in defaults, used when neither the hub nor the platform has a value. */
+const DEFAULT_SPAM_SETTINGS: SpamSettings = {
+  voiceCaptchaEnabled: false,
+  rateLimitEnabled: true,
+  maxCallsPerMinute: 3,
+  blockDurationMinutes: 30,
+}
+
+const DEFAULT_CALL_SETTINGS: CallSettings = {
+  queueTimeoutSeconds: 90,
+  voicemailMaxSeconds: 120,
+}
+
 const VALID_PROMPT_TYPES = [
   'greeting',
   'pleaseHold',
@@ -245,12 +258,7 @@ export class SettingsService {
       await this.db
         .update(systemSettings)
         .set({
-          spamSettings: {
-            voiceCaptchaEnabled: false,
-            rateLimitEnabled: true,
-            maxCallsPerMinute: 3,
-            blockDurationMinutes: 30,
-          },
+          spamSettings: { ...DEFAULT_SPAM_SETTINGS },
         })
         .where(eq(systemSettings.id, SINGLETON_ID))
     }
@@ -261,10 +269,7 @@ export class SettingsService {
       await this.db
         .update(systemSettings)
         .set({
-          callSettings: {
-            queueTimeoutSeconds: 90,
-            voicemailMaxSeconds: 120,
-          },
+          callSettings: { ...DEFAULT_CALL_SETTINGS },
         })
         .where(eq(systemSettings.id, SINGLETON_ID))
     }
@@ -333,19 +338,40 @@ export class SettingsService {
   // Spam Settings
   // =========================================================================
 
-  async getSpamSettings(): Promise<SpamSettings> {
+  /**
+   * Effective spam settings. With a hubId: hub_settings.spamSettings (that hub's
+   * own overrides) layered over the platform values in system_settings, layered
+   * over the built-in defaults. Without a hubId: the platform values only.
+   */
+  async getSpamSettings(hubId?: string): Promise<SpamSettings> {
     const row = await getSettings(this.db)
-    return (row.spamSettings as SpamSettings) ?? {
-      voiceCaptchaEnabled: false,
-      rateLimitEnabled: true,
-      maxCallsPerMinute: 3,
-      blockDurationMinutes: 30,
+    const platform: SpamSettings = {
+      ...DEFAULT_SPAM_SETTINGS,
+      ...((row.spamSettings as Partial<SpamSettings> | null) ?? {}),
     }
+    if (!hubId) return platform
+    const hubOverrides = (await this.getHubSettings(hubId)).spamSettings as
+      | Partial<SpamSettings>
+      | undefined
+    return { ...platform, ...(hubOverrides ?? {}) }
   }
 
+  /**
+   * Update spam settings. With a hubId this writes ONLY that hub's overrides in
+   * hub_settings — it never touches the platform values other hubs inherit.
+   * Without a hubId it writes the platform values (platform admins only; the
+   * route enforces that by requiring the global permission).
+   */
   async updateSpamSettings(
     data: Partial<SpamSettings>,
+    hubId?: string,
   ): Promise<SpamSettings> {
+    if (hubId) {
+      const existing =
+        ((await this.getHubSettings(hubId)).spamSettings as Partial<SpamSettings> | undefined) ?? {}
+      await this.updateHubSettings(hubId, { spamSettings: { ...existing, ...data } })
+      return this.getSpamSettings(hubId)
+    }
     const current = await this.getSpamSettings()
     const updated = { ...current, ...data }
     await this.db
@@ -393,27 +419,45 @@ export class SettingsService {
   // Call Settings
   // =========================================================================
 
-  async getCallSettings(): Promise<CallSettings> {
+  /**
+   * Effective call settings. With a hubId: that hub's own overrides layered over
+   * the platform values, layered over the defaults. Without: platform values only.
+   */
+  async getCallSettings(hubId?: string): Promise<CallSettings> {
     const row = await getSettings(this.db)
-    const settings = row.callSettings as CallSettings | null
-    return settings ?? { queueTimeoutSeconds: 90, voicemailMaxSeconds: 120 }
+    const platform: CallSettings = {
+      ...DEFAULT_CALL_SETTINGS,
+      ...((row.callSettings as Partial<CallSettings> | null) ?? {}),
+    }
+    if (!hubId) return platform
+    const hubOverrides = (await this.getHubSettings(hubId)).callSettings as
+      | Partial<CallSettings>
+      | undefined
+    return { ...platform, ...(hubOverrides ?? {}) }
   }
 
+  /**
+   * Update call settings. With a hubId this writes ONLY that hub's overrides;
+   * without one it writes the platform values.
+   */
   async updateCallSettings(
     data: Partial<CallSettings>,
+    hubId?: string,
   ): Promise<CallSettings> {
-    const current = await this.getCallSettings()
     const clamp = (v: number) => Math.max(30, Math.min(300, v))
-    const updated: CallSettings = {
-      queueTimeoutSeconds:
-        data.queueTimeoutSeconds !== undefined
-          ? clamp(data.queueTimeoutSeconds)
-          : current.queueTimeoutSeconds,
-      voicemailMaxSeconds:
-        data.voicemailMaxSeconds !== undefined
-          ? clamp(data.voicemailMaxSeconds)
-          : current.voicemailMaxSeconds,
+    const clamped: Partial<CallSettings> = {}
+    if (data.queueTimeoutSeconds !== undefined)
+      clamped.queueTimeoutSeconds = clamp(data.queueTimeoutSeconds)
+    if (data.voicemailMaxSeconds !== undefined)
+      clamped.voicemailMaxSeconds = clamp(data.voicemailMaxSeconds)
+
+    if (hubId) {
+      const existing =
+        ((await this.getHubSettings(hubId)).callSettings as Partial<CallSettings> | undefined) ?? {}
+      await this.updateHubSettings(hubId, { callSettings: { ...existing, ...clamped } })
+      return this.getCallSettings(hubId)
     }
+    const updated: CallSettings = { ...(await this.getCallSettings()), ...clamped }
     await this.db
       .update(systemSettings)
       .set({ callSettings: updated })
