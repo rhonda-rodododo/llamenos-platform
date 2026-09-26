@@ -109,6 +109,41 @@ lefthook.yml                        @rhonda-rodododo
 .github/workflows/                  @rhonda-rodododo
 knope.toml                          @rhonda-rodododo
 
+# ─── Key generation, signing, installers, updater: under scripts/ ──────
+# scripts/ as a whole is the infra lane's to write (see
+# .claude/agents/fragments/infra-supervisor.md) — dev helpers, test runners
+# and CI glue merge on green like any other lane work. These entries are the
+# subset where one quiet edit compromises every install rather than one build,
+# so they need a human even though the lane may author them. Mirrored in
+# HIGH_IMPACT_PATHS (orchestrator/src/impact.ts); guards.test.ts fails if any
+# of them stops matching a tracked file or stops being owned here.
+#
+# Generates the admin keypair: a weakened RNG or a leaked key is a full
+# takeover of the hub, and nothing a revert can undo.
+scripts/bootstrap-admin.ts          @rhonda-rodododo
+# Release signing and promotion (sign-artifacts.sh, promote-release.sh,
+# fetch-staging.sh, verify-live.sh): decide which bytes get signed and what
+# ships as a release.
+scripts/release/                    @rhonda-rodododo
+# The full-disk-encrypted installer image: build-iso.sh and the image's own
+# contents (preseed, dropbear remote-unlock setup, late-command). Whatever is
+# in these files runs as root on every server installed from the ISO.
+scripts/build-iso.sh                @rhonda-rodododo
+scripts/iso-builder/                @rhonda-rodododo
+# Reproducible-build and ISO verification: the checks an operator runs to
+# confirm a release matches its source. A verifier that always passes is
+# worse than none.
+scripts/verify-build.sh             @rhonda-rodododo
+scripts/verify-iso.sh               @rhonda-rodododo
+# The desktop updater manifest decides what every installed desktop client
+# fetches and runs next — the single widest supply-chain surface we have.
+scripts/generate-update-manifest.sh @rhonda-rodododo
+scripts/generate-update-manifest.ts @rhonda-rodododo
+# Certificate pinning: which server keys the clients trust. A wrong pin is a
+# MITM that every client accepts.
+scripts/inject-cert-pins.ts         @rhonda-rodododo
+scripts/extract-cert-pins.sh        @rhonda-rodododo
+
 # ─── The fleet judging itself ──────────────────────────────────────────
 # Narrower than #615's blanket `tests/`, deliberately: every other test
 # directory is ordinary lane work and merges on green. A blanket `tests/`
