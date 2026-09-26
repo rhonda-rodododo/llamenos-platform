@@ -18,21 +18,31 @@ function isValidTimeFormat(time: string): boolean {
 
 /**
  * Check whether a shift is active right now given the current UTC day and time.
- * Handles overnight shifts (startTime > endTime) correctly.
+ *
+ * A shift belongs to the day it STARTS on. For an overnight shift
+ * (startTime >= endTime, e.g. Fri 22:00-06:00 with days=[5]) the part after
+ * midnight (Sat 00:00-06:00) is still that Friday shift, so it is active on
+ * the day AFTER a listed day while currentTime < endTime, and it is NOT active
+ * on a listed day before its startTime.
  */
-function isShiftActive(
+export function isShiftActive(
   shift: { startTime: string; endTime: string; days: number[] },
   currentDay: number,
   currentTime: string,
 ): boolean {
-  if (!shift.days.includes(currentDay)) return false
-
-  const startsBeforeEnds = shift.startTime < shift.endTime
-  if (startsBeforeEnds) {
-    return currentTime >= shift.startTime && currentTime < shift.endTime
+  if (shift.startTime < shift.endTime) {
+    return (
+      shift.days.includes(currentDay) &&
+      currentTime >= shift.startTime &&
+      currentTime < shift.endTime
+    )
   }
   // Crosses midnight: e.g., 22:00 - 06:00
-  return currentTime >= shift.startTime || currentTime < shift.endTime
+  const prevDay = (currentDay + 6) % 7
+  return (
+    (shift.days.includes(currentDay) && currentTime >= shift.startTime) ||
+    (shift.days.includes(prevDay) && currentTime < shift.endTime)
+  )
 }
 
 /** Format current UTC time as HH:MM */
