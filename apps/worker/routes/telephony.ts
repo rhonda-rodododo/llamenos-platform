@@ -28,10 +28,15 @@ const telephony = new Hono<AppEnv>()
 // Apply webhook auth middleware to all telephony webhook routes:
 // - Content-Type enforcement (form-encoded or JSON depending on provider)
 // - IP allowlisting (via TELEPHONY_WEBHOOK_IPS env var)
-// - Replay protection (PostgreSQL nonce tracking)
+// Replay protection is deliberately skipped here: it runs exactly once, in
+// validateWebhook, AFTER the provider signature check. Running it in both
+// places inserted the same nonce twice, so every webhook looked like a replay
+// of itself and was swallowed with a 200 "OK" (#1036). Running it before the
+// signature check would also let unsigned requests burn nonces.
 telephony.use('*', webhookAuth({
   provider: 'telephony',
   allowedContentTypes: ['application/x-www-form-urlencoded', 'application/json'],
+  skipReplay: true,
 }))
 
 /**
