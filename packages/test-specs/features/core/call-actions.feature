@@ -35,6 +35,17 @@ Feature: In-Call Quick Actions
     When volunteer 0 creates a note for the active call
     Then a note should exist linked to that call ID
 
+  @backend @calls @notes @audit
+  Scenario: Answering, noting and banning a call is recorded in the hub's audit log
+    And 1 volunteers are on shift
+    And an incoming call is ringing for the hub
+    When volunteer 0 answers the call through the hub API
+    And volunteer 0 creates a note for the active call
+    And volunteer 0 bans and hangs up the call
+    Then the hub audit log should contain a "callAnswered" entry
+    And the hub audit log should contain a "noteCreated" entry
+    And the hub audit log should contain a "numberBanned" entry
+
   @backend @calls @bans
   Scenario: Banned caller cannot call back
     And 2 volunteers are on shift

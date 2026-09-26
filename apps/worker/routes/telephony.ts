@@ -308,7 +308,7 @@ telephony.post('/user-answer',
   const callRecord = activeCallsForAnswer.find(call => call.callId === parentCallSid)
   await audit(services.audit, 'callAnswered', pubkey, {
     callerLast4: callRecord?.callerLast4 || '',
-  })
+  }, undefined, hubId || null)
 
   const origin = new URL(c.req.url).origin
   const response = await adapter.handleCallAnswered({ parentCallSid, callbackUrl: origin, userPubkey: pubkey, hubId })
@@ -366,7 +366,7 @@ telephony.post('/call-status',
         await audit(services.audit, 'callEnded', pubkey, {
           callerLast4: preCall?.callerLast4 || '',
           duration,
-        })
+        }, undefined, hubId ?? null)
       } catch {
         logger.debug('Call end result', { parentCallSid, status: 404 })
         // Already ended by /call-recording
@@ -406,7 +406,7 @@ telephony.post('/queue-exit', validateWebhook, async (c) => {
   if (queueResult === 'hangup') {
     // Caller hung up while in queue — end the call as unanswered
     try { await services.calls.endCall(hubId ?? '', callSid) } catch { /* already ended */ }
-    await audit(services.audit, 'callMissed', 'system', { callSid })
+    await audit(services.audit, 'callMissed', 'system', { callSid }, undefined, hubId ?? null)
     return telephonyResponse(adapter.emptyResponse())
   }
 
@@ -465,7 +465,7 @@ telephony.post('/call-recording', validateWebhook, async (c) => {
       if (pubkey) {
         await audit(services.audit, 'callEnded', pubkey, {
           callerLast4: callRecord?.callerLast4 || '',
-        })
+        }, undefined, hubId ?? null)
       }
     } catch {
       logger.info('Call recording completed', { parentCallSid, endStatus: 404 })
@@ -499,7 +499,7 @@ telephony.post('/voicemail-recording', validateWebhook, async (c) => {
       callId: callSid,
     }, hubId)
 
-    await audit(services.audit, 'voicemailReceived', 'system', { callSid }, { request: c.req.raw, hmacSecret: c.env.HMAC_SECRET })
+    await audit(services.audit, 'voicemailReceived', 'system', { callSid }, { request: c.req.raw, hmacSecret: c.env.HMAC_SECRET }, hubId ?? null)
 
     backgroundTask(c,transcribeVoicemail(callSid, c.env, services))
   }

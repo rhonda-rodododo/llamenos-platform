@@ -97,7 +97,7 @@ platformBans.post(
       services.audit,
       'platformBanCreated',
       pubkey,
-      { phoneHash },
+      { phoneHash }, undefined, null,
     )
     return c.json({ ok: true })
   },
@@ -147,7 +147,7 @@ platformBans.post(
     )
     await audit(services.audit, 'platformBanBulkImport', pubkey, {
       count: body.phones.length,
-    })
+    }, undefined, null)
     return c.json({ ok: true, count: added })
   },
 )
@@ -182,7 +182,7 @@ platformBans.delete(
 
     await audit(services.audit, 'platformBanRemoved', pubkey, {
       banId: id,
-    })
+    }, undefined, null)
     return c.json({ ok: true })
   },
 )
@@ -274,7 +274,7 @@ platformBans.post(
     await audit(services.audit, 'platformBanPromoted', pubkey, {
       sourceHubId: sourceBan.hubId,
       sourceBanId: sourceBan.id,
-    })
+    }, undefined, null)
 
     return c.json({ ok: true })
   },

@@ -105,7 +105,7 @@ settings.patch('/transcription',
     const body = c.req.valid('json')
     const services = c.get('services')
     const result = await services.settings.updateTranscriptionSettings(body)
-    await audit(services.audit, 'transcriptionToggled', pubkey, body as Record<string, unknown>)
+    await audit(services.audit, 'transcriptionToggled', pubkey, body as Record<string, unknown>, undefined, targetHubId(c) ?? null)
     return c.json(result)
   },
 )
@@ -160,7 +160,7 @@ settings.put('/custom-fields',
     const body = c.req.valid('json')
     const services = c.get('services')
     const result = await services.settings.updateCustomFields(body as unknown as Parameters<typeof services.settings.updateCustomFields>[0])
-    await audit(services.audit, 'customFieldsUpdated', pubkey, {})
+    await audit(services.audit, 'customFieldsUpdated', pubkey, {}, undefined, targetHubId(c) ?? null)
     return c.json(result)
   },
 )
@@ -214,7 +214,7 @@ settings.patch('/spam',
     const services = c.get('services')
     const hubId = targetHubId(c)
     const result = await services.settings.updateSpamSettings(body, hubId)
-    await audit(services.audit, 'spamMitigationToggled', pubkey, body as Record<string, unknown>, undefined, hubId)
+    await audit(services.audit, 'spamMitigationToggled', pubkey, body as Record<string, unknown>, undefined, hubId ?? null)
     return c.json(result)
   },
 )
@@ -267,7 +267,7 @@ settings.patch('/call',
     const services = c.get('services')
     const hubId = targetHubId(c)
     const result = await services.settings.updateCallSettings(body, hubId)
-    await audit(services.audit, 'callSettingsUpdated', pubkey, body as Record<string, unknown>, undefined, hubId)
+    await audit(services.audit, 'callSettingsUpdated', pubkey, body as Record<string, unknown>, undefined, hubId ?? null)
     return c.json(result)
   },
 )
@@ -321,7 +321,7 @@ settings.patch('/ivr-languages',
     const services = c.get('services')
     const hubId = targetHubId(c)
     const result = await services.settings.updateIvrLanguages(body as Parameters<typeof services.settings.updateIvrLanguages>[0], hubId)
-    await audit(services.audit, 'ivrLanguagesUpdated', pubkey, { ...(body as Record<string, unknown>), hubId })
+    await audit(services.audit, 'ivrLanguagesUpdated', pubkey, { ...(body as Record<string, unknown>), hubId }, undefined, targetHubId(c) ?? null)
     return c.json(result)
   },
 )
@@ -394,7 +394,7 @@ settings.patch('/webauthn',
       }
     }
     const result = await services.identity.updateWebAuthnSettings(body)
-    await audit(services.audit, 'webauthnSettingsUpdated', pubkey, body as Record<string, unknown>)
+    await audit(services.audit, 'webauthnSettingsUpdated', pubkey, body as Record<string, unknown>, undefined, targetHubId(c) ?? null)
     return c.json(result)
   },
 )
@@ -449,7 +449,7 @@ settings.patch('/telephony-provider',
     const body = c.req.valid('json')
     const services = c.get('services')
     const result = await services.settings.updateTelephonyProvider(body as Parameters<typeof services.settings.updateTelephonyProvider>[0])
-    await audit(services.audit, 'telephonyProviderChanged', pubkey, { type: body.type })
+    await audit(services.audit, 'telephonyProviderChanged', pubkey, { type: body.type }, undefined, targetHubId(c) ?? null)
     return c.json(result)
   },
 )
@@ -575,7 +575,7 @@ settings.patch('/messaging',
     const body = c.req.valid('json')
     const services = c.get('services')
     const result = await services.settings.updateMessagingConfig(body)
-    await audit(services.audit, 'messagingConfigUpdated', pubkey, body as Record<string, unknown>)
+    await audit(services.audit, 'messagingConfigUpdated', pubkey, body as Record<string, unknown>, undefined, targetHubId(c) ?? null)
     return c.json(result)
   },
 )
@@ -667,7 +667,7 @@ settings.patch('/setup',
     const body = c.req.valid('json')
     const services = c.get('services')
     const result = await services.settings.updateSetupState(body as Record<string, unknown> as Parameters<typeof services.settings.updateSetupState>[0])
-    await audit(services.audit, 'setupStateUpdated', pubkey, body as Record<string, unknown>)
+    await audit(services.audit, 'setupStateUpdated', pubkey, body as Record<string, unknown>, undefined, targetHubId(c) ?? null)
     return c.json(result)
   },
 )
@@ -723,7 +723,7 @@ settings.put('/ivr-audio/:promptType/:language',
     const bytes = new Uint8Array(body)
     const audioBase64 = btoa(String.fromCharCode(...bytes))
     const result = await services.settings.uploadIvrAudio(promptType, language, audioBase64, body.byteLength)
-    await audit(services.audit, 'ivrAudioUploaded', pubkey, { promptType, language })
+    await audit(services.audit, 'ivrAudioUploaded', pubkey, { promptType, language }, undefined, targetHubId(c) ?? null)
     return c.json(result)
   },
 )
@@ -751,7 +751,7 @@ settings.delete('/ivr-audio/:promptType/:language',
     const language = c.req.param('language')
     const services = c.get('services')
     const result = await services.settings.deleteIvrAudio(promptType, language)
-    await audit(services.audit, 'ivrAudioDeleted', pubkey, { promptType, language })
+    await audit(services.audit, 'ivrAudioDeleted', pubkey, { promptType, language }, undefined, targetHubId(c) ?? null)
     return c.json(result)
   },
 )
@@ -804,7 +804,7 @@ settings.post('/report-types',
     const body = c.req.valid('json')
     const services = c.get('services')
     const result = await services.settings.createReportType(body as Record<string, unknown> as Parameters<typeof services.settings.createReportType>[0])
-    await audit(services.audit, 'reportTypeCreated', pubkey, { name: body.name })
+    await audit(services.audit, 'reportTypeCreated', pubkey, { name: body.name }, undefined, targetHubId(c) ?? null)
     return c.json(result, 201)
   },
 )
@@ -833,7 +833,7 @@ settings.patch('/report-types/:id',
     const body = c.req.valid('json')
     const services = c.get('services')
     const result = await services.settings.updateReportType(id, body as Record<string, unknown> as Parameters<typeof services.settings.updateReportType>[1])
-    await audit(services.audit, 'reportTypeUpdated', pubkey, { reportTypeId: id })
+    await audit(services.audit, 'reportTypeUpdated', pubkey, { reportTypeId: id }, undefined, targetHubId(c) ?? null)
     return c.json(result)
   },
 )
@@ -860,7 +860,7 @@ settings.delete('/report-types/:id',
     const id = c.req.param('id')
     const services = c.get('services')
     const result = await services.settings.archiveReportType(id)
-    await audit(services.audit, 'reportTypeArchived', pubkey, { reportTypeId: id })
+    await audit(services.audit, 'reportTypeArchived', pubkey, { reportTypeId: id }, undefined, targetHubId(c) ?? null)
     return c.json(result)
   },
 )
@@ -914,7 +914,7 @@ settings.post('/roles',
     const services = c.get('services')
     const result = await services.settings.createRole(body)
     invalidateRolesCache()
-    await audit(services.audit, 'roleCreated', pubkey, { name: body.name })
+    await audit(services.audit, 'roleCreated', pubkey, { name: body.name }, undefined, targetHubId(c) ?? null)
     return c.json(result, 201)
   },
 )
@@ -944,7 +944,7 @@ settings.patch('/roles/:id',
     const services = c.get('services')
     const result = await services.settings.updateRole(id, body)
     invalidateRolesCache()
-    await audit(services.audit, 'roleUpdated', pubkey, { roleId: id })
+    await audit(services.audit, 'roleUpdated', pubkey, { roleId: id }, undefined, targetHubId(c) ?? null)
     return c.json(result)
   },
 )
@@ -972,7 +972,7 @@ settings.delete('/roles/:id',
     const services = c.get('services')
     const result = await services.settings.deleteRole(id)
     invalidateRolesCache()
-    await audit(services.audit, 'roleDeleted', pubkey, { roleId: id })
+    await audit(services.audit, 'roleDeleted', pubkey, { roleId: id }, undefined, targetHubId(c) ?? null)
     return c.json(result)
   },
 )
@@ -1002,7 +1002,7 @@ settings.post('/roles/:id/envelopes',
     const services = c.get('services')
     const result = await services.settings.addRoleEnvelopes(id, body.envelopes)
     invalidateRolesCache()
-    await audit(services.audit, 'roleEnvelopesUpdated', pubkey, { roleId: id, count: body.envelopes.length })
+    await audit(services.audit, 'roleEnvelopesUpdated', pubkey, { roleId: id, count: body.envelopes.length }, undefined, targetHubId(c) ?? null)
     return c.json(result)
   },
 )
@@ -1136,7 +1136,7 @@ settings.patch('/ttl',
     const body = c.req.valid('json')
     const services = c.get('services')
     const result = await services.settings.updateTTLOverrides(body as Record<string, unknown>)
-    await audit(services.audit, 'ttlOverridesUpdated', pubkey, body as Record<string, unknown>)
+    await audit(services.audit, 'ttlOverridesUpdated', pubkey, body as Record<string, unknown>, undefined, targetHubId(c) ?? null)
     return c.json(result)
   },
 )
@@ -1203,7 +1203,7 @@ settings.put('/geocoding',
     const pubkey = c.get('pubkey')
     const services = c.get('services')
     await services.settings.updateGeocodingConfig(body)
-    await audit(services.audit, 'settings.geocoding.updated', pubkey, { provider: body.provider, enabled: body.enabled })
+    await audit(services.audit, 'settings.geocoding.updated', pubkey, { provider: body.provider, enabled: body.enabled }, undefined, targetHubId(c) ?? null)
     return c.json({ provider: body.provider, countries: body.countries, enabled: body.enabled })
   },
 )

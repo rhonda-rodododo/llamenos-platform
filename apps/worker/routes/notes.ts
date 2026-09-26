@@ -98,7 +98,7 @@ notes.post('/',
       adminEnvelopes: body.adminEnvelopes,
     })
 
-    await audit(services.audit, 'noteCreated', pubkey, { callId: body.callId, conversationId: body.conversationId })
+    await audit(services.audit, 'noteCreated', pubkey, { callId: body.callId, conversationId: body.conversationId }, undefined, note.hubId ?? null)
 
     // Auto-create interaction linking note to case (Epic 323)
     const { caseId, interactionTypeHash } = body
@@ -146,7 +146,7 @@ notes.patch('/:id',
       adminEnvelopes: body.adminEnvelopes,
     })
 
-    await audit(services.audit, 'noteEdited', pubkey, { noteId: id })
+    await audit(services.audit, 'noteEdited', pubkey, { noteId: id }, undefined, updated.hubId ?? null)
     return c.json({ note: updated })
   },
 )
@@ -208,7 +208,8 @@ notes.post('/:id/replies',
       authorPubkey: pubkey,
     })
 
-    await audit(services.audit, 'noteReplyCreated', pubkey, { noteId: id })
+    const parentNote = await services.records.getNote(id)
+    await audit(services.audit, 'noteReplyCreated', pubkey, { noteId: id }, undefined, parentNote.hubId ?? null)
     return c.json({ reply }, 201)
   },
 )

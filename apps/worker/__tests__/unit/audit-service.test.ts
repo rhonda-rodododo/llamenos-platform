@@ -329,13 +329,13 @@ describe('audit() helper', () => {
     const auditService = { log: vi.fn().mockResolvedValue(undefined) } as any
     const pubkey = 'a'.repeat(64)
 
-    await audit(auditService, 'login', pubkey, { foo: 'bar' })
+    await audit(auditService, 'login', pubkey, { foo: 'bar' }, undefined, null)
 
     expect(auditService.log).toHaveBeenCalledWith(
       'login',
       pubkey,
       expect.objectContaining({ foo: 'bar' }),
-      undefined,
+      null,
     )
   })
 
@@ -346,7 +346,7 @@ describe('audit() helper', () => {
       headers: { 'CF-Connecting-IP': '1.2.3.4' },
     })
 
-    await audit(auditService, 'login', pubkey, {}, { request, hmacSecret: TEST_HMAC_SECRET })
+    await audit(auditService, 'login', pubkey, {}, { request, hmacSecret: TEST_HMAC_SECRET }, null)
 
     const callDetails = auditService.log.mock.calls[0][2]
     // IP should be hashed (not raw)
@@ -374,7 +374,7 @@ describe('audit() helper', () => {
     const pubkey = 'a'.repeat(64)
     const request = new Request('https://example.com')
 
-    await audit(auditService, 'login', pubkey, {}, { request, hmacSecret: TEST_HMAC_SECRET })
+    await audit(auditService, 'login', pubkey, {}, { request, hmacSecret: TEST_HMAC_SECRET }, null)
 
     const callDetails = auditService.log.mock.calls[0][2]
     expect(callDetails.ip).toBeNull()

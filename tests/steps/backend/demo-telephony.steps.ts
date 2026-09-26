@@ -113,6 +113,15 @@ Then('the simulated call should have notified {int} volunteers', async ({ world 
   expect(data.volunteersNotified).toBe(count)
 })
 
+Then('the hub audit log should contain a {string} entry', async ({ request, world }, action: string) => {
+  const { hubId } = getScenarioState(world)
+  const { entries } = await listAuditLogViaApi(request, { hubId, limit: 100 })
+  expect(
+    entries.some(e => e.action === action),
+    `expected a ${action} entry in the hub audit log, got: ${entries.map(e => e.action).join(', ')}`,
+  ).toBe(true)
+})
+
 Then('the audit log should record the simulated call', async ({ request, world }) => {
   const state = getScenarioState(world)
   expect(state.callId).toBeTruthy()

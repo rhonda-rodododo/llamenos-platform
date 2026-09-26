@@ -73,7 +73,7 @@ setup.patch('/state', requirePermission('settings:manage-setup'),
     const body = c.req.valid('json')
     const services = c.get('services')
     const result = await services.settings.updateSetupState(body as Record<string, unknown> as Parameters<typeof services.settings.updateSetupState>[0])
-    await audit(services.audit, 'setupStateUpdated', pubkey, body as Record<string, unknown>)
+    await audit(services.audit, 'setupStateUpdated', pubkey, body as Record<string, unknown>, undefined, null)
     return c.json(result)
   })
 
@@ -126,7 +126,7 @@ setup.post('/complete', requirePermission('settings:manage-setup'),
 
     const result = await services.settings.updateSetupState({ setupCompleted: true, demoMode: body.demoMode ?? false })
 
-    await audit(services.audit, 'setupCompleted', pubkey, { demoMode: body.demoMode ?? false })
+    await audit(services.audit, 'setupCompleted', pubkey, { demoMode: body.demoMode ?? false }, undefined, null)
     return c.json(result)
   })
 
@@ -256,7 +256,7 @@ setup.post('/signal/register', requirePermission('settings:manage-messaging'),
     await audit(services.audit, 'signalRegistrationStarted', c.get('user').pubkey, {
       numberLast4: body.phoneNumber.slice(-4),
       step: result.step,
-    })
+    }, undefined, null)
 
     return c.json(result)
   })
@@ -299,7 +299,7 @@ setup.post('/signal/verify', requirePermission('settings:manage-messaging'),
     await audit(services.audit, 'signalRegistrationVerified', c.get('user').pubkey, {
       numberLast4: body.phoneNumber.slice(-4),
       step: result.step,
-    })
+    }, undefined, null)
 
     return c.json(result)
   })
@@ -342,7 +342,7 @@ setup.post('/signal/unregister', requirePermission('settings:manage-messaging'),
     await audit(services.audit, 'signalNumberUnregistered', c.get('user').pubkey, {
       numberLast4: body.registeredNumber.slice(-4),
       success: result.success,
-    })
+    }, undefined, null)
 
     return c.json({ ok: result.success, error: result.error })
   })

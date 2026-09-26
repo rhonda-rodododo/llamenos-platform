@@ -162,7 +162,7 @@ retention.patch(
 
     await audit(services.audit, 'retentionFloorsUpdated', pubkey, {
       floors: body.floors,
-    })
+    }, undefined, c.get('hubId') ?? null)
 
     const floors = await services.retention.getFloors()
     return c.json({

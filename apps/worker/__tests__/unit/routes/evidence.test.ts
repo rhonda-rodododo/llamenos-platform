@@ -167,7 +167,7 @@ describe('POST /records/:id/evidence', () => {
       'evidenceAccessDenied',
       expect.any(String),
       expect.objectContaining({ required: ['evidence:upload'] }),
-      undefined,
+      null,
     )
   })
 
@@ -243,7 +243,7 @@ describe('GET /records/:id/evidence', () => {
       'evidenceAccessed',
       expect.any(String),
       expect.objectContaining({ caseId: 'case-1', action: 'list_viewed' }),
-      undefined,
+      null,
     )
   })
 })
@@ -289,7 +289,7 @@ describe('GET /evidence/:evidenceId', () => {
       'evidenceAccessed',
       expect.any(String),
       expect.objectContaining({ evidenceId: 'ev-1', action: 'metadata_read' }),
-      undefined,
+      null,
     )
   })
 
@@ -302,7 +302,7 @@ describe('GET /evidence/:evidenceId', () => {
       'evidenceAccessDenied',
       expect.any(String),
       expect.objectContaining({ required: ['evidence:download', 'evidence:manage-custody'] }),
-      undefined,
+      null,
     )
   })
 
@@ -356,7 +356,7 @@ describe('GET /evidence/:evidenceId/custody', () => {
       'evidenceAccessed',
       expect.any(String),
       expect.objectContaining({ evidenceId: 'ev-1', action: 'custody_viewed' }),
-      undefined,
+      null,
     )
   })
 
@@ -369,7 +369,7 @@ describe('GET /evidence/:evidenceId/custody', () => {
       'evidenceAccessDenied',
       expect.any(String),
       expect.objectContaining({ required: ['evidence:manage-custody'] }),
-      undefined,
+      null,
     )
   })
 })
@@ -411,7 +411,7 @@ describe('GET /evidence/:evidenceId/access-log', () => {
       'evidenceAccessDenied',
       expect.any(String),
       expect.objectContaining({ required: ['audit:read'] }),
-      undefined,
+      null,
     )
   })
 })

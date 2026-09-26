@@ -115,7 +115,7 @@ signal.post('/identities/trust',
       await audit(services.audit, 'signalIdentityTrustChanged', user.pubkey, {
         uuid: uuid.slice(0, 8),
         trustLevel,
-      })
+      }, undefined, c.get('hubId') ?? null)
     }
 
     return c.json({ success })
@@ -187,7 +187,7 @@ signal.post('/queue/retry/:id',
 
     if (success) {
       const user = c.get('user')
-      await audit(services.audit, 'signalQueueMessageRetried', user.pubkey, { messageId })
+      await audit(services.audit, 'signalQueueMessageRetried', user.pubkey, { messageId }, undefined, c.get('hubId') ?? null)
     }
 
     return c.json({ success })

@@ -303,7 +303,7 @@ messaging.post('/:channel/webhook',
     audit(services.audit, 'messageReceived', 'system', {
       channel,
       senderHash: incoming.senderIdentifierHash,
-    })
+    }, undefined, hubId ?? null)
   )
 
   // Return 200 to acknowledge webhook (providers expect fast acknowledgment)
