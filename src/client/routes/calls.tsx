@@ -14,11 +14,25 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { RecordingPlayer } from '@/components/recording-player'
 
+/** Status filter applied to the call history list. Empty string means "All". */
+type CallStatusFilter = '' | 'completed' | 'unanswered'
+
+const STATUS_FILTERS: ReadonlyArray<{ value: CallStatusFilter; testId: string; labelKey: 'common.all' | 'callHistory.filterCompleted' | 'callHistory.filterUnanswered' }> = [
+  { value: '', testId: 'call-filter-all', labelKey: 'common.all' },
+  { value: 'completed', testId: 'call-filter-completed', labelKey: 'callHistory.filterCompleted' },
+  { value: 'unanswered', testId: 'call-filter-unanswered', labelKey: 'callHistory.filterUnanswered' },
+]
+
+function parseStatusFilter(value: unknown): CallStatusFilter {
+  return value === 'completed' || value === 'unanswered' ? value : ''
+}
+
 type CallsSearch = {
   page: number
   q: string
   dateFrom: string
   dateTo: string
+  status: CallStatusFilter
 }
 
 export const Route = createFileRoute('/calls')({
@@ -27,6 +41,7 @@ export const Route = createFileRoute('/calls')({
     q: (search?.q as string) || '',
     dateFrom: (search?.dateFrom as string) || '',
     dateTo: (search?.dateTo as string) || '',
+    status: parseStatusFilter(search?.status),
   }),
   component: CallHistoryPage,
 })
@@ -36,7 +51,7 @@ function CallHistoryPage() {
   const { isAdmin, hasDeviceKey, publicKey } = useAuth()
   const { toast } = useToast()
   const navigate = useNavigate({ from: '/calls' })
-  const { page, q, dateFrom, dateTo } = Route.useSearch()
+  const { page, q, dateFrom, dateTo, status } = Route.useSearch()
   const [calls, setCalls] = useState<CallRecord[]>([])
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
@@ -55,11 +70,12 @@ function CallHistoryPage() {
       search: q || undefined,
       dateFrom: dateFrom || undefined,
       dateTo: dateTo || undefined,
+      status: status || undefined,
     })
       .then(r => { setCalls(r.calls); setTotal(r.total) })
       .catch(() => toast(t('common.error'), 'error'))
       .finally(() => setLoading(false))
-  }, [page, q, dateFrom, dateTo])
+  }, [page, q, dateFrom, dateTo, status])
 
   useEffect(() => {
     fetchCalls()
@@ -101,7 +117,7 @@ function CallHistoryPage() {
   function handleSearch(e: React.FormEvent) {
     e.preventDefault()
     navigate({
-      search: { page: 1, q: searchInput, dateFrom: dateFromInput, dateTo: dateToInput },
+      search: { page: 1, q: searchInput, dateFrom: dateFromInput, dateTo: dateToInput, status },
     })
   }
 
@@ -109,20 +125,27 @@ function CallHistoryPage() {
     setSearchInput('')
     setDateFromInput('')
     setDateToInput('')
-    navigate({ search: { page: 1, q: '', dateFrom: '', dateTo: '' } })
+    navigate({ search: { page: 1, q: '', dateFrom: '', dateTo: '', status: '' } })
+  }
+
+  function setStatusFilter(next: CallStatusFilter) {
+    navigate({ search: (prev) => ({ ...prev, page: 1, status: next }) })
   }
 
   function setPage(newPage: number) {
     navigate({ search: (prev) => ({ ...prev, page: newPage }) })
   }
 
-  const hasFilters = q || dateFrom || dateTo
+  const hasFilters = q || dateFrom || dateTo || status
 
   if (!isAdmin) {
     return <div className="text-muted-foreground">{t('common.accessDenied')}</div>
   }
 
   const totalPages = Math.ceil(total / limit)
+  // The status filter is sent to the API; rows are also matched here so the list stays
+  // correct against a server that does not filter by status yet.
+  const visibleCalls = status ? calls.filter(c => c.status === status) : calls
 
   function formatDuration(seconds: number) {
     const m = Math.floor(seconds / 60)
@@ -188,6 +211,22 @@ function CallHistoryPage() {
         </CardContent>
       </Card>
 
+      <div data-testid="call-status-filters" role="group" className="flex flex-wrap gap-2">
+        {STATUS_FILTERS.map(f => (
+          <Button
+            key={f.testId}
+            data-testid={f.testId}
+            type="button"
+            size="sm"
+            variant={status === f.value ? 'default' : 'outline'}
+            aria-pressed={status === f.value}
+            onClick={() => setStatusFilter(f.value)}
+          >
+            {t(f.labelKey)}
+          </Button>
+        ))}
+      </div>
+
       <Card>
         <CardContent className="p-0">
           {loading ? (
@@ -201,15 +240,15 @@ function CallHistoryPage() {
                 </div>
               ))}
             </div>
-          ) : calls.length === 0 ? (
+          ) : visibleCalls.length === 0 ? (
             <div data-testid="empty-state" className="py-8 text-center text-muted-foreground">
               <PhoneIncoming className="mx-auto mb-2 h-8 w-8 opacity-40" />
               {hasFilters ? t('callHistory.noResults') : t('callHistory.noCalls')}
             </div>
           ) : (
             <div data-testid="call-list" className="divide-y divide-border">
-              {calls.map(call => (
-                <div key={call.id} data-testid="call-row" className="flex flex-wrap items-center gap-3 px-4 py-3 sm:px-6">
+              {visibleCalls.map(call => (
+                <div key={call.id} data-testid="call-row" data-call-status={call.status} className="flex flex-wrap items-center gap-3 px-4 py-3 sm:px-6">
                   <div className="min-w-0 flex-1 sm:flex-none sm:w-48">
                     {call.status === 'unanswered' ? (
                       <div className="flex items-center gap-1.5">
@@ -265,6 +304,7 @@ function CallHistoryPage() {
                     {new Date(call.startedAt).toLocaleString()}
                   </span>
                   <Link
+                    data-testid="call-notes-link"
                     to="/notes"
                     search={{ page: 1, callId: call.id, search: '' }}
                     className="text-xs text-primary hover:underline flex items-center gap-1"
