@@ -32,11 +32,13 @@ export async function startParallelRinging(
   try {
     // Get on-shift volunteers
     let onShiftPubkeys = await services.shifts.getCurrentVolunteers(hubId)
+    let usedFallback = false
 
-    // If no one is on shift, use fallback group
+    // If no one is on shift, use the hub's fallback group
     if (onShiftPubkeys.length === 0) {
-      const fallback = await services.settings.getFallbackGroup()
+      const fallback = await services.settings.getFallbackGroup(hubId)
       onShiftPubkeys = fallback.userPubkeys
+      usedFallback = true
     }
 
     logger.info('Parallel ringing started', { callSid, onShiftCount: onShiftPubkeys.length })
@@ -49,9 +51,25 @@ export async function startParallelRinging(
     // Get user details (including call preference)
     const { users: allUsers } = await services.identity.getUsers()
 
+    // Availability rules: a volunteer must be active and not on break.
+    const pickAvailable = (pubkeys: string[]) =>
+      allUsers.filter(v => pubkeys.includes(v.pubkey) && v.active && !v.onBreak)
+
     // All available on-shift users (for Nostr relay notification)
-    const available = allUsers
-      .filter(v => onShiftPubkeys.includes(v.pubkey) && v.active && !v.onBreak)
+    let available = pickAvailable(onShiftPubkeys)
+
+    // Everyone on shift is unavailable (inactive / on break) — try the fallback
+    // group with the same availability rules before giving up. The fallback is
+    // meant for exactly this case, not only for an empty roster.
+    if (available.length === 0 && !usedFallback) {
+      const fallback = await services.settings.getFallbackGroup(hubId)
+      available = pickAvailable(fallback.userPubkeys)
+      logger.info('On-shift volunteers unavailable — tried fallback group', {
+        callSid,
+        fallbackCount: fallback.userPubkeys.length,
+        fallbackAvailable: available.length,
+      })
+    }
 
     // Only ring phones for volunteers with phone or both preference (and who have a phone number)
     const toRingPhone = available
@@ -68,7 +86,8 @@ export async function startParallelRinging(
     })
 
     if (available.length === 0) {
-      logger.info('No available volunteers — skipping')
+      // A caller is waiting with no one to answer — this must be loud.
+      logger.error('No available volunteers on shift or in fallback group — caller will get no answer', { callSid, hubId })
       return { ringing: false, reason: 'no-available-volunteers', volunteersNotified: 0 }
     }
 

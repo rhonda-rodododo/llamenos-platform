@@ -134,6 +134,54 @@ describe('startParallelRinging', () => {
     expect(services.calls.addCall).toHaveBeenCalled()
   })
 
+  it('rings the fallback group when everyone on shift is on break (#1055)', async () => {
+    const services = makeServices({
+      onShiftPubkeys: ['pk-break'],
+      fallbackPubkeys: ['pk-fallback'],
+      allUsers: [
+        makeUser({ pubkey: 'pk-break', onBreak: true }),
+        makeUser({ pubkey: 'pk-fallback', phone: '+15559999999' }),
+      ],
+    })
+
+    const result = await startParallelRinging('CA-fb1', '+15551234567', 'http://localhost', makeEnv(), services, 'hub-1')
+
+    expect(services.settings.getFallbackGroup).toHaveBeenCalledWith('hub-1')
+    expect(result).toEqual({ ringing: true, volunteersNotified: 1 })
+    const tokenArgs = (services.calls.createCallToken as ReturnType<typeof vi.fn>).mock.calls.map(c => c[0].volunteerPubkey)
+    expect(tokenArgs).toEqual(['pk-fallback'])
+  })
+
+  it('applies the same availability rules to the fallback group', async () => {
+    const services = makeServices({
+      onShiftPubkeys: ['pk-break'],
+      fallbackPubkeys: ['pk-fb-break', 'pk-fb-inactive'],
+      allUsers: [
+        makeUser({ pubkey: 'pk-break', onBreak: true }),
+        makeUser({ pubkey: 'pk-fb-break', onBreak: true }),
+        makeUser({ pubkey: 'pk-fb-inactive', active: false }),
+      ],
+    })
+
+    const result = await startParallelRinging('CA-fb2', '+15551234567', 'http://localhost', makeEnv(), services, 'hub-1')
+
+    expect(result).toEqual({ ringing: false, reason: 'no-available-volunteers', volunteersNotified: 0 })
+    expect(services.calls.addCall).not.toHaveBeenCalled()
+  })
+
+  it('does not consult the fallback group when an on-shift volunteer is available', async () => {
+    const services = makeServices({
+      onShiftPubkeys: ['pk-1'],
+      fallbackPubkeys: ['pk-fallback'],
+      allUsers: [makeUser({ pubkey: 'pk-1' }), makeUser({ pubkey: 'pk-fallback' })],
+    })
+
+    await startParallelRinging('CA-fb3', '+15551234567', 'http://localhost', makeEnv(), services, 'hub-1')
+
+    expect(services.settings.getFallbackGroup).not.toHaveBeenCalled()
+    expect(mockAdapter.ringVolunteers.mock.calls[0][0].volunteers).toHaveLength(1)
+  })
+
   it('filters out inactive volunteers', async () => {
     const services = makeServices({
       onShiftPubkeys: ['pk-active', 'pk-inactive'],

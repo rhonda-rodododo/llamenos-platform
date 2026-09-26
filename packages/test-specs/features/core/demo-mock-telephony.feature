@@ -47,6 +47,29 @@ Feature: Demo mock telephony
     When the admin simulates an incoming call
     Then the response status should be 422
 
+  # The ring outcome (volunteersNotified) is server state: the count of volunteers the ringing
+  # service actually selected, not anything the test remembers. See #1055.
+  @backend @demo-mode @calls
+  Scenario: The fallback group rings when everyone on shift is on break
+    Given 1 volunteers are on shift
+    And every on-shift volunteer is on break
+    And a volunteer who is not on shift is in the hub fallback group
+    And the hub uses the mock telephony provider
+    When the admin simulates an incoming call
+    Then the response status should be 200
+    And the simulated call should have notified 1 volunteers
+    And the call status should be "ringing"
+
+  @backend @demo-mode @calls
+  Scenario: Nothing rings when everyone on shift and in the fallback group is on break
+    Given 1 volunteers are on shift
+    And every on-shift volunteer is on break
+    And a volunteer who is not on shift is in the hub fallback group
+    And the fallback volunteer is on break
+    And the hub uses the mock telephony provider
+    When the admin simulates an incoming call
+    Then the response status should be 422
+
   @backend @demo-mode @calls
   Scenario: A hub that has not selected the mock cannot be simulated against
     Given 1 volunteers are on shift
