@@ -52,6 +52,31 @@ Given(
   },
 )
 
+Given('an incoming call is ringing for the hub', async ({ request, world }) => {
+  const state = getScenarioState(world)
+  const { callId } = await simulateIncomingCall(request, { callerNumber: uniqueCallerNumber(), hubId: state.hubId })
+  state.callId = callId
+})
+
+// Answers through the real hub-scoped REST endpoint (the in-app answer path),
+// not the simulation shortcut — so the route's own audit entry is exercised.
+When(
+  'volunteer {int} answers the call through the hub API',
+  async ({ request, world }, volIndex: number) => {
+    const state = getScenarioState(world)
+    expect(state.callId).toBeTruthy()
+    const res = await apiPost(
+      request,
+      `/hubs/${state.hubId}/calls/${state.callId}/answer`,
+      {},
+      state.volunteers[volIndex].deviceKey,
+    )
+    state.lastApiResponse = res
+    setLastResponse(world, res)
+    expect(res.status).toBe(200)
+  },
+)
+
 // ── Ban + Hangup Actions ─────────────────────────────────────────
 
 When(
@@ -111,7 +136,7 @@ When(
     expect(state.callId).toBeTruthy()
     const res = await apiPost(
       request,
-      '/notes',
+      `/hubs/${state.hubId}/notes`,
       {
         callId: state.callId,
         encryptedContent: (await encryptForTest('bdd test note for active call', [state.volunteers[volIndex].deviceKey])).encryptedContent,

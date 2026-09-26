@@ -104,7 +104,7 @@ When('the volunteer answers the call', async ({ request, world }) => {
 When('the volunteer writes a note for the call', async ({ request, world }) => {
   const { data, status } = await apiPost<{ id?: string; note?: { id: string } }>(
     request,
-    '/notes',
+    `/hubs/${getScenarioState(world).hubId}/notes`,
     {
       encryptedContent: 'xdo-test-note',
       callId: getCrossDoState(world).callId,
@@ -136,14 +136,14 @@ Then('the notes list should contain the volunteer\'s note', async ({request, wor
   expect(notes.length).toBeGreaterThan(0)
 })
 
-Then('the audit log should have entries for each step', async ({request, world: _world}) => {
-  // 'userAdded' and 'noteCreated' are logged without hub scope (global events).
-  // Query without hubId to find them; hub-scoped entries (shifts, bans) will also appear.
-  const { entries } = await listAuditLogViaApi(request)
-  expect(entries.length).toBeGreaterThan(0)
-  // Should have volunteer creation and note creation at minimum
+Then('the audit log should have entries for each step', async ({request, world}) => {
+  // Events about hub activity (the shift, the note) must land in the hub's own
+  // audit log, where the hub admin can see them (#1048). The call answer is
+  // driven by a simulation shortcut here; the real answer paths are covered by
+  // the call-actions audit scenario.
+  const { entries } = await listAuditLogViaApi(request, { hubId: getScenarioState(world).hubId, limit: 100 })
   const events = entries.map(e => e.action)
-  expect(events).toContain('userAdded')
+  expect(events).toContain('shiftCreated')
   expect(events).toContain('noteCreated')
 })
 

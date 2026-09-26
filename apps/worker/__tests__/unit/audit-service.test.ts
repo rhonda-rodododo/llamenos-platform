@@ -335,7 +335,7 @@ describe('audit() helper', () => {
       'login',
       pubkey,
       expect.objectContaining({ foo: 'bar' }),
-      undefined,
+      null,
     )
   })
 

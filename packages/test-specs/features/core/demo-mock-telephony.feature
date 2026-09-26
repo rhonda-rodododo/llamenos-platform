@@ -19,8 +19,10 @@ Feature: Demo mock telephony
     And the call status should be "ringing"
     When volunteer 0 answers the simulated call
     Then the call status should be "in-progress"
+    And the hub audit log should contain a "callAnswered" entry
     When volunteer 0 creates a note for the active call
     Then a note should exist linked to that call ID
+    And the hub audit log should contain a "noteCreated" entry
     When volunteer 0 hangs up the simulated call
     Then the call status should be "completed"
 
