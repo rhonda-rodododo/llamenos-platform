@@ -306,8 +306,9 @@ Feature: Permission Matrix
 
   # ─── Invites Domain ───────────────────────────────────────────────
 
+  # Invites are issued per hub (#1037); `{hub}` is the scenario hub.
   Scenario Outline: <role> <expected> access to list invites
-    When the "<role>" user sends "GET" to "/api/invites"
+    When the "<role>" user sends "GET" to "/api/hubs/{hub}/invites"
     Then the response status should be <status>
 
     Examples:
@@ -319,7 +320,7 @@ Feature: Permission Matrix
       | reporter     | denied    | 403    |
 
   Scenario Outline: <role> <expected> access to create invite
-    When the "<role>" user sends "POST" to "/api/invites" with valid invite body
+    When the "<role>" user sends "POST" to "/api/hubs/{hub}/invites" with valid invite body
     Then the response status should be <status>
 
     Examples:

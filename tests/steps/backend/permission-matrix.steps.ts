@@ -5,6 +5,7 @@
  * across all API endpoints. Creates one user per default role and
  * verifies expected HTTP status codes for each endpoint.
  */
+import { expect } from '@playwright/test'
 import { Given, When, Before, getState, setState } from './fixtures'
 // Status assertions (Then) are in assertions.steps.ts
 import { getSharedState, setLastResponse } from './shared-state'
@@ -16,6 +17,7 @@ import {
   apiPut,
   apiDelete,
   createVolunteerViaApi,
+  addHubMemberViaApi,
   createShiftViaApi,
   createBanViaApi,
   generateTestKeypair,
@@ -74,11 +76,15 @@ function roleIdFromName(roleName: string): string {
 
 Given('test users exist for all default roles', async ({ request, world }) => {
   const roles = ['super-admin', 'hub-admin', 'reviewer', 'volunteer', 'reporter']
+  const hubId = getScenarioState(world).hubId
   for (const role of roles) {
     const vol = await createVolunteerViaApi(request, {
       name: `PM ${role} ${Date.now()}`,
       roleIds: [roleIdFromName(role)],
     })
+    // The global role authorises the unscoped rows; inside the scenario hub
+    // only a hub assignment carries authority (#1037), so hold the same role there.
+    await addHubMemberViaApi(request, hubId, vol.pubkey, [roleIdFromName(role)])
     getPermMatrixState(world).roleUsers[role] = { deviceKey: vol.deviceKey, pubkey: vol.pubkey, name: vol.name }
   }
 })
@@ -120,12 +126,14 @@ Given('a test ban exists', async ({ request, world }) => {
 })
 
 Given('a test invite exists', async ({ request, world }) => {
-  // Create a fresh invite each time (will be revoked by the test)
-  const { data } = await apiPost<{ code: string }>(request, '/invites', {
+  // Create a fresh invite each time (will be revoked by the test) — in the
+  // scenario hub, since invites are issued per hub (#1037)
+  const { data, status } = await apiPost<{ code: string }>(request, `/hubs/${getScenarioState(world).hubId}/invites`, {
     name: `PM Invite ${Date.now()}`,
     phone: uniquePhone(),
     roleIds: ['role-volunteer'],
   })
+  expect(status).toBe(201)
   const d = data as Record<string, unknown> | null
   getPermMatrixState(world).testInviteCode = d?.code as string
     ?? (d?.invite as Record<string, unknown>)?.code as string
@@ -155,7 +163,7 @@ When('the {string} user sends {string} to {string}', async ({ request, world }, 
   const user = getPermMatrixState(world).roleUsers[role]
   if (!user) throw new Error(`No test user for role "${role}"`)
 
-  getSharedState(world).lastResponse = await sendRequest(request, method, path, user.deviceKey)
+  getSharedState(world).lastResponse = await sendRequest(request, method, path, user.deviceKey, world)
 })
 
 When('the {string} user sends {string} to {string} with valid volunteer body', async ({ request, world }, role: string, _method: string, _path: string) => {
@@ -292,7 +300,7 @@ When('the {string} user sends {string} to {string} with valid invite body', asyn
   const user = getPermMatrixState(world).roleUsers[role]
   if (!user) throw new Error(`No test user for role "${role}"`)
 
-  getSharedState(world).lastResponse = await apiPost(request, '/invites', {
+  getSharedState(world).lastResponse = await apiPost(request, hubPath(_path, world), {
     name: uniqueName('PM Invite'),
     phone: uniquePhone(),
     roleIds: ['role-volunteer'],
@@ -303,7 +311,7 @@ When('the {string} user sends {string} to the test invite endpoint', async ({ re
   const user = getPermMatrixState(world).roleUsers[role]
   if (!user) throw new Error(`No test user for role "${role}"`)
 
-  getSharedState(world).lastResponse = await apiDelete(request, `/invites/${getPermMatrixState(world).testInviteCode}`, user.deviceKey)
+  getSharedState(world).lastResponse = await apiDelete(request, `/hubs/${getScenarioState(world).hubId}/invites/${getPermMatrixState(world).testInviteCode}`, user.deviceKey)
 })
 
 When('the {string} user sends {string} to {string} with spam settings body', async ({ request, world }, role: string, _method: string, _path: string) => {
@@ -488,14 +496,23 @@ When('an unauthenticated request is sent to {string} {string}', async ({request,
 
 // ── Helper: send generic request ────────────────────────────────────
 
+/**
+ * Feature paths may name the scenario hub as `{hub}` (e.g. "/api/hubs/{hub}/invites");
+ * resolve it and strip the /api prefix the api helpers add.
+ */
+function hubPath(path: string, world: Record<string, unknown>): string {
+  const resolved = path.replace('{hub}', getScenarioState(world).hubId)
+  return resolved.startsWith('/api') ? resolved.slice(4) : resolved
+}
+
 async function sendRequest(
   request: import('@playwright/test').APIRequestContext,
   method: string,
   path: string,
   deviceKey: string,
+  world: Record<string, unknown>,
 ): Promise<{ status: number; data: unknown }> {
-  // Strip /api prefix if present — api helpers add it
-  const apiPath = path.startsWith('/api') ? path.slice(4) : path
+  const apiPath = hubPath(path, world)
   switch (method) {
     case 'GET':
       return apiGet(request, apiPath, deviceKey)

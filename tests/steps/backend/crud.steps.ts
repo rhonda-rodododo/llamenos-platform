@@ -339,9 +339,10 @@ Then('only notes for that call should be returned', async ({ world }) => {
 
 // ─── Invites ────────────────────────────────────────────────────────
 
-When('an admin creates an invite for {string}', async ({ request, world }, name: string) => {
+When('an admin creates an invite for {string}', async ({ request, world, workerHub }, name: string) => {
   getCrudState(world).inviteName = name
-  const { data, status } = await apiPost<{ code?: string; invite?: { code: string } }>(request, '/invites', {
+  // Invites are issued per hub (#1037)
+  const { data, status } = await apiPost<{ code?: string; invite?: { code: string } }>(request, `/hubs/${workerHub}/invites`, {
     name,
     phone: uniquePhone(),
     roleIds: ['role-volunteer'],
@@ -351,14 +352,14 @@ When('an admin creates an invite for {string}', async ({ request, world }, name:
     ?? ((data as Record<string, unknown>)?.invite as Record<string, unknown>)?.code as string
 })
 
-Then('the invite list should contain {string}', async ({request}, name: string) => {
-  const { data } = await apiGet<{ invites: Array<{ name: string; code: string }> }>(request, '/invites')
+Then('the invite list should contain {string}', async ({ request, workerHub }, name: string) => {
+  const { data } = await apiGet<{ invites: Array<{ name: string; code: string }> }>(request, `/hubs/${workerHub}/invites`)
   const invites = (data as { invites?: Array<{ name: string }> })?.invites ?? []
   expect(invites.some(i => i.name === name)).toBeTruthy()
 })
 
-Then('the invite list should not contain the revoked code', async ({ request, world }) => {
-  const { data } = await apiGet<{ invites: Array<{ code: string }> }>(request, '/invites')
+Then('the invite list should not contain the revoked code', async ({ request, world, workerHub }) => {
+  const { data } = await apiGet<{ invites: Array<{ code: string }> }>(request, `/hubs/${workerHub}/invites`)
   const invites = (data as { invites?: Array<{ code: string }> })?.invites ?? []
   expect(invites.some(i => i.code === getCrudState(world).inviteCode)).toBeFalsy()
 })

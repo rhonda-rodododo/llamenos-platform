@@ -57,9 +57,10 @@ function createRedeemAuth(seedHex: string): { pubkey: string; timestamp: number;
 
 // ── Given ───────────────────────────────────��───────────────────────
 
-Given('an invite exists for {string} with phone {string}', async ({ request, world }, name: string, phone: string) => {
+Given('an invite exists for {string} with phone {string}', async ({ request, world, workerHub }, name: string, phone: string) => {
   const s = getS(world)
-  const res = await apiPost<{ invite: { code: string } }>(request, '/invites', {
+  // Invites are issued per hub (#1037)
+  const res = await apiPost<{ invite: { code: string } }>(request, `/hubs/${workerHub}/invites`, {
     name, phone, roleIds: ['role-volunteer'],
   }, ADMIN_SEED)
   expect(res.status).toBe(201)
@@ -79,16 +80,18 @@ Given('the invite has been redeemed by a user', async ({ request, world }) => {
   s.redeemerSeedHex = kp.seedHex
 })
 
-Given('a registered volunteer user', async ({ request, world }) => {
-  const vol = await createUserViaApi(request, { name: `Invite Vol ${Date.now()}` })
+Given('a registered volunteer user', async ({ request, world, workerHub }) => {
+  // A member of the hub, so a refusal proves the missing invites:create
+  // permission rather than mere non-membership
+  const vol = await createUserViaApi(request, { name: `Invite Vol ${Date.now()}`, hubId: workerHub })
   getS(world).volunteerDeviceKey = vol.deviceKey
 })
 
 // ── When ────────────────────────────────────────────────────────────
 
-When('the admin creates an invite for {string} with phone {string}', async ({ request, world }, name: string, phone: string) => {
+When('the admin creates an invite for {string} with phone {string}', async ({ request, world, workerHub }, name: string, phone: string) => {
   const s = getS(world)
-  const res = await apiPost<{ invite: { code: string } }>(request, '/invites', {
+  const res = await apiPost<{ invite: { code: string } }>(request, `/hubs/${workerHub}/invites`, {
     name, phone, roleIds: ['role-volunteer'],
   }, ADMIN_SEED)
   setLastResponse(world, res)
@@ -142,16 +145,16 @@ When('the same user redeems the invite', async ({ request, world }) => {
   setLastResponse(world, { status: res.status(), data })
 })
 
-When('the admin lists invites', async ({ request, world }) => {
-  setLastResponse(world, await apiGet(request, '/invites', ADMIN_SEED))
+When('the admin lists invites', async ({ request, world, workerHub }) => {
+  setLastResponse(world, await apiGet(request, `/hubs/${workerHub}/invites`, ADMIN_SEED))
 })
 
-When('the admin revokes the invite', async ({ request, world }) => {
+When('the admin revokes the invite', async ({ request, world, workerHub }) => {
   const s = getS(world)
   const crudState = getState<{ inviteCode?: string }>(world, 'crud')
   const inviteCode = s.inviteCode ?? crudState?.inviteCode
   expect(inviteCode).toBeDefined()
-  setLastResponse(world, await apiDelete(request, `/invites/${inviteCode}`))
+  setLastResponse(world, await apiDelete(request, `/hubs/${workerHub}/invites/${inviteCode}`))
 })
 
 When('a client floods invite validation {int} times', async ({ request, world }, count: number) => {
@@ -171,10 +174,10 @@ When('a client floods invite validation {int} times', async ({ request, world },
   setLastResponse(world, { status: s.rateLimitResponses[s.rateLimitResponses.length - 1], data: null })
 })
 
-When('the volunteer tries to create an invite', async ({ request, world }) => {
+When('the volunteer tries to create an invite', async ({ request, world, workerHub }) => {
   const s = getS(world)
   expect(s.volunteerDeviceKey).toBeDefined()
-  setLastResponse(world, await apiPost(request, '/invites', {
+  setLastResponse(world, await apiPost(request, `/hubs/${workerHub}/invites`, {
     name: 'Unauthorized Invite', phone: '+15559999999', roleIds: ['role-volunteer'],
   }, s.volunteerDeviceKey!))
 })

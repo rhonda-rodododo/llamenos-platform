@@ -266,12 +266,14 @@ Then('the conversation should be reopened', async ({ request, world }) => {
 
 // ─── Invite → Registration → Call Handling ──────────────────────────
 
-When('an admin creates an invite', async ({ request, world }) => {
-  const { data } = await apiPost<{ code?: string; invite?: { code: string } }>(request, '/invites', {
+When('an admin creates an invite', async ({ request, world, workerHub }) => {
+  // Invites are issued per hub (#1037)
+  const { data, status } = await apiPost<{ code?: string; invite?: { code: string } }>(request, `/hubs/${workerHub}/invites`, {
     name: uniqueName('XDO Invitee'),
     phone: uniquePhone(),
     roleIds: ['role-volunteer'],
   })
+  expect(status).toBe(201)
   getCrossDoState(world).inviteCode = (data as Record<string, unknown>)?.code as string
     ?? ((data as Record<string, unknown>)?.invite as Record<string, unknown>)?.code as string
 })
