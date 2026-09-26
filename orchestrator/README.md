@@ -199,10 +199,15 @@ deliberate exception:
 
 Unit files are at `orchestrator/systemd/llamenos-fleet-tick.{service,timer}`.
 **They are not installed or enabled by this plan** — that step is left to a
-human. To install (when ready):
+human. The units are systemd *user* units: `%h` is the owner's home directory,
+and they run `%h/.local/bin/llamenos-fleet` — a symlink into this checkout
+(`llamenos-fleet doctor` prints the exact `ln -sf` command if it is missing).
+The wrapper `cd`s into the checkout itself, so no path to the checkout is
+written into the units and it can live anywhere. To install (when ready):
 
 ```bash
-mkdir -p ~/.config/systemd/user
+mkdir -p ~/.local/bin ~/.config/systemd/user
+ln -sf "$PWD/orchestrator/bin/llamenos-fleet" ~/.local/bin/llamenos-fleet
 cp orchestrator/systemd/*.service orchestrator/systemd/*.timer ~/.config/systemd/user/
 systemctl --user daemon-reload
 systemctl --user enable --now llamenos-fleet-tick.timer

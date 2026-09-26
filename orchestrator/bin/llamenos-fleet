@@ -15,4 +15,9 @@ REPO_ROOT="$(cd -P "$(dirname "$SELF")/../.." && pwd)"
 [ -f "$HOME/.llamenos-fleet/env" ] && set -a && . "$HOME/.llamenos-fleet/env" && set +a
 
 export FLEET_REPO_ROOT="$REPO_ROOT"
+# dispatch-one.sh picks the repo to cut worktrees from as DISPATCH_REPO > the
+# cwd's repo > a hardcoded fallback, and the fleet never sets DISPATCH_REPO. Run
+# from the checkout this wrapper lives in so the cwd resolves to it whatever the
+# caller's cwd is (systemd starts user units in $HOME, which is no repo at all).
+cd "$REPO_ROOT"
 exec bun "$REPO_ROOT/orchestrator/src/cli.ts" "$@"

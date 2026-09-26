@@ -121,9 +121,9 @@ routing:
   comment_triage: haiku
 
 projects:
-  /media/rikki/recover2/projects/llamenos:
+  /path/to/llamenos:
     rules_file: .supervisor-rules.md
-  /media/rikki/recover2/projects/skybuild:
+  /path/to/skybuild:
     rules_file: .supervisor-rules.md
 ```
 

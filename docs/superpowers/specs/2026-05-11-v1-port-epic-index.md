@@ -1,5 +1,7 @@
 # v1 → v2 Feature Port: Epic Index
 
+> **Path placeholders:** `<llamenos-hotline>` = your checkout of the retired v1 `llamenos-hotline` repo.
+
 **Date:** 2026-05-11 (updated 2026-05-12)
 **Status:** EP01-EP05, EP07 specced and planned; EP06, EP08-EP09 are stubs
 
@@ -67,7 +69,7 @@ EP04 (Analytics) ── independent
 ## Cross-Cutting Concerns
 
 ### v1 Reference Codebase
-- Location: `/home/rikki/projects/llamenos-hotline/`
+- Location: `<llamenos-hotline>/`
 - **Local main is 10 commits behind and 6 commits ahead of origin/main** — should be reconciled before relying on it for detailed feature audits
 - Key directories: `src/client/components/admin-sections/`, `src/server/routes/`, `src/server/db/schema/`
 

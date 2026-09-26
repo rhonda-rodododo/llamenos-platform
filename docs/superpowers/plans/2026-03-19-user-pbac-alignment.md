@@ -1,5 +1,7 @@
 # User/PBAC Naming Alignment Implementation Plan
 
+> **Path placeholders:** `<project-slug>` = Claude Code's per-project directory name under `~/.claude/projects/` (the checkout path with `/` replaced by `-`).
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Rename every use of "volunteer" as an entity type to "user" across the entire codebase — DB, backend, protocol, client, mobile, and tests — while preserving `role-volunteer` and "Volunteer" as the role display name.
@@ -647,7 +649,7 @@ Run: `grep -rn "c\.get('volunteer')" apps/worker/routes/ --include="*.ts"` to fi
 
 **Files:**
 - Modify: `~/projects/llamenos/CLAUDE.md`
-- Modify: `~/.claude/projects/-home-rikki-projects-llamenos/memory/MEMORY.md`
+- Modify: `~/.claude/projects/<project-slug>/memory/MEMORY.md`
 
 #### `CLAUDE.md`
 

@@ -10,7 +10,7 @@
 
 **Spec:** `docs/superpowers/specs/2026-09-11-llamenos-fleet-orchestrator-design.md`
 
-**Reference implementation:** `/media/rikki/Main/projects/translatemd/orchestrator/src/` — a working system of the same shape, 3,261 lines. Several tasks are *ports* of a named file. When a task says "port", read the reference file first; its comments record the specific production failures each guard exists to prevent, and those comments must survive the port.
+**Reference implementation:** `translatemd/orchestrator/src/` — a working system of the same shape, 3,261 lines. Several tasks are *ports* of a named file. When a task says "port", read the reference file first; its comments record the specific production failures each guard exists to prevent, and those comments must survive the port.
 
 ## Global Constraints
 
@@ -2281,10 +2281,11 @@ After=network-online.target
 
 [Service]
 Type=oneshot
-Environment=PATH=/home/rikki/.bun/bin:/home/rikki/.local/bin:/usr/local/bin:/usr/bin:/bin
-WorkingDirectory=/media/rikki/Main/projects/llamenos
+# %h = the user unit owner's home. No WorkingDirectory=: the wrapper at
+# %h/.local/bin/llamenos-fleet symlinks into the checkout and cd's there itself.
+Environment=PATH=%h/.bun/bin:%h/.local/bin:/usr/local/bin:/usr/bin:/bin
 EnvironmentFile=-%h/.llamenos-fleet/env
-ExecStart=/home/rikki/.local/bin/llamenos-fleet tick
+ExecStart=%h/.local/bin/llamenos-fleet tick
 # A pass that cannot run is not a failure: the lock, the halt file and the
 # breakers all exit cleanly on purpose, so systemd must not treat a quiet night
 # as a fault and back off.

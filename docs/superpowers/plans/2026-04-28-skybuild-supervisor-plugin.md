@@ -1,5 +1,7 @@
 # Skybuild Supervisor Plugin — Implementation Plan
 
+> **Path placeholders:** `<skybuild>` = your checkout of the skybuild repo; `<llamenos-platform>` = your checkout of the llamenos-platform repo.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Package the supervising-dispatched-sessions skill as a standalone Claude Code + opencode plugin with hook-based role enforcement, auto-init, and progress-file communication — distributed from the skybuild repo.
@@ -8,7 +10,7 @@
 
 **Tech Stack:** Bash (scripts), YAML (config), Markdown (skill/templates), JSON (plugin manifests)
 
-**Working directory:** `/media/rikki/recover2/projects/skybuild`
+**Working directory:** `<skybuild>`
 
 ---
 
@@ -22,7 +24,7 @@
 - [ ] **Step 1: Create the plugin directory tree**
 
 ```bash
-cd /media/rikki/recover2/projects/skybuild
+cd <skybuild>
 mkdir -p plugins/supervisor/.claude-plugin
 mkdir -p plugins/supervisor/.opencode
 mkdir -p plugins/supervisor/skills/supervising-dispatched-sessions
@@ -160,7 +162,7 @@ Edit `~/.skybuild-supervisor/supervisor.yml` to customize models, timeouts, and 
 - [ ] **Step 5: Commit scaffold**
 
 ```bash
-cd /media/rikki/recover2/projects/skybuild
+cd <skybuild>
 git add plugins/supervisor/
 git commit -m "feat(supervisor): scaffold plugin directory structure"
 ```
@@ -205,7 +207,7 @@ Create `plugins/supervisor/hooks/hooks.json`:
 - [ ] **Step 2: Verify hook syntax is valid JSON**
 
 ```bash
-cd /media/rikki/recover2/projects/skybuild
+cd <skybuild>
 python3 -c "import json; json.load(open('plugins/supervisor/hooks/hooks.json')); print('valid')"
 ```
 
@@ -448,7 +450,7 @@ Copy `~/.claude/skills/supervising-dispatched-sessions/bootstrap.sh` to `plugins
 
 1. `STATUS_DIR="$HOME/tier-overnight-status"` → `STATUS_DIR="$HOME/.skybuild-supervisor/status"`
 2. `PROMPT_DIR="$HOME/tier-prompts"` → `PROMPT_DIR="$HOME/.skybuild-supervisor/prompts"`
-3. Replace hardcoded `cd /media/rikki/recover2/projects/llamenos-platform` with:
+3. Replace hardcoded `cd <llamenos-platform>` with:
    ```bash
    MAIN_REPO="${DISPATCH_REPO:-$(git rev-parse --show-toplevel 2>/dev/null)}"
    cd "$MAIN_REPO" 2>/dev/null && {
@@ -476,7 +478,7 @@ Copy `~/.claude/skills/supervising-dispatched-sessions/supervisor-template.sh` t
 1. `PROMPT_DIR="$HOME/tier-prompts"` → `PROMPT_DIR="$HOME/.skybuild-supervisor/prompts"`
 2. `STATUS_DIR="$HOME/tier-overnight-status"` → `STATUS_DIR="$HOME/.skybuild-supervisor/status"`
 3. `LOG_FILE="$HOME/${ROUND_NAME}.log"` → `LOG_FILE="$HOME/.skybuild-supervisor/logs/${ROUND_NAME}.log"`
-4. Remove hardcoded `MAIN_REPO="/media/rikki/recover2/projects/llamenos-platform"`, replace with:
+4. Remove hardcoded `MAIN_REPO="<llamenos-platform>"`, replace with:
    ```bash
    MAIN_REPO="${DISPATCH_REPO:-$(git rev-parse --show-toplevel 2>/dev/null)}"
    ```
@@ -839,7 +841,7 @@ No automated tests for this plugin — it orchestrates external processes. Inste
 mv ~/.skybuild-supervisor ~/.skybuild-supervisor.bak 2>/dev/null
 
 # Run init
-bash /media/rikki/recover2/projects/skybuild/plugins/supervisor/scripts/init.sh
+bash <skybuild>/plugins/supervisor/scripts/init.sh
 ```
 
 Expected:
@@ -881,7 +883,7 @@ Expected: no output and `exit code: 0`
 - [ ] **Step 5: Verify dstat runs without errors**
 
 ```bash
-bash /media/rikki/recover2/projects/skybuild/plugins/supervisor/scripts/status.sh --all
+bash <skybuild>/plugins/supervisor/scripts/status.sh --all
 ```
 
 Expected: either "No workers found" or a markdown table (if legacy status files were migrated)
@@ -909,7 +911,7 @@ git commit -m "fix(supervisor): adjustments from smoke test"
 - [ ] **Step 1: Verify complete file inventory**
 
 ```bash
-cd /media/rikki/recover2/projects/skybuild
+cd <skybuild>
 find plugins/supervisor/ -type f | sort
 ```
 

@@ -1,5 +1,7 @@
 # Epic 302: Skills & Documentation Overhaul for BDD-First Workflow
 
+> **Path placeholders:** `<project-slug>` = Claude Code's per-project directory name under `~/.claude/projects/` (the checkout path with `/` replaced by `-`).
+
 **Status**: COMPLETE
 **Priority**: High
 **Depends on**: None (can run parallel with Epic 301)
@@ -203,7 +205,7 @@ Add `bun run test:backend:bdd` to the Development Commands section.
 
 ### Task 7: Update MEMORY.md
 
-**File**: `/Users/rhonda/.claude/projects/-Users-rhonda-projects-llamenos/memory/MEMORY.md`
+**File**: `~/.claude/projects/<project-slug>/memory/MEMORY.md`
 
 1. Replace Cardinal Rule (lines 3-5) with "Tests Are The Spec" rule
 2. Replace Feature Development Workflow (lines 83-109) with phased BDD workflow

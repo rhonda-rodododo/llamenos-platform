@@ -1,20 +1,22 @@
 # Plan: Port V1 VPS Infrastructure to V2
 
+> **Path placeholders:** `<v1-llamenos-platform>` = your checkout of the v1 llamenos-platform repo; `<v2-worktree>` = the V2 worktree this plan was written in.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Port the mature VPS deployment infrastructure from V1 (`/home/rikki/projects/llamenos-platform/`) to V2 (`/media/rikki/recover2/projects/llamenos-plan-vps-infra-port/`), adapting for V2 architecture: RustFS (not MinIO), 1984 Hosting Iceland (not Hetzner), and updated service names.
+**Goal:** Port the mature VPS deployment infrastructure from V1 (`<v1-llamenos-platform>/`) to V2 (`<v2-worktree>/`), adapting for V2 architecture: RustFS (not MinIO), 1984 Hosting Iceland (not Hetzner), and updated service names.
 
 **Spec reference:** `docs/superpowers/specs/2026-04-30-desktop-distribution-design.md` (Section 9: Port V1 VPS Infrastructure, Section 3: Serving Infrastructure)
 
 **Source references:**
-- V1 ISO builder: `/home/rikki/projects/llamenos-platform/scripts/iso-builder/`
-- V1 Ansible: `/home/rikki/projects/llamenos-platform/deploy/ansible/`
-- V1 Caddy: `/home/rikki/projects/llamenos-platform/deploy/docker/Caddyfile.production`
-- V1 Backup: `/home/rikki/projects/llamenos-platform/deploy/ansible/roles/backup/`
-- V1 Production checklist: `/home/rikki/projects/llamenos-platform/deploy/PRODUCTION_CHECKLIST.md`
-- V1 CI workflows: `/home/rikki/projects/llamenos-platform/.github/workflows/`
-- V1 OpenTofu: `/home/rikki/projects/llamenos-platform/deploy/opentofu/`
-- V2 deploy: `/media/rikki/recover2/projects/llamenos-plan-vps-infra-port/deploy/`
+- V1 ISO builder: `<v1-llamenos-platform>/scripts/iso-builder/`
+- V1 Ansible: `<v1-llamenos-platform>/deploy/ansible/`
+- V1 Caddy: `<v1-llamenos-platform>/deploy/docker/Caddyfile.production`
+- V1 Backup: `<v1-llamenos-platform>/deploy/ansible/roles/backup/`
+- V1 Production checklist: `<v1-llamenos-platform>/deploy/PRODUCTION_CHECKLIST.md`
+- V1 CI workflows: `<v1-llamenos-platform>/.github/workflows/`
+- V1 OpenTofu: `<v1-llamenos-platform>/deploy/opentofu/`
+- V2 deploy: `<v2-worktree>/deploy/`
 
 ---
 
@@ -924,8 +926,8 @@
 
 ## Task 5: Production Checklist
 
-**V1 source:** `/home/rikki/projects/llamenos-platform/deploy/PRODUCTION_CHECKLIST.md` (125 points)
-**V2 already has:** `/media/rikki/recover2/projects/llamenos-plan-vps-infra-port/deploy/PRODUCTION_CHECKLIST.md`
+**V1 source:** `<v1-llamenos-platform>/deploy/PRODUCTION_CHECKLIST.md` (125 points)
+**V2 already has:** `<v2-worktree>/deploy/PRODUCTION_CHECKLIST.md`
 
 **Modifications:**
 - Update all MinIO references to RustFS

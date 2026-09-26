@@ -28,7 +28,7 @@
 
 ### Task 1: Pin and verify the dispatch dependency
 
-`dispatch-one.sh` lives at `~/.claude/skills/supervising-dispatched-sessions/`, which is a symlink into `/media/rikki/Main/projects/claude-skills` — **a real git repository, and the script is tracked there.** It is not untracked, as an earlier draft of this plan wrongly claimed.
+`dispatch-one.sh` lives at `~/.claude/skills/supervising-dispatched-sessions/`, which is a symlink into the separate `claude-skills` repository checkout — **a real git repository, and the script is tracked there.** It is not untracked, as an earlier draft of this plan wrongly claimed.
 
 The actual risk is narrower: llamenos cannot *pin a version* of it. A change committed to `claude-skills` takes effect on the next dispatch with no llamenos commit, and the fleet cannot run on a machine where that repo is absent. Vendoring a duplicate of a tracked file is the wrong fix — it creates two sources of truth for one script. Pin and verify instead.
 

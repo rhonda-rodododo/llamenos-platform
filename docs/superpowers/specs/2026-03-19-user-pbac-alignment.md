@@ -1,5 +1,7 @@
 # Spec: User/PBAC Naming Alignment
 
+> **Path placeholders:** `<project-slug>` = Claude Code's per-project directory name under `~/.claude/projects/` (the checkout path with `/` replaced by `-`).
+
 **Date**: 2026-03-19
 **Status**: Ready for implementation
 **Scope**: Full codebase rename — DB, backend, protocol, client, mobile, tests, docs
@@ -538,7 +540,7 @@ Update `CLAUDE.md`:
 - "Volunteer identity protection" → "User identity protection"
 - Any place "volunteer" is used as an entity type rather than a role name
 
-Update `~/.claude/projects/-home-rikki-projects-llamenos/memory/MEMORY.md`:
+Update `~/.claude/projects/<project-slug>/memory/MEMORY.md`:
 - "E2E Testing Conventions": `createVolunteerAndGetNsec()` → `createUserAndGetNsec()`
 - Update any memory entries using "volunteer" as entity type
 
