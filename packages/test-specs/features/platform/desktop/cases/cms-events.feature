@@ -53,8 +53,6 @@ Feature: Event Management
     And the event name should be displayed
     And the event start date should be displayed
 
-  # @fixme: event link API 404s for record-backed events — #789
-  @fixme
   Scenario: Event detail shows linked cases tab
     Given an event with linked cases exists
     When I view the event detail
@@ -62,15 +60,11 @@ Feature: Event Management
     Then linked case records should be visible
     And each case link should show a case number
 
-  # @fixme: event link API 404s for record-backed events — #789
-  @fixme
   Scenario: Event detail shows linked cases count
     Given an event with 3 linked cases exists
     When I view the event detail
     Then the linked cases count should show 3
 
-  # @fixme: event link API 404s for record-backed events — #789
-  @fixme
   Scenario: Event detail shows linked reports tab
     Given an event with linked reports exists
     When I view the event detail
@@ -79,8 +73,6 @@ Feature: Event Management
 
   # --- Linking cases to events ---
 
-  # @fixme: event link API 404s for record-backed events — #789
-  @fixme
   Scenario: Link an existing case to an event
     Given an event exists
     And arrest cases exist
@@ -92,8 +84,6 @@ Feature: Event Management
     Then the case should appear in the event's linked cases
     And the linked cases count should increase by 1
 
-  # @fixme: event link API 404s for record-backed events — #789
-  @fixme
   Scenario: Link a report to an event
     Given an event exists
     And a report exists

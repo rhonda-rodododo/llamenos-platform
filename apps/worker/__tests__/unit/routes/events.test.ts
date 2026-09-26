@@ -4,7 +4,7 @@
  * Tests: permission enforcement, CRUD operations, event linking/unlinking,
  * sub-event listing, Nostr publish (fire-and-forget), audit logging.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { Hono } from 'hono'
 import type { AppEnv } from '@worker/types'
 import eventsRouter from '@worker/routes/events'
@@ -346,7 +346,7 @@ describe('POST /events/:id/records', () => {
     })
 
     expect(res.status).toBe(201)
-    expect(mockCases.linkEvent).toHaveBeenCalledWith(recordId, 'ev-1', 'a'.repeat(64))
+    expect(mockCases.linkEvent).toHaveBeenCalledWith(recordId, 'ev-1', 'a'.repeat(64), 'hub-1')
     expect(auditLog).toHaveBeenCalledOnce()
   })
 
@@ -375,7 +375,7 @@ describe('DELETE /events/:id/records/:recordId', () => {
     expect(res.status).toBe(200)
     const json = await res.json() as Record<string, unknown>
     expect(json.ok).toBe(true)
-    expect(mockCases.unlinkEvent).toHaveBeenCalledWith('rec-1', 'ev-1')
+    expect(mockCases.unlinkEvent).toHaveBeenCalledWith('rec-1', 'ev-1', 'hub-1')
     expect(auditLog).toHaveBeenCalledOnce()
   })
 
@@ -399,7 +399,7 @@ describe('GET /events/:id/records', () => {
     expect(res.status).toBe(200)
     const json = await res.json() as Record<string, unknown>
     expect((json.links as unknown[]).length).toBe(1)
-    expect(mockCases.listEventRecords).toHaveBeenCalledWith('ev-1')
+    expect(mockCases.listEventRecords).toHaveBeenCalledWith('ev-1', 'hub-1')
   })
 
   it('returns 403 without events:read', async () => {
@@ -426,7 +426,7 @@ describe('POST /events/:id/reports', () => {
     })
 
     expect(res.status).toBe(201)
-    expect(mockCases.linkReportEvent).toHaveBeenCalledWith('rpt-1', 'ev-1', 'a'.repeat(64))
+    expect(mockCases.linkReportEvent).toHaveBeenCalledWith('rpt-1', 'ev-1', 'a'.repeat(64), 'hub-1')
     expect(auditLog).toHaveBeenCalledOnce()
   })
 
@@ -455,7 +455,7 @@ describe('DELETE /events/:id/reports/:reportId', () => {
     expect(res.status).toBe(200)
     const json = await res.json() as Record<string, unknown>
     expect(json.ok).toBe(true)
-    expect(mockCases.unlinkReportEvent).toHaveBeenCalledWith('rpt-1', 'ev-1')
+    expect(mockCases.unlinkReportEvent).toHaveBeenCalledWith('rpt-1', 'ev-1', 'hub-1')
     expect(auditLog).toHaveBeenCalledOnce()
   })
 })
@@ -473,7 +473,7 @@ describe('GET /events/:id/reports', () => {
     expect(res.status).toBe(200)
     const json = await res.json() as Record<string, unknown>
     expect((json.links as unknown[]).length).toBe(1)
-    expect(mockCases.listEventReports).toHaveBeenCalledWith('ev-1')
+    expect(mockCases.listEventReports).toHaveBeenCalledWith('ev-1', 'hub-1')
   })
 
   it('returns 403 without events:read', async () => {
