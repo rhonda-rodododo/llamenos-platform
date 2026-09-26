@@ -1,4 +1,5 @@
 import { Hono } from 'hono'
+import { z } from 'zod'
 import { describeRoute, resolver, validator } from 'hono-openapi'
 import type { AppEnv } from '../types'
 import { requirePermission } from '../middleware/permission-guard'
@@ -10,6 +11,7 @@ import {
   createContactBodySchema,
   updateContactBodySchema,
   listContactsQuerySchema,
+  contactCaseLinkSchema,
 } from '@protocol/schemas/contacts-v2'
 import {
   contactRelationshipSchema,
@@ -37,6 +39,12 @@ import {
   bulkCreateContactBodySchema,
   bulkCreateContactResponseSchema,
 } from '@protocol/schemas/contact-bulk'
+
+// Wrapper for the cases response. contactCaseLinkSchema (the per-link shape the
+// client types as ContactCaseLink) lives in @protocol/schemas.
+const contactCaseListResponseSchema = z.object({
+  cases: z.array(contactCaseLinkSchema),
+})
 
 const contactsV2 = new Hono<AppEnv>()
 
@@ -525,6 +533,53 @@ contactsV2.get('/:id/relationships',
     const services = c.get('services')
     const relationships = await services.contacts.listRelationships(contactId)
     return c.json({ relationships })
+  },
+)
+
+// List case records linked to a contact (hub-scoped)
+contactsV2.get('/:id/cases',
+  describeRoute({
+    tags: ['Contact Directory'],
+    summary: 'List case records linked to a contact, with the contact\'s role on each',
+    responses: {
+      200: {
+        description: 'Linked case records',
+        content: { 'application/json': { schema: resolver(contactCaseListResponseSchema) } },
+      },
+      ...authErrors,
+      ...notFoundError,
+    },
+  }),
+  requirePermission('contacts:view'),
+  async (c) => {
+    const contactId = c.req.param('id')
+    const hubId = c.get('hubId') ?? ''
+    const services = c.get('services')
+
+    // A contact from another hub is indistinguishable from a missing one.
+    const contact = await services.contacts.get(contactId)
+    if (contact.hubId !== hubId) return c.json({ error: 'Contact not found' }, 404)
+
+    const links = await services.cases.listLinksForContact(contactId, hubId)
+
+    // Entity types resolve the human-readable label; status is stored as the
+    // raw status value, which the type maps to a label.
+    const { entityTypes } = await services.settings.getEntityTypes(hubId)
+    const typeById = new Map(entityTypes.map((et) => [et.id, et]))
+
+    const cases = links.map((l) => {
+      const entityType = l.entityTypeId ? typeById.get(l.entityTypeId) : undefined
+      const statusLabel = entityType?.statuses.find((s) => s.value === l.statusHash)?.label
+      return {
+        recordId: l.recordId,
+        ...(l.caseNumber ? { caseNumber: l.caseNumber } : {}),
+        entityTypeLabel: entityType?.label || entityType?.name || '',
+        role: l.role ?? '',
+        status: statusLabel ?? l.statusHash,
+        createdAt: l.createdAt.toISOString(),
+      }
+    })
+    return c.json({ cases })
   },
 )
 
