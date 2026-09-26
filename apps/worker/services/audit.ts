@@ -141,12 +141,12 @@ export function computeEntryHash(entry: {
 const VERIFY_PAGE_SIZE = 2000
 
 /** Rows of one chain: a hub's, or the platform chain when `hubId` is undefined. */
-function chainCondition(hubId: string | undefined) {
+function chainCondition(hubId: string | null | undefined) {
   return hubId ? eq(auditLog.hubId, hubId) : sql`${auditLog.hubId} IS NULL`
 }
 
 /** Advisory-lock key text for a chain. Distinct chains may share a hashtext bucket; that only over-serialises. */
-function chainLockKey(hubId: string | undefined): string {
+function chainLockKey(hubId: string | null | undefined): string {
   return `audit:${hubId ?? 'platform'}`
 }
 
