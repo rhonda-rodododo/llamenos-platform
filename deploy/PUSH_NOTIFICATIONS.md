@@ -29,17 +29,18 @@ The staging backend is the `demo` deployment
 
 ```yaml
 llamenos_ntfy_enabled: true
-# Public name Android devices subscribe through. Must be a real DNS record on
-# the llamenos.org zone with a valid TLS certificate, reachable from testers'
-# phones (same constraint as the staging host itself, #726 / #954).
-ntfy_domain: "push.<staging host>.llamenos.org"
+# Public name Android devices subscribe through. Must be a subdomain of the
+# pinned domain (llamenos-hotline.org for the official build) with a real DNS
+# record and a valid TLS certificate, reachable from testers' phones (same
+# constraint as the staging host itself, #726 / #954).
+ntfy_domain: "push.<staging host>.llamenos-hotline.org"
 # Leave ntfy_auth_token unset: the role mints it with `ntfy token add` on
 # first deploy and persists it on the host.
 ```
 
 `deploy-demo.yml` **refuses to deploy** if `llamenos_ntfy_enabled` is not
-true or `ntfy_domain` is missing, equals `domain`, or is outside
-`*.llamenos.org`. Deploy order on this path (`roles/llamenos`): the ntfy
+true or `ntfy_domain` is missing, equals `domain`, or is not a subdomain of
+`domain` (the deployment's own domain, which is the pinned domain). Deploy order on this path (`roles/llamenos`): the ntfy
 container is started and provisioned first (publish account, bearer token,
 ACLs), then the app `.env` is rendered with `NTFY_URL` / `NTFY_AUTH_TOKEN`,
 then the rest of the stack starts. Caddy serves `ntfy_domain` alongside the
