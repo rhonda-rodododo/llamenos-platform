@@ -30,7 +30,7 @@ import hubRoutes from './routes/hubs'
 import blastsRoutes from './routes/blasts'
 import devicesRoutes from './routes/devices'
 import sessionRoutes from './routes/sessions'
-import securityEventsRoutes, { adminSecurityEventsRoutes } from './routes/security-events'
+import securityEventsRoutes, { adminSecurityEventsRoutes, publicSecurityEventsRoutes } from './routes/security-events'
 import accountRoutes from './routes/account'
 import adminDevicesRoutes from './routes/admin/devices'
 import contactsRoutes from './routes/contacts'
@@ -181,6 +181,10 @@ api.patch('/messaging/preferences', async (c) => {
   const result = await services.blasts.updatePreferences(token, body as { language?: string; status?: 'active' | 'paused' | 'unsubscribed'; tags?: string[] })
   return c.json(result)
 })
+
+// Client-reported security events (unauthenticated — cert pin failures precede login).
+// Only POST is registered here; GET /security-events falls through to the authenticated router.
+api.route('/security-events', publicSecurityEventsRoutes)
 
 // Public IVR audio serve (Twilio fetches during calls)
 api.get('/ivr-audio/:promptType/:language', async (c) => {
