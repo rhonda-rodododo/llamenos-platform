@@ -1,119 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { CallsService } from '../../services/calls'
-import { ServiceError } from '../../services/settings'
-
-// ---------------------------------------------------------------------------
-// DB Mock Builder
-// ---------------------------------------------------------------------------
-
-/**
- * Creates a mock database that stores active calls and call records in-memory.
- * This allows us to test the service's business logic without a real DB.
- */
-function createMockDb() {
-  const activeCalls = new Map<string, Record<string, unknown>>()
-  const callRecords = new Map<string, Record<string, unknown>>()
-  const callTokens = new Map<string, Record<string, unknown>>()
-
-  function makeChain(
-    target: Map<string, Record<string, unknown>>,
-    operation: 'select' | 'insert' | 'update' | 'delete',
-  ) {
-    let whereFilter: ((row: Record<string, unknown>) => boolean) | undefined
-    let insertValues: Record<string, unknown> | undefined
-    let updateValues: Record<string, unknown> | undefined
-
-    const chain: Record<string, (...args: unknown[]) => unknown> = {
-      from: () => chain,
-      select: () => chain,
-      where: (condition: unknown) => {
-        // Store the filter; we'll evaluate it when terminal methods are called
-        whereFilter = condition as (row: Record<string, unknown>) => boolean
-        return chain
-      },
-      limit: () => chain,
-      orderBy: () => chain,
-      values: (...args: unknown[]) => {
-        insertValues = args[0] as Record<string, unknown>
-        return chain
-      },
-      set: (...args: unknown[]) => {
-        updateValues = args[0] as Record<string, unknown>
-        return chain
-      },
-      onConflictDoNothing: () => chain,
-      returning: () => {
-        if (operation === 'insert' && insertValues) {
-          const id = insertValues.callId ?? insertValues.token ?? crypto.randomUUID()
-          const row = {
-            ...insertValues,
-            id,
-            startedAt: insertValues.startedAt ?? new Date(),
-            createdAt: insertValues.createdAt ?? new Date(),
-          }
-          target.set(id as string, row)
-          return [row]
-        }
-        if (operation === 'delete') {
-          const toDelete: Record<string, unknown>[] = []
-          for (const [key, row] of target) {
-            if (!whereFilter || matchesFilter(row, whereFilter)) {
-              toDelete.push(row)
-              target.delete(key)
-            }
-          }
-          return toDelete
-        }
-        if (operation === 'update' && updateValues) {
-          const updated: Record<string, unknown>[] = []
-          for (const [key, row] of target) {
-            if (!whereFilter || matchesFilter(row, whereFilter)) {
-              const newRow = { ...row, ...updateValues }
-              target.set(key, newRow)
-              updated.push(newRow)
-            }
-          }
-          return updated
-        }
-        return []
-      },
-    }
-
-    // For select, returning rows matching filter
-    if (operation === 'select') {
-      const origWhere = chain.where
-      chain.where = (...args: unknown[]) => {
-        origWhere(...args)
-        const result = [...target.values()]
-        // Return array when terminal (simulates drizzle)
-        return {
-          ...chain,
-          limit: () => result,
-          orderBy: () => ({
-            limit: () => ({
-              offset: () => result,
-            }),
-          }),
-          then: (resolve: (v: unknown) => void) => resolve(result),
-        }
-      }
-    }
-
-    return chain
-  }
-
-  // Simple filter matching — checks callId and hubId
-  function matchesFilter(_row: Record<string, unknown>, _filter: unknown): boolean {
-    // For our mock, we always return true since we set up test data carefully
-    return true
-  }
-
-  return {
-    activeCalls,
-    callRecords,
-    callTokens,
-  }
-}
 
 // ---------------------------------------------------------------------------
 // Simplified mock for drizzle-style calls
@@ -138,7 +24,7 @@ function createServiceWithData(opts?: {
   // Build a mock DB that supports the essential operations used by CallsService
   const db = {
     select: vi.fn().mockImplementation(() => ({
-      from: vi.fn().mockImplementation((table: unknown) => ({
+      from: vi.fn().mockImplementation(() => ({
         where: vi.fn().mockImplementation(() => {
           // Return matching rows
           const source = _activeCalls
@@ -288,22 +174,35 @@ describe('CallsService', () => {
       expect(result.answeredBy).toBe('pk1') // mock returns 'pk1'
     })
 
-    it('throws 404 when call does not exist', async () => {
-      const { svc } = createServiceWithData()
-      // Mock update to return empty array
-      const db = {
-        update: vi.fn().mockReturnValue({
-          set: vi.fn().mockReturnValue({
-            where: vi.fn().mockReturnValue({
-              returning: vi.fn().mockResolvedValue([]),
+    function dbWith(updated: unknown[], existing: unknown[]) {
+      const where = vi.fn().mockReturnValue({ returning: vi.fn().mockResolvedValue(updated) })
+      return {
+        where,
+        db: {
+          update: vi.fn().mockReturnValue({ set: vi.fn().mockReturnValue({ where }) }),
+          select: vi.fn().mockReturnValue({
+            from: vi.fn().mockReturnValue({
+              where: vi.fn().mockReturnValue({ limit: vi.fn().mockResolvedValue(existing) }),
             }),
           }),
-        }),
+        },
       }
-      const emptySvc = new CallsService(db as never)
+    }
+
+    it('throws 404 when call does not exist', async () => {
+      const { db } = dbWith([], [])
       await expect(
-        emptySvc.answerCall('hub-1', 'nonexistent', 'pk1'),
-      ).rejects.toThrow('Call not found')
+        new CallsService(db as never).answerCall('hub-1', 'nonexistent', 'pk1'),
+      ).rejects.toMatchObject({ status: 404, message: 'Call not found' })
+    })
+
+    it('throws 409 when the call exists but was already answered (first pickup wins)', async () => {
+      // The conditional UPDATE matched no row (status != ringing / answered_by set),
+      // but the call is still there → someone else won.
+      const { db } = dbWith([], [{ callId: 'call-1', status: 'in-progress', answeredBy: 'pk-first' }])
+      await expect(
+        new CallsService(db as never).answerCall('hub-1', 'call-1', 'pk-second'),
+      ).rejects.toMatchObject({ status: 409, message: 'Call already answered' })
     })
   })
 
@@ -344,7 +243,7 @@ describe('CallsService', () => {
     })
 
     it('sets status to unanswered when no volunteer picked up', async () => {
-      const { svc, db } = createServiceWithData({
+      const { svc } = createServiceWithData({
         activeCalls: [{
           callId: 'call-unanswered',
           hubId: 'hub-1',
@@ -712,7 +611,6 @@ describe('CallsService', () => {
 
   describe('listCallHistory', () => {
     it('uses default pagination (page 1, limit 50)', async () => {
-      const selectFn = vi.fn()
       const countResult = [{ total: 2 }]
       const callRows = [
         { callId: 'c1', startedAt: new Date() },

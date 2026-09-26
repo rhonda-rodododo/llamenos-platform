@@ -17,6 +17,8 @@ vi.mock('@worker/db', () => ({
   getDb: vi.fn().mockReturnValue({}),
 }))
 import { getTelephonyFromService, getHubTelephonyFromService } from '@worker/lib/service-factories'
+import { ServiceError } from '@worker/services/settings'
+import { recordRingLegs } from '@worker/services/ringing'
 import { checkWebhookReplay } from '@worker/services/webhook-replay'
 
 // Mock webhook replay protection — unit tests have no database
@@ -37,6 +39,7 @@ function makeMockAdapter(overrides?: Partial<TelephonyAdapter>): TelephonyAdapte
     handleWaitMusic: vi.fn().mockResolvedValue({ contentType: 'text/xml', body: '<Response><Play/></Response>' }),
     handleVoicemailComplete: vi.fn().mockReturnValue({ contentType: 'text/xml', body: '<Response><Say>Thank you</Say><Hangup/></Response>' }),
     rejectCall: vi.fn().mockReturnValue({ contentType: 'text/xml', body: '<Response><Reject/></Response>' }),
+    hangupResponse: vi.fn().mockReturnValue({ contentType: 'text/xml', body: '<Response><Hangup/></Response>' }),
     hangupCall: vi.fn().mockResolvedValue(undefined),
     ringVolunteers: vi.fn().mockResolvedValue([]),
     cancelRinging: vi.fn().mockResolvedValue(undefined),
@@ -541,6 +544,60 @@ describe('Telephony routes', () => {
           hubId: 'hub-1',
         }),
       )
+    })
+
+    const validToken = () => {
+      services.calls.resolveCallToken = vi.fn().mockResolvedValue({
+        callSid: 'CA-parent',
+        volunteerPubkey: 'pk-vol-1',
+        hubId: 'hub-1',
+      })
+    }
+    const answer = async () => {
+      const app = await createTestApp(adapter, services)
+      return app.request('/api/telephony/user-answer?callToken=valid-token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: 'CallSid=LEG-2',
+      })
+    }
+
+    it('hangs up the leg and does not bridge, audit or publish when another volunteer already won', async () => {
+      validToken()
+      services.calls.answerCall = vi.fn().mockRejectedValue(new ServiceError(409, 'Call already answered'))
+      const res = await answer()
+      expect(res.status).toBe(200)
+      expect(await res.text()).toContain('<Hangup/>')
+      expect(adapter.handleCallAnswered).not.toHaveBeenCalled()
+      expect(services.audit.log).not.toHaveBeenCalled()
+    })
+
+    it('hangs up the leg when the call no longer exists', async () => {
+      validToken()
+      services.calls.answerCall = vi.fn().mockRejectedValue(new ServiceError(404, 'Call not found'))
+      const res = await answer()
+      expect(await res.text()).toContain('<Hangup/>')
+      expect(adapter.handleCallAnswered).not.toHaveBeenCalled()
+    })
+
+    it('cancels the other ringing legs, sparing the winner\'s own leg', async () => {
+      validToken()
+      services.calls.getActiveCalls = vi.fn().mockResolvedValue([{ callId: 'CA-parent', callerLast4: '1111' }])
+      vi.mocked(adapter.parseIncomingWebhook).mockResolvedValue({ callSid: 'LEG-2', callerNumber: '+1', calledNumber: '+2' } as never)
+      recordRingLegs('CA-parent', ['LEG-1', 'LEG-2', 'LEG-3'])
+      const res = await answer()
+      expect(res.status).toBe(200)
+      expect(adapter.cancelRinging).toHaveBeenCalledWith(['LEG-1', 'LEG-2', 'LEG-3'], 'LEG-2')
+    })
+
+    it('does not cancel any leg when the winner\'s leg SID is unknown (would hang up the winner)', async () => {
+      validToken()
+      services.calls.getActiveCalls = vi.fn().mockResolvedValue([{ callId: 'CA-parent', callerLast4: '1111' }])
+      vi.mocked(adapter.parseIncomingWebhook).mockRejectedValue(new Error('unparseable'))
+      recordRingLegs('CA-parent', ['LEG-1', 'LEG-2'])
+      const res = await answer()
+      expect(res.status).toBe(200)
+      expect(adapter.cancelRinging).not.toHaveBeenCalled()
     })
   })
 

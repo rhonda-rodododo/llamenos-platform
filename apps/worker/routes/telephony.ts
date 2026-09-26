@@ -9,7 +9,8 @@ import { buildAudioUrlMap, telephonyResponse } from '../lib/helpers'
 import { hashPhone } from '../lib/crypto'
 import { detectLanguageFromPhone, languageFromDigit, DEFAULT_LANGUAGE } from '@shared/languages'
 import { audit } from '../services/audit'
-import { startParallelRinging } from '../services/ringing'
+import { startParallelRinging, cancelLosingLegs } from '../services/ringing'
+import { ServiceError } from '../services/settings'
 import { maybeTranscribe, transcribeVoicemail } from '../services/transcription'
 import { publishEvent } from '../lib/ws-events'
 import { KIND_CALL_UPDATE, KIND_CALL_VOICEMAIL, KIND_PRESENCE_UPDATE } from '@shared/event-kinds'
@@ -292,7 +293,27 @@ telephony.post('/user-answer',
   const { callSid: parentCallSid, volunteerPubkey: pubkey, hubId } = tokenData
   const adapter = (await getHubAdapter(c.env, services, hubId || undefined))!
 
-  await services.calls.answerCall(hubId ?? '', parentCallSid, pubkey)
+  // First pickup wins: the answer is an atomic conditional update. A leg that lost
+  // the race (or whose call is gone) is hung up instead of bridged into an empty queue.
+  try {
+    await services.calls.answerCall(hubId ?? '', parentCallSid, pubkey)
+  } catch (err) {
+    if (err instanceof ServiceError && (err.status === 409 || err.status === 404)) {
+      logger.info('user-answer: call no longer answerable — hanging up leg', { parentCallSid, status: err.status })
+      return telephonyResponse(adapter.hangupResponse())
+    }
+    throw err
+  }
+
+  // Stop every other phone still ringing for this call. The winner's own leg SID is
+  // needed so it is not cancelled with the losers; if the provider's webhook does not
+  // yield one we cancel nothing (losers then ring out, but can no longer win).
+  const winnerLegSid = await adapter.parseIncomingWebhook(c.req.raw.clone()).then(i => i.callSid, () => undefined)
+  if (winnerLegSid) {
+    await cancelLosingLegs(c.env, services, hubId ?? '', parentCallSid, winnerLegSid)
+  } else {
+    logger.warn('user-answer: winner leg SID not in webhook — not cancelling other legs', { parentCallSid })
+  }
 
   // Publish call answered event + presence update
   publishEvent(c.env, KIND_CALL_UPDATE, {
