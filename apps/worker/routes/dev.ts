@@ -9,6 +9,7 @@ import { getTestPushLog, clearTestPushLog } from '../lib/push-dispatch'
 import { getApnsBundleId, getApnsVoipTopic } from '../lib/apns-topic'
 import { seedDemoDataset } from '../services/demo-seeder'
 import { ServiceError } from '../services/settings'
+import { resolveRingableVolunteers } from '../services/ringing'
 import { DEMO_HUB } from '../lib/demo-dataset'
 import { demoIdentities } from '../lib/demo-identities'
 
@@ -756,7 +757,7 @@ interface SimulateIncomingCallBody {
   callerNumber: string
   language?: string
   hubId?: string
-  /** When true, returns 422 if no volunteers are on shift (mirrors real telephony routing) */
+  /** When true, returns 422 if the call would ring nobody (same ring set as real telephony routing) */
   checkVolunteers?: boolean
 }
 
@@ -824,15 +825,14 @@ dev.post('/test-simulate/incoming-call', async (c) => {
     return c.json({ error: 'Caller is banned', banned: true }, 403)
   }
 
-  // Optionally check for on-shift volunteers (mirrors real telephony routing)
+  // Optionally refuse the call when nobody would be rung — the same ring set
+  // (on shift → fallback group; active, not on break, hub access) that real
+  // telephony routing rings and that the answer route accepts. Real routing never
+  // registers a ringing call nobody can answer; this makes a test that forgot to
+  // put anyone in the ring set fail here, not later as a 403 on answer.
   if (body.checkVolunteers) {
-    let volunteerPubkeys: string[] = []
-    try {
-      volunteerPubkeys = await services.shifts.getCurrentVolunteers(hubId)
-    } catch {
-      // Shifts not configured — proceed with empty list
-    }
-    if (volunteerPubkeys.length === 0) {
+    const ringable = await resolveRingableVolunteers(services, hubId)
+    if (!ringable || ringable.available.length === 0) {
       return c.json({ error: 'No volunteers available', status: 'no-volunteers' }, 422)
     }
   }
