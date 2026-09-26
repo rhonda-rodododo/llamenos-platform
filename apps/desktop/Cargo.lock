@@ -7358,8 +7358,3 @@ dependencies = [
  "syn 2.0.118",
  "winnow 0.7.15",
 ]
-
-[[patch.unused]]
-name = "hpke-rs-libcrux"
-version = "0.6.1"
-source = "git+https://github.com/celabshq/hpke-rs#0a4aa953e157111b9a00c9cfc586e9c6a2778e9f"
