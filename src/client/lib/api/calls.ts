@@ -1,4 +1,4 @@
-import { request, hp, getAuthHeaders, notifyAuthExpired, notifyApiActivity, ApiError, NetworkError, isRetryable, MAX_RETRIES, BASE_RETRY_DELAY } from './client'
+import { request, hp, hubPath, getAuthHeaders, notifyAuthExpired, notifyApiActivity, ApiError, NetworkError, isRetryable, MAX_RETRIES, BASE_RETRY_DELAY } from './client'
 import { getApiUrl } from '../api-config'
 import { netFetch } from '../net'
 import type { ActiveCall, CallRecord, UserPresence } from '@protocol/schemas'
@@ -8,8 +8,16 @@ export type { CallRecord }
 
 // --- Calls ---
 
-export async function listActiveCalls() {
-  return request<{ calls: ActiveCall[] }>(hp('/calls/active'))
+/** A call together with the hub it belongs to — every hub action is scoped by it. */
+export type HubCall = ActiveCall & { hubId: string }
+
+/**
+ * List the active calls of ONE hub, tagging each with that hub. Callers that
+ * cover every member hub fan this out per hub; the active hub is irrelevant.
+ */
+export async function listActiveCalls(hubId: string): Promise<{ calls: HubCall[] }> {
+  const { calls } = await request<{ calls: ActiveCall[] }>(hubPath(hubId, '/calls/active'))
+  return { calls: calls.map(call => ({ ...call, hubId })) }
 }
 
 export async function getCallHistory(params?: { page?: number; limit?: number; search?: string; dateFrom?: string; dateTo?: string; status?: 'completed' | 'unanswered' }) {
@@ -24,17 +32,19 @@ export async function getCallHistory(params?: { page?: number; limit?: number; s
 }
 
 // --- Call Actions (REST) ---
+// Always scoped to the call's own hub (never the active hub): the server matches
+// callId AND hubId, so acting on hub B's call through hub A's path 404s.
 
-export async function answerCall(callId: string) {
-  return request<{ call: ActiveCall }>(hp(`/calls/${callId}/answer`), { method: 'POST' })
+export async function answerCall(callId: string, hubId: string) {
+  return request<{ call: ActiveCall }>(hubPath(hubId, `/calls/${callId}/answer`), { method: 'POST' })
 }
 
-export async function hangupCall(callId: string) {
-  return request<{ call: ActiveCall }>(hp(`/calls/${callId}/hangup`), { method: 'POST' })
+export async function hangupCall(callId: string, hubId: string) {
+  return request<{ call: ActiveCall }>(hubPath(hubId, `/calls/${callId}/hangup`), { method: 'POST' })
 }
 
-export async function reportCallSpam(callId: string) {
-  return request<{ callId: string; callerNumber: string | null; reportedBy: string }>(hp(`/calls/${callId}/spam`), { method: 'POST' })
+export async function reportCallSpam(callId: string, hubId: string) {
+  return request<{ callId: string; callerNumber: string | null; reportedBy: string }>(hubPath(hubId, `/calls/${callId}/spam`), { method: 'POST' })
 }
 
 // --- Calls Today ---

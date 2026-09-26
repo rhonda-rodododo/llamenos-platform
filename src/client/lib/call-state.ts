@@ -1,21 +1,29 @@
 // Module-level call state store — readable outside React without re-render coupling.
 // Updated by useCalls hook as a side effect.
+//
+// Calls are stored with the hub they belong to: acting on a call (answer, hang up)
+// must target the call's own hub, which is not necessarily the active one.
 
-let ringingCallIds: string[] = []
-let currentCallId: string | null = null
-
-export function getRingingCallIds(): string[] {
-  return ringingCallIds
+export interface CallRef {
+  id: string
+  hubId: string
 }
 
-export function setRingingCallIds(ids: string[]) {
-  ringingCallIds = ids
+let ringingCalls: CallRef[] = []
+let currentCall: CallRef | null = null
+
+export function getRingingCalls(): CallRef[] {
+  return ringingCalls
 }
 
-export function getCurrentCallId(): string | null {
-  return currentCallId
+export function setRingingCalls(calls: CallRef[]) {
+  ringingCalls = calls
 }
 
-export function setCurrentCallId(id: string | null) {
-  currentCallId = id
+export function getCurrentCall(): CallRef | null {
+  return currentCall
+}
+
+export function setCurrentCall(call: CallRef | null) {
+  currentCall = call
 }

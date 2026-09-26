@@ -3,9 +3,10 @@ import { useTranslation } from 'react-i18next'
 import { useAuth } from '@/lib/auth'
 import { useEffect, useState } from 'react'
 import { useCalls, useCallTimer, useShiftStatus } from '@/lib/hooks'
-import { createNote, banAndHangup, getUserPresence, listUsers, type ActiveCall, type UserPresence, type User } from '@/lib/api'
+import { createNote, banAndHangup, getUserPresence, listUsers, type HubCall, type UserPresence, type User } from '@/lib/api'
 import { usePersonalStats } from '@/lib/queries/analytics'
 import { encryptNote } from '@/lib/platform'
+import { useConfig } from '@/lib/config'
 import { useTranscription } from '@/lib/transcription'
 
 import { useToast } from '@/lib/toast'
@@ -43,6 +44,8 @@ function DashboardPage() {
   const { isAuthenticated, isAdmin, hasDeviceKey, publicKey, onBreak, toggleBreak } = useAuth()
   const { toast } = useToast()
   const navigate = useNavigate()
+  const { hubs, isMultiHub } = useConfig()
+  const hubName = (hubId: string) => hubs.find(h => h.id === hubId)?.name ?? hubId
   const { calls, currentCall, answerCall, hangupCall, reportSpam, ringingCalls, activeCalls } = useCalls()
   const { onShift, currentShift, nextShift } = useShiftStatus()
   const [presence, setPresence] = useState<UserPresence[]>([])
@@ -204,7 +207,7 @@ function DashboardPage() {
           onReportSpam={() => reportSpam(currentCall.id)}
           onBanNumber={async (reason) => {
             try {
-              await banAndHangup(currentCall.id, reason)
+              await banAndHangup(currentCall.id, currentCall.hubId, reason)
               toast(t('common.success'), 'success')
             } catch {
               toast(t('common.error'), 'error')
@@ -225,11 +228,15 @@ function DashboardPage() {
           </CardHeader>
           <CardContent className="space-y-2">
             {ringingCalls.map(call => (
-              <div key={call.id} className="flex items-center justify-between rounded-lg bg-green-100 px-4 py-3 dark:bg-green-950/30">
+              <div key={call.id} data-testid={`incoming-call-row-${call.id}`} className="flex items-center justify-between rounded-lg bg-green-100 px-4 py-3 dark:bg-green-950/30">
                 <div>
                   <p className="font-medium">{t('calls.incoming')}</p>
+                  {isMultiHub && (
+                    <p data-testid="call-hub-label" className="text-xs text-muted-foreground">{hubName(call.hubId)}</p>
+                  )}
                 </div>
                 <Button
+                  data-testid={`answer-call-btn-${call.id}`}
                   onClick={() => answerCall(call.id)}
                   className="animate-pulse bg-green-600 hover:bg-green-700"
                 >
@@ -331,7 +338,7 @@ function DashboardPage() {
 }
 
 function ActiveCallPanel({ call, onHangup, onReportSpam, onBanNumber, authorPubkey }: {
-  call: ActiveCall
+  call: HubCall
   onHangup: () => void
   onReportSpam: () => void
   onBanNumber: (reason?: string) => void
@@ -362,7 +369,7 @@ function ActiveCallPanel({ call, onHangup, onReportSpam, onBanNumber, authorPubk
     try {
       const adminPub = adminDecryptionPubkey || authorPubkey
       const { encryptedContent, authorEnvelope, adminEnvelopes } = await encryptNote(JSON.stringify({ text: noteText }), authorPubkey, [adminPub])
-      await createNote({ callId: call.id, encryptedContent, authorEnvelope, adminEnvelopes })
+      await createNote({ callId: call.id, encryptedContent, authorEnvelope, adminEnvelopes }, call.hubId)
       setSaved(true)
       setTimeout(() => setSaved(false), 2000)
     } catch {
@@ -384,7 +391,7 @@ function ActiveCallPanel({ call, onHangup, onReportSpam, onBanNumber, authorPubk
             authorPubkey,
             [adminPub],
           )
-          await createNote({ callId: call.id, encryptedContent, authorEnvelope, adminEnvelopes })
+          await createNote({ callId: call.id, encryptedContent, authorEnvelope, adminEnvelopes }, call.hubId)
           toast(t('transcription.saved'), 'success')
         }
       } catch {

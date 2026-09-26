@@ -7,18 +7,22 @@ import { useRelay, useRelayState } from './context'
 import type { RelayEventHandler } from './types'
 
 /**
- * Subscribe to relay events for a specific hub.
+ * Subscribe to relay events for a set of hubs (one relay subscription per hub).
  *
  * Automatically manages subscription lifecycle: subscribes when the relay
  * is connected, unsubscribes on unmount or when deps change.
  *
- * @param hubId - Hub to subscribe to (from config)
+ * Multi-hub axiom: anything that must be received regardless of what the user
+ * is browsing (incoming calls, conversation events) subscribes to EVERY member
+ * hub with this hook, never to the active hub only.
+ *
+ * @param hubIds - Hubs to subscribe to; order and duplicates are irrelevant
  * @param kinds - Event kinds to listen for
- * @param handler - Callback receiving (kind, decrypted content, hubId)
+ * @param handler - Callback receiving (kind, decrypted content, hubId of the originating hub)
  * @param enabled - Set to false to disable the subscription (default: true)
  */
-export function useRelaySubscription(
-  hubId: string | undefined,
+export function useRelaySubscriptions(
+  hubIds: readonly string[],
   kinds: number[],
   handler: RelayEventHandler,
   enabled = true,
@@ -29,16 +33,33 @@ export function useRelaySubscription(
   const handlerRef = useRef(handler)
   handlerRef.current = handler
 
-  useEffect(() => {
-    if (!relay || !hubId || !enabled || state !== 'connected') return
+  const hubKey = [...new Set(hubIds)].sort().join(',')
 
-    const subId = relay.subscribe(hubId, kinds, (kind, content, hub) => {
-      handlerRef.current(kind, content, hub)
-    })
+  useEffect(() => {
+    if (!relay || !hubKey || !enabled || state !== 'connected') return
+
+    const subIds = hubKey.split(',').map(hubId =>
+      relay.subscribe(hubId, kinds, (kind, content, hub) => {
+        handlerRef.current(kind, content, hub)
+      }),
+    )
 
     return () => {
-      relay.unsubscribe(subId)
+      for (const subId of subIds) relay.unsubscribe(subId)
     }
-    // Resubscribe when relay instance, hub, kinds, or enabled state changes
-  }, [relay, hubId, kinds.join(','), enabled, state])
+    // Resubscribe when relay instance, hub set, kinds, or enabled state changes
+  }, [relay, hubKey, kinds.join(','), enabled, state])
+}
+
+/**
+ * Subscribe to relay events for a single hub. See {@link useRelaySubscriptions}
+ * for the multi-hub form.
+ */
+export function useRelaySubscription(
+  hubId: string | undefined,
+  kinds: number[],
+  handler: RelayEventHandler,
+  enabled = true,
+): void {
+  useRelaySubscriptions(hubId ? [hubId] : [], kinds, handler, enabled)
 }
