@@ -9,7 +9,7 @@ import { expect } from '@playwright/test'
 import { Given, When, Then } from './fixtures'
 import { getScenarioState } from './common.steps'
 import { setLastResponse } from './shared-state'
-import { apiPost, apiPut, listAuditLogViaApi } from '../../api-helpers'
+import { apiPatch, apiPost, apiPut, createVolunteerViaApi, listAuditLogViaApi, setFallbackGroupViaApi } from '../../api-helpers'
 
 interface SimulatedCallResponse {
   ok?: boolean
@@ -26,6 +26,33 @@ Given('the hub uses the mock telephony provider', async ({ request, world }) => 
   const res = await apiPut(request, demoPath(hubId, '/mock'), { enabled: true })
   // Fail loudly when the server is not in demo mode — never pass vacuously.
   expect(res.status, `enabling the mock failed (is the server running with DEMO_MODE=true?): ${JSON.stringify(res.data)}`).toBe(200)
+})
+
+async function setOnBreak(
+  request: Parameters<typeof apiPatch>[0],
+  deviceKey: string,
+  onBreak: boolean,
+) {
+  const res = await apiPatch(request, '/auth/me/availability', { onBreak }, deviceKey)
+  expect(res.status, `setting onBreak=${onBreak} failed: ${JSON.stringify(res.data)}`).toBe(200)
+}
+
+Given('every on-shift volunteer is on break', async ({ request, world }) => {
+  const { volunteers } = getScenarioState(world)
+  expect(volunteers.length).toBeGreaterThan(0)
+  for (const vol of volunteers) await setOnBreak(request, vol.deviceKey, true)
+})
+
+Given('a volunteer who is not on shift is in the hub fallback group', async ({ request, world }) => {
+  const state = getScenarioState(world)
+  const fallback = await createVolunteerViaApi(request, { name: `BDD Fallback ${Date.now()}` })
+  await setFallbackGroupViaApi(request, [fallback.pubkey], state.hubId)
+  state.volunteers.push(fallback)
+})
+
+Given('the fallback volunteer is on break', async ({ request, world }) => {
+  const { volunteers } = getScenarioState(world)
+  await setOnBreak(request, volunteers[volunteers.length - 1].deviceKey, true)
 })
 
 async function simulate(
