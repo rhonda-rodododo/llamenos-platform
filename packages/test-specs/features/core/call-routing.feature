@@ -251,6 +251,19 @@ Feature: Call Routing & History
     And I tap the "All" call filter chip
     Then the "All" call filter should be selected
 
+  @desktop @regression
+  Scenario: Status chips list only calls with the selected status
+    Given I am authenticated and on the dashboard
+    And 2 completed calls and 1 unanswered call exist in the active hub
+    When I tap the view call history button
+    And I tap the "Completed" call filter chip
+    Then the call history lists at least 2 "completed" calls and no other status
+    When I tap the "Unanswered" call filter chip
+    Then the call history lists at least 1 "unanswered" calls and no other status
+    When I tap the "All" call filter chip
+    Then the call history lists at least 1 "completed" calls
+    And the call history lists at least 1 "unanswered" calls
+
   @desktop @android @regression
   Scenario: Call history has pull to refresh
     Given I am authenticated and on the dashboard

@@ -97,7 +97,7 @@ export function CommandPalette() {
                 {t('commandPalette.searchNotes', { query: searchQuery.trim() })}
               </CommandItem>
               {isAdmin && (
-                <CommandItem onSelect={() => runCommand(() => navigate({ to: '/calls', search: { page: 1, q: searchQuery.trim(), dateFrom: '', dateTo: '' } }))}>
+                <CommandItem onSelect={() => runCommand(() => navigate({ to: '/calls', search: { page: 1, q: searchQuery.trim(), dateFrom: '', dateTo: '', status: '' } }))}>
                   <Search className="h-4 w-4" />
                   {t('commandPalette.searchCalls', { query: searchQuery.trim() })}
                 </CommandItem>
@@ -138,7 +138,7 @@ export function CommandPalette() {
                   <ShieldBan className="h-4 w-4" />
                   {t('nav.banList')}
                 </CommandItem>
-                <CommandItem onSelect={() => runCommand(() => navigate({ to: '/calls', search: { page: 1, q: '', dateFrom: '', dateTo: '' } }))}>
+                <CommandItem onSelect={() => runCommand(() => navigate({ to: '/calls', search: { page: 1, q: '', dateFrom: '', dateTo: '', status: '' } }))}>
                   <PhoneIncoming className="h-4 w-4" />
                   {t('nav.callHistory')}
                 </CommandItem>

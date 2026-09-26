@@ -12,13 +12,14 @@ export async function listActiveCalls() {
   return request<{ calls: ActiveCall[] }>(hp('/calls/active'))
 }
 
-export async function getCallHistory(params?: { page?: number; limit?: number; search?: string; dateFrom?: string; dateTo?: string }) {
+export async function getCallHistory(params?: { page?: number; limit?: number; search?: string; dateFrom?: string; dateTo?: string; status?: 'completed' | 'unanswered' }) {
   const qs = new URLSearchParams()
   if (params?.page) qs.set('page', String(params.page))
   if (params?.limit) qs.set('limit', String(params.limit))
   if (params?.search) qs.set('search', params.search)
   if (params?.dateFrom) qs.set('dateFrom', params.dateFrom)
   if (params?.dateTo) qs.set('dateTo', params.dateTo)
+  if (params?.status) qs.set('status', params.status)
   return request<{ calls: CallRecord[]; total: number }>(hp(`/calls/history?${qs}`))
 }
 

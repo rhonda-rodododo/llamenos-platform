@@ -7,10 +7,18 @@
  * Behavioral depth: Hard assertions on call-specific elements.
  * No .or(PAGE_TITLE) fallbacks.
  */
-import { expect } from '@playwright/test'
+import { expect, type Page } from '@playwright/test'
 import { Given, When, Then } from '../fixtures'
 import { TestIds } from '../../test-ids'
 import { Timeouts, Navigation } from '../../helpers'
+import { ADMIN_SEED, seedHexToPubkey } from '../../api-helpers'
+import {
+  simulateIncomingCall,
+  simulateAnswerCall,
+  simulateEndCall,
+  simulateVoicemail,
+  uniqueCallerNumber,
+} from '../../simulation-helpers'
 
 Given('I am on the call history screen', async ({ page }) => {
   await Navigation.goToCallHistory(page)
@@ -30,45 +38,80 @@ Then('I should see the call history title', async ({ page }) => {
   await expect(page.getByTestId(TestIds.PAGE_TITLE)).toContainText(/call/i)
 })
 
+/** Maps the chip label used in the shared feature specs to its stable testid + URL status. */
+const CALL_FILTER_CHIPS: Record<string, { testId: string; status: string }> = {
+  All: { testId: TestIds.CALL_FILTER_ALL, status: '' },
+  Completed: { testId: TestIds.CALL_FILTER_COMPLETED, status: 'completed' },
+  Unanswered: { testId: TestIds.CALL_FILTER_UNANSWERED, status: 'unanswered' },
+}
+
+function callFilterChip(filterName: string) {
+  const chip = CALL_FILTER_CHIPS[filterName]
+  if (!chip) throw new Error(`Unknown call filter chip "${filterName}" — expected one of ${Object.keys(CALL_FILTER_CHIPS).join(', ')}`)
+  return chip
+}
+
 Then('I should see the {string} call filter chip', async ({ page }, filterName: string) => {
-  // Desktop call history uses search + date filters instead of status chips.
-  // Check for the filter text or fall back to verifying the page is loaded.
-  const filterChip = page.getByText(new RegExp(filterName, 'i')).first()
-  const isVisible = await filterChip.isVisible({ timeout: 3000 }).catch(() => false)
-  if (!isVisible) {
-    // Fallback: just verify the page is loaded
-    await expect(page.getByTestId(TestIds.PAGE_TITLE)).toBeVisible({ timeout: Timeouts.ELEMENT })
-  }
+  await expect(page.getByTestId(callFilterChip(filterName).testId)).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 When('I tap the {string} call filter chip', async ({ page }, filterName: string) => {
-  // Desktop call history has no per-status chips (search + date filters only — see the
-  // sibling Then step above); this step is shared with iOS/Android, where the chip is
-  // real. Was: `isVisible({ timeout })` — ignored on Playwright's `isVisible()`, so this
-  // returned immediately rather than waiting, racing the page load on platforms that DO
-  // have the chip — and matched on an unanchored substring, so filterName "All" matched
-  // the sidebar's "Call Notes" nav link. Word-boundary the match, then wait for a settled
-  // state (the chip, or confirmation the page itself has loaded) instead of guessing, and
-  // click only if the chip actually exists.
-  //
-  // NOTE: a hard assertion (fail loudly if the chip never renders) was tried here first —
-  // it broke every desktop chip-filter scenario, since desktop genuinely never renders
-  // per-status chips (confirmed by reading calls.tsx). This `.or(pageTitle)` fallback is
-  // not a swallowed probe — it's the correct handling of a real platform difference.
-  const filterChip = page.getByText(new RegExp(`\\b${filterName}\\b`, 'i')).filter({ visible: true })
-  const pageTitle = page.getByTestId(TestIds.PAGE_TITLE)
-  await expect(filterChip.first().or(pageTitle)).toBeVisible({ timeout: Timeouts.ELEMENT })
-  if (await filterChip.count() > 0) {
-    await filterChip.first().click()
-  }
+  await page.getByTestId(callFilterChip(filterName).testId).click()
 })
 
 Then('the {string} call filter should be selected', async ({ page }, filterName: string) => {
-  const filterChip = page.getByText(new RegExp(filterName, 'i')).first()
-  const isVisible = await filterChip.isVisible({ timeout: 3000 }).catch(() => false)
-  if (!isVisible) {
-    await expect(page.getByTestId(TestIds.PAGE_TITLE)).toBeVisible({ timeout: Timeouts.ELEMENT })
+  const { testId, status } = callFilterChip(filterName)
+  await expect(page.getByTestId(testId)).toHaveAttribute('aria-pressed', 'true', { timeout: Timeouts.ELEMENT })
+  for (const other of Object.values(CALL_FILTER_CHIPS)) {
+    if (other.testId !== testId) {
+      await expect(page.getByTestId(other.testId)).toHaveAttribute('aria-pressed', 'false')
+    }
   }
+  // The list must have settled on the filtered result (skeleton gone), then every
+  // rendered row has to carry the selected status.
+  await expect(
+    page.getByTestId(TestIds.CALL_LIST).or(page.getByTestId(TestIds.EMPTY_STATE)),
+  ).toBeVisible({ timeout: Timeouts.ELEMENT })
+  if (status) {
+    await expect.poll(() => callRowStatuses(page).then(rows => rows.filter(r => r !== status))).toEqual([])
+  }
+})
+
+async function countCallRows(page: Page, status: string): Promise<number> {
+  return (await callRowStatuses(page)).filter(r => r === status).length
+}
+
+/** Status (data-call-status) of every call row currently rendered. */
+function callRowStatuses(page: Page): Promise<Array<string | null>> {
+  return page.getByTestId(TestIds.CALL_ROW).evaluateAll(rows => rows.map(r => r.getAttribute('data-call-status')))
+}
+
+Given(
+  '{int} completed calls and {int} unanswered call exist in the active hub',
+  async ({ backendRequest, workerHub }, completed: number, unanswered: number) => {
+    const adminPubkey = seedHexToPubkey(ADMIN_SEED)
+    for (let i = 0; i < completed; i++) {
+      const { callId } = await simulateIncomingCall(backendRequest, { callerNumber: uniqueCallerNumber(), hubId: workerHub })
+      await simulateAnswerCall(backendRequest, callId, adminPubkey)
+      await simulateEndCall(backendRequest, callId)
+    }
+    for (let i = 0; i < unanswered; i++) {
+      const { callId } = await simulateIncomingCall(backendRequest, { callerNumber: uniqueCallerNumber(), hubId: workerHub })
+      await simulateVoicemail(backendRequest, callId)
+    }
+  },
+)
+
+Then(
+  'the call history lists at least {int} {string} calls and no other status',
+  async ({ page }, minimum: number, status: string) => {
+    await expect.poll(() => countCallRows(page, status), { timeout: Timeouts.ELEMENT }).toBeGreaterThanOrEqual(minimum)
+    await expect.poll(() => callRowStatuses(page).then(rows => rows.filter(r => r !== status))).toEqual([])
+  },
+)
+
+Then('the call history lists at least {int} {string} calls', async ({ page }, minimum: number, status: string) => {
+  await expect.poll(() => countCallRows(page, status), { timeout: Timeouts.ELEMENT }).toBeGreaterThanOrEqual(minimum)
 })
 
 Then('I should see the call history content or empty state', async ({ page }) => {
@@ -90,38 +133,33 @@ Then('the call history screen should support pull to refresh', async ({ page }) 
   await expect(content.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
+/** Waits for the call history to settle on either rows or the empty state; returns the row count. */
+async function settledCallRowCount(page: Page): Promise<number> {
+  await expect(
+    page.getByTestId(TestIds.CALL_LIST).or(page.getByTestId(TestIds.EMPTY_STATE)),
+  ).toBeVisible({ timeout: Timeouts.ELEMENT })
+  return page.getByTestId(TestIds.CALL_ROW).count()
+}
+
 Then('each call record should have an add note button', async ({ page }) => {
-  const callRow = page.getByTestId(TestIds.CALL_ROW).first()
-  const hasRow = await callRow.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
-  if (hasRow) {
-    // Verify note button exists within call row
-    const noteBtn = callRow.locator('button, [role="button"]')
-    const btnCount = await noteBtn.count()
-    expect(btnCount).toBeGreaterThanOrEqual(1)
+  // Desktop's per-row note affordance is the "view notes" link into /notes for that call.
+  const rows = page.getByTestId(TestIds.CALL_ROW)
+  const rowCount = await settledCallRowCount(page)
+  for (let i = 0; i < rowCount; i++) {
+    await expect(rows.nth(i).getByTestId(TestIds.CALL_NOTES_LINK)).toBeVisible({ timeout: Timeouts.ELEMENT })
   }
   // If no call records exist in test env, step passes gracefully
 })
 
 When('I tap the add note button on a call record', async ({ page }) => {
-  const callRow = page.getByTestId(TestIds.CALL_ROW).first()
-  const hasRow = await callRow.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
-  if (hasRow) {
-    // Look for an add-note button within the row first
-    const noteBtn = callRow.locator('button, [role="button"]').first()
-    const hasBtn = await noteBtn.isVisible({ timeout: 3000 }).catch(() => false)
-    if (hasBtn) {
-      await noteBtn.click()
-      return
-    }
-    await callRow.click()
-  }
-  // If no call records exist (CI without backend), navigate to notes directly
-  // so the note creation screen assertion passes
-  if (!hasRow) {
+  if (await settledCallRowCount(page) > 0) {
+    await page.getByTestId(TestIds.CALL_ROW).first().getByTestId(TestIds.CALL_NOTES_LINK).click()
+  } else {
+    // No call records in this environment: go to the notes page directly.
     const { Navigation } = await import('../../pages/index')
     await Navigation.goToNotes(page)
-    await page.getByTestId(TestIds.NOTE_NEW_BTN).click()
   }
+  await page.getByTestId(TestIds.NOTE_NEW_BTN).click()
 })
 
 When('I tap the back button on call history', async ({ page }) => {
