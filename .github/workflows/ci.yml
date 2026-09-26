@@ -422,7 +422,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2]
+        shard: [1, 2, 3, 4]
 
     steps:
       - name: Checkout
@@ -488,7 +488,7 @@ jobs:
           done
 
       - name: Run E2E tests
-        run: bunx playwright test --project=bootstrap --project=bdd --shard=${{ matrix.shard }}/2 --workers=1
+        run: bunx playwright test --project=bootstrap --project=bdd --shard=${{ matrix.shard }}/${{ strategy.job-total }} --workers=1
         env:
           CI: "true"
           PLAYWRIGHT_BASE_URL: "http://localhost:8788"
@@ -967,7 +967,7 @@ jobs:
           SHARD_ID=${{ matrix.shard }}
           IDX=0
           while IFS= read -r file; do
-            if [ $((IDX % 4)) -eq "$SHARD_ID" ]; then
+            if [ $((IDX % ${{ strategy.job-total }})) -eq "$SHARD_ID" ]; then
               # Prepend "features/" to match the Android asset path:
               # Gradle copies packages/test-specs/features/platform/mobile/**
               # to src/androidTest/assets/features/platform/mobile/**
