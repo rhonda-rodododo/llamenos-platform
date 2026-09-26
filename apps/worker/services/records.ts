@@ -40,6 +40,8 @@ export interface CreateNoteInput {
   fieldEnvelopes?: unknown
   authorEnvelope: unknown
   adminEnvelopes?: unknown[]
+  /** Explicit creation time — only for seeding historical demo data. */
+  createdAt?: Date
 }
 
 export interface UpdateNoteInput {
@@ -100,6 +102,7 @@ export class RecordsService {
         authorEnvelope: input.authorEnvelope,
         adminEnvelopes: input.adminEnvelopes ?? [],
         replyCount: 0,
+        ...(input.createdAt ? { createdAt: input.createdAt, updatedAt: input.createdAt } : {}),
       })
       .returning()
 

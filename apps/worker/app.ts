@@ -42,6 +42,7 @@ import metricsRoutes from './routes/metrics'
 import systemRoutes from './routes/system'
 import entitySchemaRoutes from './routes/entity-schema'
 import evidenceRoutes from './routes/evidence'
+import demoRoutes from './routes/demo'
 import geocodingRoutes from './routes/geocoding'
 import analyticsRoutes from './routes/analytics'
 import sigchainRoutes from './routes/sigchain'
@@ -247,6 +248,7 @@ authenticated.route('/events', eventsRoutes)
 authenticated.route('/admin/events', eventsAdminRouter)
 authenticated.route('/', evidenceRoutes)
 authenticated.route('/system', systemRoutes)
+authenticated.route('/demo', demoRoutes)
 authenticated.route('/geocoding', geocodingRoutes)
 authenticated.route('/analytics', analyticsRoutes)
 // Phase 6: per-user sigchain (mounted at /users/:targetPubkey/sigchain via nested router)

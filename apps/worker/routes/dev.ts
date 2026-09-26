@@ -7,6 +7,9 @@ import { publishEvent } from '../lib/ws-events'
 import { KIND_CALL_RING, KIND_CALL_UPDATE, KIND_CALL_VOICEMAIL, KIND_MESSAGE_NEW, KIND_PRESENCE_UPDATE } from '@shared/event-kinds'
 import { getTestPushLog, clearTestPushLog } from '../lib/push-dispatch'
 import { getApnsBundleId, getApnsVoipTopic } from '../lib/apns-topic'
+import { seedDemoDataset } from '../services/demo-seeder'
+import { DEMO_HUB } from '../lib/demo-dataset'
+import { DEMO_ACCOUNTS } from '@shared/demo-accounts'
 
 /**
  * Decode a pubkey (hex only — npub1 bech32 encoding is no longer supported).
@@ -715,6 +718,34 @@ dev.post('/test-seed', async (c) => {
   })
 })
 
+
+// ─── Demo dataset (BDD helper) ─────────────────────────────────────────────────
+// Runs the same seeder the demo reset uses, without the destructive global wipe,
+// so BDD can exercise it against the shared dev server. Creates the demo accounts
+// if they are missing; DELETE removes the demo hub and accounts again.
+
+dev.post('/test-seed-demo', async (c) => {
+  if (c.env.ENVIRONMENT !== 'development' || !checkResetSecret(c)) {
+    return c.json({ error: 'Not Found' }, 404)
+  }
+  const services = c.get('services')
+  await services.identity.ensureInit(undefined, true)
+  const summary = await seedDemoDataset(services, c.env)
+  return c.json({ ok: true, summary })
+})
+
+dev.delete('/test-seed-demo', async (c) => {
+  if (c.env.ENVIRONMENT !== 'development' || !checkResetSecret(c)) {
+    return c.json({ error: 'Not Found' }, 404)
+  }
+  const services = c.get('services')
+  const { hubs } = await services.settings.getHubs()
+  if (hubs.some(h => h.id === DEMO_HUB.id)) await services.settings.deleteHub(DEMO_HUB.id)
+  for (const account of DEMO_ACCOUNTS) {
+    await services.identity.deleteUser(account.pubkey).catch(() => {})
+  }
+  return c.json({ ok: true })
+})
 
 // ─── Simulation Endpoints (E2E test helpers) ───────────────────────────────
 // These bypass TelephonyAdapter entirely — they proxy directly to service calls.
