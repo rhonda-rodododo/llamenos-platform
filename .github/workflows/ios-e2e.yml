@@ -311,7 +311,7 @@ jobs:
           echo "Total UI test files: $TOTAL"
 
           SHARD_ID=${{ matrix.shard }}
-          TOTAL_SHARDS=4
+          TOTAL_SHARDS=${{ strategy.job-total }}
 
           # Build -only-testing arguments for tests assigned to this shard
           ONLY_TESTING_ARGS=""
