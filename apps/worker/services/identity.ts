@@ -261,8 +261,10 @@ export class IdentityService {
   }
 
   /**
-   * Ensure default admin is seeded (called on startup).
-   * Also seeds demo accounts when DEMO_MODE is true.
+   * Upsert the given admin as role-super-admin, and seed demo accounts when
+   * `demoMode` is true. Called only from dev/test reset routes and the demo
+   * seeder — NOT on production startup, so setting ADMIN_PUBKEY alone does not
+   * create an account (the first admin registers via POST /api/auth/bootstrap).
    */
   async ensureInit(adminPubkey?: string, demoMode = false): Promise<void> {
     if (adminPubkey) {
