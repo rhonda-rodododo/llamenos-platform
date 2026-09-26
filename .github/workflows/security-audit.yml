@@ -69,8 +69,12 @@ jobs:
       - name: Audit JS dependencies (critical)
         run: bun audit --audit-level=critical
 
+      # Informational only. The critical-severity gate above is the hard gate and
+      # stays blocking. This step is allowed to fail (continue-on-error) so lower
+      # severities are surfaced as a failed step in the UI without reddening the
+      # job — `|| true` on top of that would only hide the step's own result.
       - name: Audit JS dependencies (all severities — informational)
-        run: bun audit || true
+        run: bun audit
         continue-on-error: true
 
   # ─── Rust Dependency Audit ─────────────────────────────────
@@ -89,8 +93,24 @@ jobs:
         with:
           toolchain: stable
 
-      - name: Install cargo-audit
-        run: cargo install cargo-audit --locked
+      - name: Install cargo-audit (pinned — avoid silent behaviour drift)
+        run: cargo install cargo-audit --version 0.22.1 --locked
+
+      # `cargo audit` on a crate with no Cargo.lock cannot audit anything. That
+      # used to be handled by making the apps/desktop step never fail, which
+      # turned "lockfile missing" into "vulnerabilities ignored". Assert the
+      # precondition loudly and specifically instead, and let the audit steps
+      # below fail for real.
+      - name: Assert Cargo.lock is committed (packages/crypto, apps/desktop)
+        run: |
+          missing=0
+          for lock in packages/crypto/Cargo.lock apps/desktop/Cargo.lock; do
+            if [ ! -f "$lock" ]; then
+              echo "::error file=$lock::$lock is not committed — cargo audit has nothing to audit. Commit the lockfile; do not disable this check."
+              missing=1
+            fi
+          done
+          exit "$missing"
 
       - name: Audit Rust dependencies (packages/crypto)
         working-directory: packages/crypto
@@ -99,7 +119,6 @@ jobs:
       - name: Audit Rust dependencies (apps/desktop)
         working-directory: apps/desktop
         run: cargo audit
-        continue-on-error: true  # May fail if desktop Cargo.lock is not committed
 
   # ─── Dockerfile Security Scanning ──────────────────────────
   dockerfile-scan:
@@ -343,6 +362,11 @@ jobs:
           exit-code: '0'
 
   # ─── Crypto Guardrails (informational) ─────────────────────
+  # Findings are emitted as ::warning:: annotations and never fail the build —
+  # that is by design. Everything else (a missing path, a bad regex, a crashed
+  # step) DOES fail the job: there is deliberately no job-level continue-on-error
+  # and no blanket `|| true`. grep exits 1 for "no match", which here means
+  # "clean" and is tolerated; exit >= 2 is a real error and is not.
   crypto-guardrails:
     runs-on: ubuntu-latest
     if: >-
@@ -351,23 +375,37 @@ jobs:
     permissions:
       contents: read
     timeout-minutes: 5
-    continue-on-error: true
 
     steps:
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
-      - name: Check for raw unwrap() on crypto operations
+      - name: Crypto code guardrails (warn-only findings)
         run: |
+          set -euo pipefail
+          paths=(packages/crypto/src/ apps/desktop/src/crypto.rs)
+
+          # scan <ERE-to-find> <ERE-of-lines-to-exclude>
+          # Prints matching lines. Tolerates ONLY grep's "no match" (exit 1).
+          scan() {
+            local raw rc=0
+            raw=$(grep -rnE "$1" "${paths[@]}" --include='*.rs') || rc=$?
+            if [ "$rc" -gt 1 ]; then
+              echo "::error::grep failed (exit $rc) scanning ${paths[*]}" >&2
+              return "$rc"
+            fi
+            [ -n "$raw" ] || return 0
+            rc=0
+            printf '%s\n' "$raw" | grep -Ev "$2" || rc=$?
+            if [ "$rc" -gt 1 ]; then
+              echo "::error::grep filter failed (exit $rc)" >&2
+              return "$rc"
+            fi
+          }
+
           echo "=== Checking for raw unwrap() in crypto crate ==="
           # Flag unwrap() calls that aren't in test files
-          FINDINGS=$(grep -rn '\.unwrap()' packages/crypto/src/ apps/desktop/src/crypto.rs \
-            --include='*.rs' \
-            | grep -v '#\[cfg(test)\]' \
-            | grep -v '_test\.rs:' \
-            | grep -v 'tests\.rs:' \
-            | grep -v 'mod tests' \
-            || true)
+          FINDINGS=$(scan '\.unwrap\(\)' '#\[cfg\(test\)\]|_test\.rs:|tests\.rs:|mod tests')
           if [ -n "$FINDINGS" ]; then
             echo "::warning::Found unwrap() calls in crypto code (consider proper error handling):"
             echo "$FINDINGS"
@@ -375,16 +413,8 @@ jobs:
             echo "No unwrap() calls found in production crypto code."
           fi
 
-      - name: Check for non-cryptographic RNG usage
-        run: |
           echo "=== Checking for non-cryptographic RNG in crypto crate ==="
-          FINDINGS=$(grep -rn 'use rand::' packages/crypto/src/ apps/desktop/src/crypto.rs \
-            --include='*.rs' \
-            | grep -v 'rand::rngs::OsRng' \
-            | grep -v 'rand::CryptoRng' \
-            | grep -v '_test\.rs:' \
-            | grep -v 'tests\.rs:' \
-            || true)
+          FINDINGS=$(scan 'use rand::' 'rand::rngs::OsRng|rand::CryptoRng|_test\.rs:|tests\.rs:')
           if [ -n "$FINDINGS" ]; then
             echo "::warning::Found non-OsRng/non-CryptoRng rand usage in crypto code:"
             echo "$FINDINGS"
@@ -392,17 +422,8 @@ jobs:
             echo "No suspicious RNG usage found."
           fi
 
-      - name: Check for hardcoded keys outside tests
-        run: |
           echo "=== Checking for hardcoded keys in crypto code ==="
-          FINDINGS=$(grep -rn -E '(0x[0-9a-fA-F]{32,}|\\x[0-9a-fA-F]{2}){8,}' \
-            packages/crypto/src/ apps/desktop/src/crypto.rs \
-            --include='*.rs' \
-            | grep -v '_test\.rs:' \
-            | grep -v 'tests\.rs:' \
-            | grep -v '#\[cfg(test)\]' \
-            | grep -v 'mod tests' \
-            || true)
+          FINDINGS=$(scan '(0x[0-9a-fA-F]{32,}|\\x[0-9a-fA-F]{2}){8,}' '_test\.rs:|tests\.rs:|#\[cfg\(test\)\]|mod tests')
           if [ -n "$FINDINGS" ]; then
             echo "::warning::Found potential hardcoded keys in production crypto code:"
             echo "$FINDINGS"
@@ -411,18 +432,16 @@ jobs:
           fi
 
   # ─── Rust Dependency Policy (cargo deny) ───────────────────
-  # G5 (CI gate audit, 2026-09-11): this job was continue-on-error at both
-  # job AND step level, and cargo install cargo-deny --locked (unpinned)
-  # had drifted onto cargo-deny 0.20, whose config schema silently broke
-  # deny.toml's `unmaintained = "warn"` field — the tool was failing to even
-  # parse its config and producing zero results, invisibly, before this fix.
+  # Every check here is a hard gate — there is no continue-on-error at job or
+  # step level. History: G5 (CI gate audit, 2026-09-11) made licenses/bans/
+  # sources blocking and pinned cargo-deny (an unpinned install had drifted to
+  # 0.20, whose config schema silently broke deny.toml). `advisories` stayed
+  # warn-only pending RUSTSEC triage (#646); that left the job unable to go red
+  # on a TLS-library vulnerability, so it is blocking now.
   #
-  # deny.toml has been fixed for the 0.20 schema and the version is now
-  # pinned. `licenses`, `bans`, and `sources` are clean for both manifests
-  # and are now hard-fail. `advisories` has real, un-triaged findings
-  # (RUSTSEC vulnerabilities + unmaintained crates in the openmls/libcrux
-  # dependency chain — see the tracking issue filed alongside this PR) and
-  # stays warn-only until that triage is complete.
+  # The only sanctioned way to accept an advisory is a per-ID, justified,
+  # dated entry in deny.toml `[advisories].ignore` — enforced by the expiry
+  # step below.
   cargo-deny:
     runs-on: ubuntu-latest
     permissions:
@@ -441,16 +460,43 @@ jobs:
       - name: Install cargo-deny (pinned — avoid silent config-schema drift)
         run: cargo install cargo-deny --version 0.20.2 --locked
 
+      # cargo-deny has no native expiry for `ignore` entries, so enforce it:
+      # every entry must be a per-ID table with a reason ending in
+      # `[expires YYYY-MM-DD]`, and that date must not have passed.
+      - name: Enforce advisory ignore expiry (deny.toml)
+        run: |
+          python3 - <<'PY'
+          import datetime, re, sys, tomllib
+
+          with open("deny.toml", "rb") as f:
+              ignores = tomllib.load(f).get("advisories", {}).get("ignore", [])
+
+          today = datetime.date.today()
+          bad = []
+          for entry in ignores:
+              if not isinstance(entry, dict) or "id" not in entry or not entry.get("reason"):
+                  bad.append(f"{entry!r}: must be {{ id = \"RUSTSEC-…\", reason = \"…\" }} (bare IDs carry no justification)")
+                  continue
+              m = re.search(r"\[expires (\d{4}-\d{2}-\d{2})\]\s*$", entry["reason"])
+              if not m:
+                  bad.append(f"{entry['id']}: reason must end with `[expires YYYY-MM-DD]`")
+              elif datetime.date.fromisoformat(m.group(1)) < today:
+                  bad.append(f"{entry['id']}: ignore EXPIRED on {m.group(1)} — re-triage (fix, or renew with a fresh justification)")
+
+          for msg in bad:
+              print(f"::error file=deny.toml::{msg}")
+          print(f"{len(ignores)} advisory ignore(s) checked, {len(bad)} problem(s)")
+          sys.exit(1 if bad else 0)
+          PY
+
       - name: Check packages/crypto (licenses, bans, sources)
         run: cargo deny --manifest-path packages/crypto/Cargo.toml check licenses bans sources
 
       - name: Check apps/desktop (licenses, bans, sources)
         run: cargo deny --manifest-path apps/desktop/Cargo.toml check licenses bans sources
 
-      - name: Check packages/crypto advisories (warn-only — see tracking issue)
+      - name: Check packages/crypto advisories
         run: cargo deny --manifest-path packages/crypto/Cargo.toml check advisories
-        continue-on-error: true
 
-      - name: Check apps/desktop advisories (warn-only — see tracking issue)
+      - name: Check apps/desktop advisories
         run: cargo deny --manifest-path apps/desktop/Cargo.toml check advisories
-        continue-on-error: true

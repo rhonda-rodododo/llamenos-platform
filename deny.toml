@@ -15,19 +15,44 @@ db-path = "~/.cargo/advisory-db"
 version = 2
 
 # cargo-deny 0.20 changed `unmaintained` from a severity string to a scope
-# enum (which crates to check for unmaintained status). Severity is no
-# longer configurable per-lint here — RUSTSEC "unmaintained" advisories are
-# reported at their own severity via the advisory database, and unknown/
-# unresolved advisories are handled by the `ignore` list below.
+# enum (which crates to check for unmaintained status). It is `all` here, so
+# unmaintained transitive crates are hard errors, exactly like vulnerabilities.
 unmaintained = "all"
 
 # Always error on yanked crates — these are explicitly retracted.
 yanked = "warn"
 
-# Ignore advisories we've explicitly assessed and accepted.
+# Advisories we have explicitly assessed and accepted. This list is the ONLY
+# way an advisory may fail to fail the build (the `cargo-deny` job in
+# .github/workflows/security-audit.yml has no continue-on-error), so:
+#
+#   * one entry per advisory ID — never a wildcard, never a whole crate;
+#   * `reason` states why it is not exploitable / not fixable today;
+#   * `reason` MUST end with `[expires YYYY-MM-DD]`. The "Enforce advisory
+#     ignore expiry" step in the workflow fails the build once that date has
+#     passed (or if the marker is missing), forcing a re-triage instead of a
+#     silent, permanent suppression.
+#
+# Vulnerabilities (rustls, quick-xml, rkyv) are deliberately NOT listed: they
+# are fixed by upgrading, not by ignoring.
+#
+# All entries below are UNMAINTAINED (not vulnerable) crates in apps/desktop's
+# Tauri-side dependency graph. Removing them needs an upstream release of
+# Tauri / tauri-plugin-stronghold; we do not control it. Track re-triage in #646.
 ignore = [
-  # Add any accepted/mitigated advisory IDs here, e.g.:
-  # "RUSTSEC-2020-0001",
+  # tauri-plugin-stronghold -> iota_stronghold -> bincode 1.3.3. Serialises the
+  # local Stronghold snapshot only; maintainer stepped down, no vulnerability.
+  { id = "RUSTSEC-2025-0141", reason = "bincode 1.3.3 unmaintained; only via tauri-plugin-stronghold/iota_stronghold snapshot (de)serialisation of local data, no known vulnerability, needs upstream migration [expires 2026-12-31]" },
+  # tauri-plugin-stronghold -> iota_stronghold -> stronghold_engine -> paste.
+  { id = "RUSTSEC-2024-0436", reason = "paste 1.0.15 unmaintained; compile-time proc-macro only (via stronghold_engine), absent from the shipped binary [expires 2026-12-31]" },
+  # tauri -> tray-icon -> libappindicator -> gtk -> glib-macros -> proc-macro-error.
+  { id = "RUSTSEC-2024-0370", reason = "proc-macro-error 1.0.4 unmaintained; compile-time proc-macro only (via gtk-rs 0.18 glib-macros), absent from the shipped binary, waits on Tauri's move to gtk4/gtk-rs 0.20 [expires 2026-12-31]" },
+  # tauri-build / tauri-utils -> urlpattern 0.3.0 -> unic-* (5 crates, one advisory each).
+  { id = "RUSTSEC-2025-0075", reason = "unic-char-range unmaintained; via tauri-utils -> urlpattern (capability/URL-pattern parsing of our own tauri.conf.json), no untrusted input, no known vulnerability [expires 2026-12-31]" },
+  { id = "RUSTSEC-2025-0080", reason = "unic-common unmaintained; via tauri-utils -> urlpattern, same as RUSTSEC-2025-0075 [expires 2026-12-31]" },
+  { id = "RUSTSEC-2025-0081", reason = "unic-char-property unmaintained; via tauri-utils -> urlpattern, same as RUSTSEC-2025-0075 [expires 2026-12-31]" },
+  { id = "RUSTSEC-2025-0098", reason = "unic-ucd-version unmaintained; via tauri-utils -> urlpattern, same as RUSTSEC-2025-0075 [expires 2026-12-31]" },
+  { id = "RUSTSEC-2025-0100", reason = "unic-ucd-ident unmaintained; via tauri-utils -> urlpattern, same as RUSTSEC-2025-0075 [expires 2026-12-31]" },
 ]
 
 # ── Licenses ────────────────────────────────────────────────────────────────
