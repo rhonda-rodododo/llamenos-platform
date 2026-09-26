@@ -4313,9 +4313,12 @@
     "enableWebrtc": "Habilitar WebRTC",
     "envFallback": "Usando valores predeterminados de variable de entorno (Twilio)",
     "error": "Connection error",
-    "notImplemented": "Este proveedor aún no está implementado. Por favor use Twilio o SignalWire.",
+    "inAppAudioSupported": "Los voluntarios pueden contestar llamadas en la app (audio en la app).",
+    "inAppAudioUnsupported": "Las llamadas suenan en los teléfonos de los voluntarios; sin audio en la app.",
+    "inAppAudioUnsupportedWhy": "{{provider}} aún no tiene integración de audio en la app. El timbre en paralelo a los teléfonos de los voluntarios funciona con normalidad, pero las llamadas no se pueden contestar dentro de la app. Usa Twilio o SignalWire para tener audio en la app.",
     "phoneNumber": "Número de Teléfono de la Línea",
     "phoneNumberHelp": "El número de teléfono que marcan los llamantes (formato E.164)",
+    "phonesOnlySuffix": "solo teléfonos",
     "privateKey": "Private Key",
     "provider": "Proveedor",
     "providerDescriptions": {

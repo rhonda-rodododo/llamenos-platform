@@ -15,6 +15,7 @@ import {
 import type { ErasureRequest } from '@protocol/schemas'
 import * as keyManager from '@/lib/key-manager'
 import { useToast } from '@/lib/toast'
+import { supportsInAppAudio } from '@/lib/in-app-audio'
 import { Settings2, Mic, Bell, User, Globe, Fingerprint, KeyRound, Trash2, Plus, Phone, Monitor, PhoneCall, Smartphone, Loader2, CheckCircle2, Bug, Send, MessageSquare, LogOut, Lock, AlertTriangle, Clock, Server } from 'lucide-react'
 import { isPackagedTauri, getApiBase, resetApiBase, stagePendingServerAddress } from '@/lib/api-config'
 import { ServerAddressForm } from '@/components/setup/ServerAddressForm'
@@ -76,6 +77,7 @@ function SettingsPage() {
   const webauthnAvailable = isWebAuthnAvailable()
   const [currentCallPref, setCurrentCallPref] = useState<'phone' | 'browser' | 'both'>(callPreference)
   const [webrtcAvailable, setWebrtcAvailable] = useState(false)
+  const [inAppAudioUnsupported, setInAppAudioUnsupported] = useState(false)
   const [showLogoutDialog, setShowLogoutDialog] = useState(false)
   const [erasureRequest, setErasureRequest] = useState<ErasureRequest | null>(null)
   const [erasureLoading, setErasureLoading] = useState(true)
@@ -105,7 +107,8 @@ function SettingsPage() {
         setCanOptOut(r.allowUserOptOut)
       }).catch(() => toast(t('common.error'), 'error')),
       getWebRtcStatus().then(r => {
-        setWebrtcAvailable(r.available)
+        setWebrtcAvailable(r.available && supportsInAppAudio(r.provider))
+        setInAppAudioUnsupported(r.provider !== null && !supportsInAppAudio(r.provider))
       }).catch(() => toast(t('common.error'), 'error')),
     ]
     // Load WebAuthn credentials for all users
@@ -405,8 +408,10 @@ function SettingsPage() {
         onToggle={(open) => toggleSection('call-preference', open)}
       >
         {!webrtcAvailable && (
-          <p className="text-sm text-muted-foreground">
-            {t('settings.webrtcNotConfigured')}
+          <p className="text-sm text-muted-foreground" data-testid="webrtc-unavailable-notice">
+            {inAppAudioUnsupported
+              ? t('telephonyProvider.inAppAudioUnsupported')
+              : t('settings.webrtcNotConfigured')}
           </p>
         )}
         <div className="space-y-2">

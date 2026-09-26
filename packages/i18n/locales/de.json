@@ -4313,9 +4313,12 @@
     "enableWebrtc": "WebRTC aktivieren",
     "envFallback": "Using environment variable defaults (Twilio)",
     "error": "Connection error",
-    "notImplemented": "This provider is not yet implemented. Please use Twilio or SignalWire.",
+    "inAppAudioSupported": "Freiwillige können Anrufe in der App annehmen (In-App-Audio).",
+    "inAppAudioUnsupported": "Anrufe klingeln auf den Telefonen der Freiwilligen; kein In-App-Audio.",
+    "inAppAudioUnsupportedWhy": "{{provider}} hat noch keine In-App-Audio-Integration. Das parallele Klingeln auf den Telefonen der Freiwilligen funktioniert wie gewohnt, Anrufe können aber nicht in der App angenommen werden. Nutzen Sie Twilio oder SignalWire für In-App-Audio.",
     "phoneNumber": "Hotline Phone Number",
     "phoneNumberHelp": "The phone number callers dial (E.164 format)",
+    "phonesOnlySuffix": "nur Telefone",
     "privateKey": "Private Key",
     "provider": "Provider",
     "providerDescriptions": {

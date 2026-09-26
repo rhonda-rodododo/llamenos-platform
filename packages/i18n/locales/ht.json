@@ -4313,9 +4313,12 @@
     "enableWebrtc": "Aktive WebRTC",
     "envFallback": "Using environment variable defaults (Twilio)",
     "error": "Connection error",
-    "notImplemented": "This provider is not yet implemented. Please use Twilio or SignalWire.",
+    "inAppAudioSupported": "Volontè yo ka reponn apèl yo andedan app la (odyo andedan app la).",
+    "inAppAudioUnsupported": "Apèl yo sonnen sou telefòn volontè yo; pa gen odyo andedan app la.",
+    "inAppAudioUnsupportedWhy": "{{provider}} poko gen entegrasyon odyo andedan app la. Sonri an paralèl sou telefòn volontè yo mache tankou anvan, men yo pa ka reponn apèl yo andedan app la. Itilize Twilio oswa SignalWire pou gen odyo andedan app la.",
     "phoneNumber": "Hotline Phone Number",
     "phoneNumberHelp": "The phone number callers dial (E.164 format)",
+    "phonesOnlySuffix": "telefòn sèlman",
     "privateKey": "Private Key",
     "provider": "Provider",
     "providerDescriptions": {

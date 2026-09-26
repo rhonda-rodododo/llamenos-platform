@@ -4313,9 +4313,12 @@
     "enableWebrtc": "I-enable ang WebRTC",
     "envFallback": "Using environment variable defaults (Twilio)",
     "error": "Connection error",
-    "notImplemented": "This provider is not yet implemented. Please use Twilio or SignalWire.",
+    "inAppAudioSupported": "Maaaring sagutin ng mga boluntaryo ang mga tawag sa app (audio sa app).",
+    "inAppAudioUnsupported": "Tumutunog ang mga tawag sa telepono ng mga boluntaryo; walang audio sa app.",
+    "inAppAudioUnsupportedWhy": "Wala pang integrasyon ng audio sa app ang {{provider}}. Gumagana pa rin ang sabay-sabay na pag-ring sa mga telepono ng mga boluntaryo, pero hindi masasagot ang mga tawag sa loob ng app. Gamitin ang Twilio o SignalWire para magkaroon ng audio sa app.",
     "phoneNumber": "Hotline Phone Number",
     "phoneNumberHelp": "The phone number callers dial (E.164 format)",
+    "phonesOnlySuffix": "telepono lang",
     "privateKey": "Private Key",
     "provider": "Provider",
     "providerDescriptions": {

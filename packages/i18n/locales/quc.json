@@ -1722,7 +1722,6 @@
     "description": "Tichojmirisax ri ajya'ol oyonik rech kab'an ucholajem ri taq oyonik",
     "enableWebrtc": "Tijaqax WebRTC",
     "envFallback": "Kakojo' ri taq ruyonil (Twilio)",
-    "notImplemented": "Re ajya'ol re' man samajin ta. Takojo' Twilio o SignalWire.",
     "phoneNumber": "Rajilab'al Teléfono rech Oyonem Tzij",
     "phoneNumberHelp": "Ri rajilab'al teléfono koyow ri oyonela' (E.164 ruwach)",
     "privateKey": "Ewan Etal",
@@ -1753,7 +1752,11 @@
     "bridgeSecretHelp": "HMAC shared secret for authenticating bridge-worker communication (must not reuse ARI password)",
     "connected": "Connected",
     "disconnected": "Not connected",
-    "error": "Connection error"
+    "error": "Connection error",
+    "inAppAudioSupported": "Ri aj samajela' xaq kakichap ri oyonik pa ri app (mayijab'al pa app).",
+    "inAppAudioUnsupported": "Ri oyonik kaqaj chi ke ri kiteleforo ri aj samajela'; ma k'o ta mayijab'al pa app.",
+    "inAppAudioUnsupportedWhy": "Ri {{provider}} man k'o ta ri mayijab'al pa app. Ri oyonik junam pa kiteleforo ri aj samajela' xaq ka'analajik, po man kakichap ta ri oyonik pa app. Takojo' Twilio o SignalWire richin k'o mayijab'al pa app.",
+    "phonesOnlySuffix": "xa teleforo"
   },
   "transcription": {
     "allowOptOut": "Tiya' q'ij chi ke aj samajela' rech ketz'apij ri rutz'ib'axik ch'ab'al",

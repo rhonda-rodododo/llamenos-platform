@@ -1722,7 +1722,6 @@
     "description": "Pêşkêşkerê têlefoniyê yê ku ji bo birêvebirina bangan tê bikaranîn mîheng bike",
     "enableWebrtc": "WebRTC Çalak Bike",
     "envFallback": "Guhêrbarên jîngehê yên standard tên bikaranîn (Twilio)",
-    "notImplemented": "Ev pêşkêşker hêj nehatiye bicîhkirin. Ji kerema xwe Twilio an SignalWire bikar bîne.",
     "phoneNumber": "Jimareya Têlefonê ya Xeta Alîkariyê",
     "phoneNumberHelp": "Jimareya ku bangker lê dizenginînin (formata E.164)",
     "privateKey": "Kilîda Taybet",
@@ -1753,7 +1752,11 @@
     "bridgeSecretHelp": "HMAC shared secret for authenticating bridge-worker communication (must not reuse ARI password)",
     "connected": "Connected",
     "disconnected": "Not connected",
-    "error": "Connection error"
+    "error": "Connection error",
+    "inAppAudioSupported": "Dilxwaz dikarin di nav bernameyê de bersiva bangan bidin (dengê nav bernameyê).",
+    "inAppAudioUnsupported": "Bang li ser têlefonên dilxwazan lê dixin; dengê nav bernameyê tune ye.",
+    "inAppAudioUnsupportedWhy": "{{provider}} hêj entegrasyona dengê nav bernameyê tune. Lêdana hevdemî li têlefonên dilxwazan wekî her carê dixebite, lê nayê bersivandin di nav bernameyê de. Ji bo dengê nav bernameyê Twilio an SignalWire bi kar bîne.",
+    "phonesOnlySuffix": "tenê têlefon"
   },
   "transcription": {
     "allowOptOut": "Destûrê bide xwebexşan ku transkrîpsîyonê neçalak bikin",

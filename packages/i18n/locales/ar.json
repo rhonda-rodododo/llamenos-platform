@@ -4313,9 +4313,12 @@
     "enableWebrtc": "تفعيل WebRTC",
     "envFallback": "Using environment variable defaults (Twilio)",
     "error": "Connection error",
-    "notImplemented": "This provider is not yet implemented. Please use Twilio or SignalWire.",
+    "inAppAudioSupported": "يمكن للمتطوعين الرد على المكالمات داخل التطبيق (صوت داخل التطبيق).",
+    "inAppAudioUnsupported": "ترن المكالمات على هواتف المتطوعين؛ لا يوجد صوت داخل التطبيق.",
+    "inAppAudioUnsupportedWhy": "لا يدعم {{provider}} الصوت داخل التطبيق حتى الآن. الرنين المتوازي على هواتف المتطوعين يعمل كالمعتاد، لكن لا يمكن الرد على المكالمات داخل التطبيق. استخدم Twilio أو SignalWire للحصول على الصوت داخل التطبيق.",
     "phoneNumber": "Hotline Phone Number",
     "phoneNumberHelp": "The phone number callers dial (E.164 format)",
+    "phonesOnlySuffix": "الهواتف فقط",
     "privateKey": "Private Key",
     "provider": "Provider",
     "providerDescriptions": {

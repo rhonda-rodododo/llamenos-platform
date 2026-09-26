@@ -4313,9 +4313,12 @@
     "enableWebrtc": "Bật WebRTC",
     "envFallback": "Using environment variable defaults (Twilio)",
     "error": "Connection error",
-    "notImplemented": "This provider is not yet implemented. Please use Twilio or SignalWire.",
+    "inAppAudioSupported": "Tình nguyện viên có thể trả lời cuộc gọi ngay trong ứng dụng (âm thanh trong ứng dụng).",
+    "inAppAudioUnsupported": "Cuộc gọi đổ chuông trên điện thoại của tình nguyện viên; không có âm thanh trong ứng dụng.",
+    "inAppAudioUnsupportedWhy": "{{provider}} chưa có tích hợp âm thanh trong ứng dụng. Đổ chuông song song trên điện thoại của tình nguyện viên vẫn hoạt động bình thường, nhưng không thể trả lời cuộc gọi trong ứng dụng. Hãy dùng Twilio hoặc SignalWire để có âm thanh trong ứng dụng.",
     "phoneNumber": "Hotline Phone Number",
     "phoneNumberHelp": "The phone number callers dial (E.164 format)",
+    "phonesOnlySuffix": "chỉ điện thoại",
     "privateKey": "Private Key",
     "provider": "Provider",
     "providerDescriptions": {

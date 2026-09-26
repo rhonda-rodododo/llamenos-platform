@@ -1722,7 +1722,6 @@
     "description": "ጥሪዎችን ለማስተናገድ የሚጠቀመውን የቴሌፎን አቅራቢ ያዋቅሩ",
     "enableWebrtc": "WebRTC አንቃ",
     "envFallback": "የአካባቢ ተለዋዋጭ ነባሪዎችን እየተጠቀመ (Twilio)",
-    "notImplemented": "ይህ አቅራቢ ገና አልተተገበረም። እባክዎ Twilio ወይም SignalWire ይጠቀሙ።",
     "phoneNumber": "የስልክ መስመር ቁጥር",
     "phoneNumberHelp": "ደዋዮች የሚደውሉት ቁጥር (E.164 ቅርጸት)",
     "privateKey": "Private Key",
@@ -1753,7 +1752,11 @@
     "bridgeSecretHelp": "HMAC shared secret for authenticating bridge-worker communication (must not reuse ARI password)",
     "connected": "Connected",
     "disconnected": "Not connected",
-    "error": "Connection error"
+    "error": "Connection error",
+    "inAppAudioSupported": "በጎ ፈቃደኞች ጥሪዎችን በመተግበሪያው ውስጥ መመለስ ይችላሉ (በመተግበሪያ ውስጥ ድምፅ)።",
+    "inAppAudioUnsupported": "ጥሪዎች በበጎ ፈቃደኞች ስልኮች ላይ ይደውላሉ፤ በመተግበሪያ ውስጥ ድምፅ የለም።",
+    "inAppAudioUnsupportedWhy": "{{provider}} እስካሁን በመተግበሪያ ውስጥ የድምፅ ውህደት የለውም። በበጎ ፈቃደኞች ስልኮች ላይ በአንድ ጊዜ መደወል እንደተለመደው ይሰራል፤ ነገር ግን ጥሪዎችን በመተግበሪያው ውስጥ መመለስ አይቻልም። በመተግበሪያ ውስጥ ድምፅ ለማግኘት Twilio ወይም SignalWire ይጠቀሙ።",
+    "phonesOnlySuffix": "ስልኮች ብቻ"
   },
   "transcription": {
     "allowOptOut": "ፈቃደኞች ግልባጭን እንዲያሰናክሉ ፍቀድ",

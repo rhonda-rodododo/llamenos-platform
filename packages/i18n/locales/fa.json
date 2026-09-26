@@ -1722,7 +1722,6 @@
     "description": "پیکربندی ارائه‌دهنده تلفن برای مدیریت تماس‌ها",
     "enableWebrtc": "فعال‌سازی WebRTC",
     "envFallback": "استفاده از مقادیر پیش‌فرض متغیرهای محیطی (Twilio)",
-    "notImplemented": "این ارائه‌دهنده هنوز پیاده‌سازی نشده. لطفا از Twilio یا SignalWire استفاده کنید.",
     "phoneNumber": "شماره تلفن خط اضطراری",
     "phoneNumberHelp": "شماره‌ای که تماس‌گیرندگان شماره‌گیری می‌کنند (فرمت E.164)",
     "privateKey": "کلید خصوصی",
@@ -1753,7 +1752,11 @@
     "bridgeSecretHelp": "HMAC shared secret for authenticating bridge-worker communication (must not reuse ARI password)",
     "connected": "Connected",
     "disconnected": "Not connected",
-    "error": "Connection error"
+    "error": "Connection error",
+    "inAppAudioSupported": "داوطلبان می‌توانند در برنامه به تماس‌ها پاسخ دهند (صدا در برنامه).",
+    "inAppAudioUnsupported": "تماس‌ها روی تلفن داوطلبان زنگ می‌خورند؛ صدا در برنامه پشتیبانی نمی‌شود.",
+    "inAppAudioUnsupportedWhy": "{{provider}} هنوز یکپارچه‌سازی صدا در برنامه ندارد. زنگ موازی روی تلفن داوطلبان طبق معمول کار می‌کند، اما نمی‌توان درون برنامه به تماس‌ها پاسخ داد. برای صدا در برنامه از Twilio یا SignalWire استفاده کنید.",
+    "phonesOnlySuffix": "فقط تلفن"
   },
   "transcription": {
     "allowOptOut": "اجازه غیرفعال‌سازی توسط داوطلبان",
