@@ -4158,9 +4158,12 @@
     "enableWebrtc": "Enable WebRTC",
     "envFallback": "Using environment variable defaults (Twilio)",
     "error": "Connection error",
-    "notImplemented": "This provider is not yet implemented. Please use Twilio or SignalWire.",
+    "inAppAudioSupported": "Volunteers can answer calls in the app (in-app audio).",
+    "inAppAudioUnsupported": "Calls ring volunteers' phones; no in-app audio.",
+    "inAppAudioUnsupportedWhy": "{{provider}} has no in-app audio integration yet. Parallel ringing to volunteers' phones works as usual, but calls cannot be answered inside the app. Use Twilio or SignalWire for in-app audio.",
     "phoneNumber": "Hotline Phone Number",
     "phoneNumberHelp": "The phone number callers dial (E.164 format)",
+    "phonesOnlySuffix": "phones only",
     "privateKey": "Private Key",
     "provider": "Provider",
     "providerDescriptions": {

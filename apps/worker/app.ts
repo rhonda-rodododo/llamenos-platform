@@ -30,7 +30,7 @@ import hubRoutes from './routes/hubs'
 import blastsRoutes from './routes/blasts'
 import devicesRoutes from './routes/devices'
 import sessionRoutes from './routes/sessions'
-import securityEventsRoutes, { adminSecurityEventsRoutes } from './routes/security-events'
+import securityEventsRoutes, { adminSecurityEventsRoutes, publicSecurityEventsRoutes } from './routes/security-events'
 import accountRoutes from './routes/account'
 import adminDevicesRoutes from './routes/admin/devices'
 import contactsRoutes from './routes/contacts'
@@ -42,6 +42,7 @@ import metricsRoutes from './routes/metrics'
 import systemRoutes from './routes/system'
 import entitySchemaRoutes from './routes/entity-schema'
 import evidenceRoutes from './routes/evidence'
+import demoRoutes from './routes/demo'
 import geocodingRoutes from './routes/geocoding'
 import analyticsRoutes from './routes/analytics'
 import sigchainRoutes from './routes/sigchain'
@@ -182,6 +183,10 @@ api.patch('/messaging/preferences', async (c) => {
   return c.json(result)
 })
 
+// Client-reported security events (unauthenticated — cert pin failures precede login).
+// Only POST is registered here; GET /security-events falls through to the authenticated router.
+api.route('/security-events', publicSecurityEventsRoutes)
+
 // Public IVR audio serve (Twilio fetches during calls)
 api.get('/ivr-audio/:promptType/:language', async (c) => {
   const services = c.get('services')
@@ -243,6 +248,7 @@ authenticated.route('/events', eventsRoutes)
 authenticated.route('/admin/events', eventsAdminRouter)
 authenticated.route('/', evidenceRoutes)
 authenticated.route('/system', systemRoutes)
+authenticated.route('/demo', demoRoutes)
 authenticated.route('/geocoding', geocodingRoutes)
 authenticated.route('/analytics', analyticsRoutes)
 // Phase 6: per-user sigchain (mounted at /users/:targetPubkey/sigchain via nested router)

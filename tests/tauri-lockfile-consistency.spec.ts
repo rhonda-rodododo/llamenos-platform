@@ -99,9 +99,9 @@ const DESKTOP_CARGO_TOML = resolve(REPO_ROOT, 'apps/desktop/Cargo.toml')
 
 // `cargo metadata --locked` on a fully cold `~/.cargo/registry` + `~/.cargo/git`
 // (no CI cache hit — first run after a lockfile-affecting cache-key change, an
-// evicted cache, etc.) resolves the whole dependency graph AND clones the
-// `hpke-rs` git dependency (see the `[patch.crates-io]` entry in
-// apps/desktop/Cargo.toml). That observably took >60s on a cold GitHub Actions
+// evicted cache, etc.) resolves the whole dependency graph (at the time of the
+// incident it also cloned an `hpke-rs` git `[patch.crates-io]` dependency, since
+// removed in #930). That observably took >60s on a cold GitHub Actions
 // runner (the incident this rewrite fixes — see file docstring above for the
 // full story: CI killed cargo mid-resolve and the old code reported the kill
 // as "lockfile no longer satisfies manifest", which was false). CI now also
@@ -189,7 +189,7 @@ test.describe('Tauri desktop Cargo.lock consistency', () => {
         `\`cargo metadata --locked\` did not finish within ${CARGO_METADATA_TIMEOUT_MS}ms and was killed — ` +
           `this is an ENVIRONMENT/TIMEOUT failure, not evidence of lockfile drift (cargo never reached a ` +
           `verdict). Likely a cold \`~/.cargo/registry\`/\`~/.cargo/git\` (no cache hit) resolving the full ` +
-          `dependency graph plus cloning the \`hpke-rs\` git patch dependency. Check whether CI's cache-warm ` +
+          `dependency graph. Check whether CI's cache-warm ` +
           `step for apps/desktop ran and hit, or whether the registry/git host was slow/unreachable. This does ` +
           `NOT mean Cargo.lock needs updating.`,
       ).toBe(true)

@@ -142,7 +142,7 @@ describe('ErasureService.createSelfRequest — co-approver admin check (H01)', (
 - [ ] **Step 1.2: Run test to confirm it fails**
 
 ```bash
-cd /media/rikki/recover/projects/llamenos-plan-epic-e/apps/worker
+cd "$(git rev-parse --show-toplevel)/apps/worker"
 bun test __tests__/unit/erasure-service.test.ts 2>&1 | tail -20
 ```
 
@@ -377,7 +377,7 @@ Expected: PASS
 - [ ] **Step 2.6: Check TypeScript**
 
 ```bash
-cd /media/rikki/recover/projects/llamenos-plan-epic-e && bun run typecheck 2>&1 | grep -E "cases|records|IDOR" | head -10
+cd "$(git rev-parse --show-toplevel)" && bun run typecheck 2>&1 | grep -E "cases|records|IDOR" | head -10
 ```
 
 Expected: No errors in changed files.
@@ -907,7 +907,7 @@ git commit -m "fix(puk): use upsert for PUK envelope distribution to prevent rac
 - [ ] **Step 7.1: Audit all routes for missing rate limits** (do this after Epic A merges)
 
 ```bash
-cd /media/rikki/recover/projects/llamenos-plan-epic-e/apps/worker
+cd "$(git rev-parse --show-toplevel)/apps/worker"
 grep -rn "rateLimit\|rate_limit\|checkRateLimit" routes/ | sort
 ```
 
@@ -955,7 +955,7 @@ git commit -m "feat(rate-limit): apply default rate limit tier to all authentica
 - [ ] **Step 8.1: Run full typecheck**
 
 ```bash
-cd /media/rikki/recover/projects/llamenos-plan-epic-e && bun run typecheck 2>&1 | tail -30
+cd "$(git rev-parse --show-toplevel)" && bun run typecheck 2>&1 | tail -30
 ```
 
 Expected: 0 errors.
@@ -963,7 +963,7 @@ Expected: 0 errors.
 - [ ] **Step 8.2: Run all unit tests**
 
 ```bash
-cd /media/rikki/recover/projects/llamenos-plan-epic-e/apps/worker && bun test --run 2>&1 | tail -30
+cd "$(git rev-parse --show-toplevel)/apps/worker" && bun test --run 2>&1 | tail -30
 ```
 
 Expected: All pass.

@@ -28,6 +28,7 @@ export type AlertInput =
   | { type: 'recovery_rotated' }
   | { type: 'lockdown_triggered'; tier: 'A' | 'B' | 'C' }
   | { type: 'session_revoked_remote'; city: string; country: string }
+  | { type: 'cert_pin_mismatch'; eventCount: number }
   | {
       type: 'digest'
       periodDays: number
@@ -60,6 +61,8 @@ export function renderAlertMessage(input: AlertInput): string {
       return `🚨 Emergency lockdown tier ${input.tier} was triggered on your account.`
     case 'session_revoked_remote':
       return `⛔ A session from ${input.city}, ${input.country} was revoked.`
+    case 'cert_pin_mismatch':
+      return `🚨 ${input.eventCount} client(s) reported a TLS certificate pin mismatch. This may be an active network attack or an unexpected certificate rotation. Review the admin security events log.`
     case 'digest':
       return `📊 Summary (last ${input.periodDays} days): ${input.loginCount} login(s), ${input.alertCount} alert(s), ${input.failedCount} failed attempt(s).`
   }

@@ -13,6 +13,8 @@ import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Check, Loader2, Copy } from 'lucide-react'
+import { InAppAudioNotice } from './InAppAudioNotice'
+import { supportsInAppAudio } from '@/lib/in-app-audio'
 import type { SetupData } from './SetupWizard'
 
 interface Props {
@@ -81,15 +83,22 @@ export function VoiceSmsProviderForm({ data, onChange }: Props) {
             tabIndex={0}
             onClick={() => update({ type })}
             onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); update({ type }) } }}
+            data-testid={`provider-card-${type}`}
+            data-in-app-audio={supportsInAppAudio(type) ? 'supported' : 'unsupported'}
             className={`cursor-pointer p-3 text-center text-xs transition-all ${
               selectedType === type ? 'border-primary ring-2 ring-primary/20' : 'hover:border-primary/50'
             }`}
           >
             <span className="font-medium">{TELEPHONY_PROVIDER_LABELS[type]}</span>
+            {!supportsInAppAudio(type) && (
+              <span className="mt-0.5 block text-[10px] text-muted-foreground">{t('telephonyProvider.phonesOnlySuffix')}</span>
+            )}
             {selectedType === type && <Check className="mx-auto mt-1 h-3 w-3 text-primary" />}
           </Card>
         ))}
       </div>
+
+      <InAppAudioNotice provider={selectedType} />
 
       {/* Credential fields */}
       <div className="space-y-3">

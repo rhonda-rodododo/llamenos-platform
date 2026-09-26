@@ -687,7 +687,7 @@ a one-line ask. That ask is what the blocked ping carries.
 ## 11. Determinism invariants
 
 Checkable invariants, not advice — each learned from a specific live failure. Canonical
-source: `/home/rikki/tier-prompts/determinism-rules.md`; folded into every worker prompt
+source: `~/tier-prompts/determinism-rules.md`; folded into every worker prompt
 via `.claude/agents/fragments/_worker-rules.md`.
 
 **Gating and merges**

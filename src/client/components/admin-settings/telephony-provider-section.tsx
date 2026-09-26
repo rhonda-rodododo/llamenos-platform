@@ -18,6 +18,8 @@ import { PhoneInput } from '@/components/phone-input'
 import { Radio, Save, Loader2, RefreshCw } from 'lucide-react'
 import { ProviderStatusBadge } from '@/components/setup/ProviderStatusBadge'
 import { WebhookConfirmation } from '@/components/setup/WebhookConfirmation'
+import { InAppAudioNotice } from '@/components/setup/InAppAudioNotice'
+import { supportsInAppAudio } from '@/lib/in-app-audio'
 
 interface Props {
   config: TelephonyProviderConfig | null
@@ -88,19 +90,25 @@ export function TelephonyProviderSection({ config, draft, onConfigChange, onDraf
           <select
             value={draft.type || 'twilio'}
             onChange={(e) => {
-              onDraftChange({ type: e.target.value as TelephonyProviderType })
+              const type = e.target.value as TelephonyProviderType
+              // In-app audio (WebRTC) only exists for some providers; never
+              // carry the flag over to one that cannot honour it.
+              onDraftChange({ type, ...(supportsInAppAudio(type) ? {} : { webrtcEnabled: false }) })
               setTestResult(null)
             }}
             className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
             data-testid="provider-select"
           >
             {(Object.entries(TELEPHONY_PROVIDER_LABELS) as [TelephonyProviderType, string][]).map(([key, label]) => (
-              <option key={key} value={key}>{label}</option>
+              <option key={key} value={key} data-testid={`provider-option-${key}`} data-in-app-audio={supportsInAppAudio(key) ? 'supported' : 'unsupported'}>
+                {supportsInAppAudio(key) ? label : `${label} — ${t('telephonyProvider.phonesOnlySuffix')}`}
+              </option>
             ))}
           </select>
           <p className="text-xs text-muted-foreground">
             {t(`telephonyProvider.providerDescriptions.${draft.type || 'twilio'}`)}
           </p>
+          <InAppAudioNotice provider={draft.type || 'twilio'} />
         </div>
 
         {/* Common: Phone Number */}
@@ -250,8 +258,8 @@ export function TelephonyProviderSection({ config, draft, onConfigChange, onDraf
           </>
         )}
 
-        {/* WebRTC Config (not for Asterisk) */}
-        {draft.type !== 'asterisk' && (
+        {/* WebRTC Config — only for providers that carry in-app audio */}
+        {supportsInAppAudio(draft.type || 'twilio') && (
           <div className="space-y-3 rounded-lg border border-border p-4">
             <div className="flex items-center justify-between">
               <div className="space-y-0.5">
@@ -261,9 +269,10 @@ export function TelephonyProviderSection({ config, draft, onConfigChange, onDraf
               <Switch
                 checked={draft.webrtcEnabled || false}
                 onCheckedChange={(checked) => updateDraft({ webrtcEnabled: checked })}
+                data-testid="webrtc-enabled-switch"
               />
             </div>
-            {draft.webrtcEnabled && (draft.type === 'twilio' || draft.type === 'signalwire') && (
+            {draft.webrtcEnabled && (
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div className="space-y-1">
                   <Label>{t('telephonyProvider.apiKeySid')}</Label>

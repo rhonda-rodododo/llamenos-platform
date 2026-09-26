@@ -1342,7 +1342,7 @@ Expected: All existing tests plus all new tests pass. Zero failures.
 
 Run:
 ```bash
-cd /media/rikki/recover/projects/llamenos
+cd "$(git rev-parse --show-toplevel)"
 git add packages/protocol/crypto-labels.json packages/crypto/src/labels.rs packages/crypto/src/shamir.rs packages/crypto/src/lib.rs packages/crypto/src/ffi.rs packages/crypto/tests/recovery_flow.rs
 git commit -m "feat(crypto): EP09-P1 Shamir secret sharing + recovery group crypto foundation
 

@@ -61,7 +61,7 @@ tauri-plugin-dialog = "2"
 # keeps this on the same crypto backend `reqwest`/`tokio-tungstenite` already
 # resolve to above (see Cargo.lock) instead of pulling in `aws-lc-rs` (rustls's
 # own default), which would add a cmake/nasm build dependency for nothing.
-rustls = { version = "0.23", default-features = false, features = ["ring", "tls12", "std"] }
+rustls = { version = "0.23.45", default-features = false, features = ["ring", "tls12", "std"] }
 rustls-webpki = "0.103"
 
 [dev-dependencies]
@@ -82,13 +82,3 @@ tokio = { version = "1", features = ["rt", "io-util"] }
 default = ["custom-protocol", "updater"]
 custom-protocol = ["tauri/custom-protocol"]
 updater = ["dep:tauri-plugin-updater"]
-
-# Security: RUSTSEC-2026-0124 — hpke-rs-libcrux 0.6.1 on crates.io pins libcrux-aead
-# to ^0.0.7, pulling libcrux-chacha20poly1305 0.0.7 (DoS vulnerability) into the
-# Cargo.lock even though the libcrux backend is never compiled (openmls_rust_crypto
-# uses hpke-rs-rust-crypto, not hpke-rs-libcrux). The celabshq/hpke-rs main branch
-# already bumps libcrux-aead to 0.0.8 but hasn't been released to crates.io yet.
-# This patch replaces the published 0.6.1 with the git head at the same version so
-# the lock file resolves libcrux-chacha20poly1305 to >=0.0.8.
-[patch.crates-io]
-hpke-rs-libcrux = { git = "https://github.com/celabshq/hpke-rs", package = "hpke-rs-libcrux" }

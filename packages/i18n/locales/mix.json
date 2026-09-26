@@ -1722,7 +1722,6 @@
     "description": "Configurar proveedor de telefonía ña kúñaꞌa llamada",
     "enableWebrtc": "Xíni̱ñúꞌú WebRTC",
     "envFallback": "Kuniñúꞌú variable de entorno predeterminado (Twilio)",
-    "notImplemented": "Proveedor yóꞌo ta̱ꞌán kúu kuniñúꞌú. Kuniñúꞌú Twilio xi SignalWire.",
     "phoneNumber": "Número de Teléfono de Línea",
     "phoneNumberHelp": "Número ña kána ña̱yivi (formato E.164)",
     "privateKey": "Llave Privada",
@@ -1753,7 +1752,11 @@
     "bridgeSecretHelp": "HMAC shared secret for authenticating bridge-worker communication (must not reuse ARI password)",
     "connected": "Connected",
     "disconnected": "Not connected",
-    "error": "Connection error"
+    "error": "Connection error",
+    "inAppAudioSupported": "Ñayivi voluntario kúu kuni̱ ndaꞌa llamada nu̱ú app (audio nu̱ú app).",
+    "inAppAudioUnsupported": "Llamada ndaꞌi nu̱ú teléfono ña voluntario; ta̱ꞌán kúu audio nu̱ú app.",
+    "inAppAudioUnsupportedWhy": "Proveedor {{provider}} ta̱ꞌán ka̱ꞌa audio nu̱ú app. Ndaꞌi llamada nu̱ú teléfono ña voluntario kúu tá kúmí, ndaa ta̱ꞌán kúu kuni̱ ndaꞌa llamada nu̱ú app. Kuniñúꞌú Twilio xi SignalWire ña audio nu̱ú app.",
+    "phonesOnlySuffix": "teléfono ndaa"
   },
   "transcription": {
     "allowOptOut": "Taxi ña̱yivi voluntario tási transcripción",

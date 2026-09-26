@@ -1,5 +1,7 @@
 # BDD-Driven Workflow Overhaul — Implementation Plan
 
+> **Path placeholders:** `<project-slug>` = Claude Code's per-project directory name under `~/.claude/projects/` (the checkout path with `/` replaced by `-`).
+
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
 **Goal:** Restructure the entire development workflow around shared BDD specs as behavioral contracts, with phased execution that prevents collision between concurrent agents.
@@ -1150,7 +1152,7 @@ Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>"
 ## Task 11: Update MEMORY.md
 
 **Files:**
-- Modify: `/Users/rhonda/.claude/projects/-Users-rhonda-projects-llamenos/memory/MEMORY.md`
+- Modify: `~/.claude/projects/<project-slug>/memory/MEMORY.md`
 
 **Step 1: Update Cardinal Rule**
 
@@ -1219,7 +1221,7 @@ Move detailed content (Android build env, iOS simulator details, etc.) to separa
 **Step 5: Commit**
 
 ```bash
-git add /Users/rhonda/.claude/projects/-Users-rhonda-projects-llamenos/memory/MEMORY.md
+git add ~/.claude/projects/<project-slug>/memory/MEMORY.md
 git commit -m "refactor: update MEMORY.md for BDD-first phased workflow
 
 Update cardinal rule: tests are the spec. Replace waterfall workflow

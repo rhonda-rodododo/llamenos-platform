@@ -8,6 +8,8 @@ phase: 3
 
 # Spec: EP04 — Analytics & Dashboards
 
+> **Path placeholders:** `<llamenos-hotline>` = your checkout of the retired v1 `llamenos-hotline` repo.
+
 **Date:** 2026-05-11 (specced 2026-05-12)
 **Status:** Specced
 
@@ -523,13 +525,13 @@ Feature file: `packages/test-specs/features/admin/analytics.feature`
 ## References
 
 ### v1 (Port Source)
-- `/home/rikki/projects/llamenos-hotline/src/client/components/admin-sections/analytics-section.tsx`
-- `/home/rikki/projects/llamenos-hotline/src/client/components/dashboard/call-volume-chart.tsx`
-- `/home/rikki/projects/llamenos-hotline/src/client/components/dashboard/call-hours-chart.tsx`
-- `/home/rikki/projects/llamenos-hotline/src/client/components/dashboard/user-stats-table.tsx`
-- `/home/rikki/projects/llamenos-hotline/src/client/lib/queries/analytics.ts`
-- `/home/rikki/projects/llamenos-hotline/src/server/routes/analytics.ts`
-- `/home/rikki/projects/llamenos-hotline/src/server/services/records.ts` (getCallVolumeByDay, getCallHourDistribution, getUserCallStats)
+- `<llamenos-hotline>/src/client/components/admin-sections/analytics-section.tsx`
+- `<llamenos-hotline>/src/client/components/dashboard/call-volume-chart.tsx`
+- `<llamenos-hotline>/src/client/components/dashboard/call-hours-chart.tsx`
+- `<llamenos-hotline>/src/client/components/dashboard/user-stats-table.tsx`
+- `<llamenos-hotline>/src/client/lib/queries/analytics.ts`
+- `<llamenos-hotline>/src/server/routes/analytics.ts`
+- `<llamenos-hotline>/src/server/services/records.ts` (getCallVolumeByDay, getCallHourDistribution, getUserCallStats)
 
 ### v2 (Existing)
 - `apps/worker/routes/analytics.ts`

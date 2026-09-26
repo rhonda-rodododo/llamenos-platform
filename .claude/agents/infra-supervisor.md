@@ -461,9 +461,12 @@ v1 project; do not mix their paths, remotes, or scripts.
 ## Dispatch invocation (for supervisors)
 
 ```bash
-DISPATCH_REPO=/media/rikki/Main/projects/llamenos \
-WORKTREE_BASE=/media/rikki/Main/projects \
-  ~/.claude/skills/supervising-dispatched-sessions/dispatch-one.sh <name> <prompt-file> [timeout] [model]
+# DISPATCH_REPO = absolute path of the main llamenos checkout (must already be set — the :? guard
+# aborts rather than let dispatch-one.sh fall back to whatever repo the cwd happens to be in).
+# WORKTREE_BASE = directory that holds worktrees; defaults to the checkout's parent directory.
+: "${DISPATCH_REPO:?set DISPATCH_REPO to the absolute path of the main llamenos checkout}"
+export DISPATCH_REPO WORKTREE_BASE="${WORKTREE_BASE:-$(dirname "$DISPATCH_REPO")}"
+~/.claude/skills/supervising-dispatched-sessions/dispatch-one.sh <name> <prompt-file> [timeout] [model]
 ```
 
 Prefix names with `ll-` to disambiguate from other projects in status.sh output.
@@ -473,8 +476,8 @@ Prefix names with `ll-` to disambiguate from other projects in status.sh output.
 ## Llámenos Platform Worker Rules
 
 ### Git & Worktrees
-- **Always work in your worktree** — never `cd` to or `git checkout` in `/media/rikki/Main/projects/llamenos` (the main repo).
-- **Worktrees live at** `/media/rikki/Main/projects/llamenos-<name>`.
+- **Always work in your worktree** — never `cd` to or `git checkout` in the main repo checkout (`$DISPATCH_REPO`; it is the first entry of `git worktree list`).
+- **Worktrees live at** `$WORKTREE_BASE/<repo-dir>-<name>`, where `<repo-dir>` is the main checkout's directory name (`llamenos` for a default clone). Your own worktree is your current directory.
 - **GitHub remote:** `git@github.com:rhonda-rodododo/llamenos-platform.git`
 
 ### Push & PR Creation (GitHub)

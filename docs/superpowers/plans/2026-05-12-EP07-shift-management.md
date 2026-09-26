@@ -1,5 +1,7 @@
 # EP07: Shift Management — Implementation Plan
 
+> **Path placeholders:** `<llamenos-hotline>` = your checkout of the retired v1 `llamenos-hotline` repo.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Deliver complete shift management: ring groups, shift overrides, server-side clock-in with heartbeat liveness, user availability blocks, shift join/leave requests with approval, routing pipeline evolution, React Query migration, and cross-platform shift views (desktop, iOS, Android).
@@ -2301,7 +2303,7 @@ git commit -m "feat(EP07): add desktop API client functions for all shift endpoi
 
 - [ ] **Step 1: Create comprehensive React Query hooks file**
 
-Create `src/client/lib/queries/shifts.ts` with all query and mutation hooks. Follow the pattern established in v1 (`/home/rikki/projects/llamenos-hotline/src/client/lib/queries/shifts.ts`).
+Create `src/client/lib/queries/shifts.ts` with all query and mutation hooks. Follow the pattern established in v1 (`<llamenos-hotline>/src/client/lib/queries/shifts.ts`).
 
 Include:
 - All 11 query hooks from the spec (useShifts, useShiftStatus, useFallbackGroup, useRingGroups, useRingGroupMembers, useShiftOverrides, useAvailabilityBlocks, useAllAvailabilityBlocks, useShiftJoinRequests, useMyShiftJoinRequests, useClockStatus)
@@ -2412,7 +2414,7 @@ Plus volunteer-facing elements visible to all:
 - My Schedule card
 - Availability block management
 
-Port from the v1 patterns in `/home/rikki/projects/llamenos-hotline/src/client/routes/shifts.tsx`, adapting to use:
+Port from the v1 patterns in `<llamenos-hotline>/src/client/routes/shifts.tsx`, adapting to use:
 - React Query hooks from `src/client/lib/queries/shifts.ts`
 - Hub-key encryption via `platform.ts` (encryptHubField/decryptHubField)
 - Client UUID pre-generation for AAD binding

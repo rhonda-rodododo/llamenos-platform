@@ -150,6 +150,8 @@ export class AuditService {
     actorPubkey: string,
     details: Record<string, unknown> = {},
     hubId?: string,
+    /** Explicit timestamp — only for seeding historical demo data. Entries must be appended in chronological order. */
+    at?: Date,
   ): Promise<AuditEntry> {
     // Validate actorPubkey format: 'system' or 64-char hex
     if (actorPubkey !== 'system' && !/^[0-9a-f]{64}$/.test(actorPubkey)) {
@@ -157,7 +159,7 @@ export class AuditService {
     }
 
     const id = crypto.randomUUID()
-    const createdAt = new Date().toISOString()
+    const createdAt = (at ?? new Date()).toISOString()
 
     return await this.db.transaction(async (tx) => {
       // Get latest entry hash with FOR UPDATE to serialise chain writes

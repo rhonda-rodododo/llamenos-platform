@@ -31,7 +31,7 @@ import type {
   DeviceRecord,
 } from '../types'
 import { ServiceError } from './settings'
-import { DEMO_ACCOUNTS } from '@shared/demo-accounts'
+import { demoIdentities } from '../lib/demo-identities'
 import { createLogger } from '../lib/logger'
 import { withRetry, isRetryableDbError } from '../lib/retry'
 import { getCircuitBreaker } from '../lib/circuit-breaker'
@@ -210,6 +210,23 @@ export class IdentityService {
   }
 
   /**
+   * Pubkeys of all active super-admins — recipients of client-reported
+   * security alerts (e.g. certificate pin mismatches).
+   */
+  async listActiveSuperAdminPubkeys(): Promise<string[]> {
+    const rows = await this.db
+      .select({ pubkey: users.pubkey })
+      .from(users)
+      .where(
+        and(
+          eq(users.active, true),
+          sql`${users.roles} @> ARRAY['role-super-admin']::text[]`,
+        ),
+      )
+    return rows.map((r) => r.pubkey)
+  }
+
+  /**
    * Bootstrap the first admin. Fails if an admin already exists.
    */
   async bootstrapAdmin(pubkey: string): Promise<void> {
@@ -276,7 +293,7 @@ export class IdentityService {
     }
 
     if (demoMode) {
-      for (const account of DEMO_ACCOUNTS) {
+      for (const account of demoIdentities()) {
         await this.db.insert(users).values({
           pubkey: account.pubkey,
           displayName: account.name,
@@ -1457,7 +1474,8 @@ export class IdentityService {
   }
 
   async emitSecurityEvent(
-    userPubkey: string,
+    /** null for events reported by an unauthenticated client (e.g. cert pin mismatch). */
+    userPubkey: string | null,
     eventType: string,
     deviceId: string | null,
     metadata: Record<string, unknown> = {},

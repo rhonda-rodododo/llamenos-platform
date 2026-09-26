@@ -1722,7 +1722,6 @@
     "description": "ခေါ်ဆိုမှုများ ကိုင်တွယ်ရန် အသုံးပြုမည့် တယ်လီဖုန်းဝန်ဆောင်မှုကို ပြင်ဆင်ပါ",
     "enableWebrtc": "WebRTC ဖွင့်မည်",
     "envFallback": "ပတ်ဝန်းကျင်ကိန်းရှင် မူလတန်ဖိုးများ အသုံးပြုနေသည် (Twilio)",
-    "notImplemented": "ဤဝန်ဆောင်မှုပေးသူကို အကောင်အထည်ဖော်ခြင်း မရှိသေးပါ။ Twilio သို့မဟုတ် SignalWire ကို အသုံးပြုပါ။",
     "phoneNumber": "ဟော့လိုင်းဖုန်းနံပါတ်",
     "phoneNumberHelp": "ခေါ်ဆိုသူများ ခေါ်ဆိုမည့် ဖုန်းနံပါတ် (E.164 ပုံစံ)",
     "privateKey": "Private Key",
@@ -1753,7 +1752,11 @@
     "bridgeSecretHelp": "HMAC shared secret for authenticating bridge-worker communication (must not reuse ARI password)",
     "connected": "Connected",
     "disconnected": "Not connected",
-    "error": "Connection error"
+    "error": "Connection error",
+    "inAppAudioSupported": "စေတနာ့ဝန်ထမ်းများသည် အက်ပ်ထဲတွင် ဖုန်းခေါ်ဆိုမှုများကို ဖြေဆိုနိုင်သည် (အက်ပ်တွင်း အသံ)။",
+    "inAppAudioUnsupported": "ခေါ်ဆိုမှုများသည် စေတနာ့ဝန်ထမ်းများ၏ ဖုန်းများတွင် မြည်သည်။ အက်ပ်တွင်း အသံ မရှိပါ။",
+    "inAppAudioUnsupportedWhy": "{{provider}} တွင် အက်ပ်တွင်း အသံ ပေါင်းစပ်မှု မရှိသေးပါ။ စေတနာ့ဝန်ထမ်းများ၏ ဖုန်းများသို့ တပြိုင်နက် ခေါ်ဆိုခြင်းမှာ ပုံမှန်အတိုင်း အလုပ်လုပ်သော်လည်း အက်ပ်ထဲတွင် ဖုန်းကို ဖြေဆို၍ မရပါ။ အက်ပ်တွင်း အသံအတွက် Twilio သို့မဟုတ် SignalWire ကို သုံးပါ။",
+    "phonesOnlySuffix": "ဖုန်းသာ"
   },
   "transcription": {
     "allowOptOut": "စေတနာ့ဝန်ထမ်းများကို စာသားပြောင်းခြင်း ပိတ်ခွင့်ပေးမည်",

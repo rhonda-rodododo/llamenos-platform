@@ -4313,9 +4313,12 @@
     "enableWebrtc": "Включить WebRTC",
     "envFallback": "Using environment variable defaults (Twilio)",
     "error": "Connection error",
-    "notImplemented": "This provider is not yet implemented. Please use Twilio or SignalWire.",
+    "inAppAudioSupported": "Волонтёры могут отвечать на звонки в приложении (аудио в приложении).",
+    "inAppAudioUnsupported": "Звонки поступают на телефоны волонтёров; аудио в приложении недоступно.",
+    "inAppAudioUnsupportedWhy": "У {{provider}} пока нет интеграции аудио в приложении. Параллельный вызов на телефоны волонтёров работает как обычно, но отвечать на звонки внутри приложения нельзя. Для аудио в приложении используйте Twilio или SignalWire.",
     "phoneNumber": "Hotline Phone Number",
     "phoneNumberHelp": "The phone number callers dial (E.164 format)",
+    "phonesOnlySuffix": "только телефоны",
     "privateKey": "Private Key",
     "provider": "Provider",
     "providerDescriptions": {

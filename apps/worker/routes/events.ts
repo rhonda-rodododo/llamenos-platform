@@ -302,7 +302,12 @@ events.post('/:id/records',
     const services = c.get('services')
     const body = c.req.valid('json')
 
-    const result = await services.cases.linkEvent(body.recordId, id, pubkey)
+    const result = await services.cases.linkEvent(
+      body.recordId,
+      id,
+      pubkey,
+      c.get('hubId') ?? '',
+    )
 
     await audit(services.audit, 'recordLinkedToEvent', pubkey, {
       eventId: id,
@@ -338,7 +343,7 @@ events.delete('/:id/records/:recordId',
     const pubkey = c.get('pubkey')
     const services = c.get('services')
 
-    await services.cases.unlinkEvent(recordId, id)
+    await services.cases.unlinkEvent(recordId, id, c.get('hubId') ?? '')
 
     await audit(services.audit, 'recordUnlinkedFromEvent', pubkey, {
       eventId: id,
@@ -371,7 +376,7 @@ events.get('/:id/records',
   async (c) => {
     const id = c.req.param('id')
     const services = c.get('services')
-    const eventRecords = await services.cases.listEventRecords(id)
+    const eventRecords = await services.cases.listEventRecords(id, c.get('hubId') ?? '')
     return c.json({ links: eventRecords })
   },
 )
@@ -402,7 +407,12 @@ events.post('/:id/reports',
     const services = c.get('services')
     const body = c.req.valid('json')
 
-    const result = await services.cases.linkReportEvent(body.reportId, id, pubkey)
+    const result = await services.cases.linkReportEvent(
+      body.reportId,
+      id,
+      pubkey,
+      c.get('hubId') ?? '',
+    )
 
     await audit(services.audit, 'reportLinkedToEvent', pubkey, {
       eventId: id,
@@ -438,7 +448,7 @@ events.delete('/:id/reports/:reportId',
     const pubkey = c.get('pubkey')
     const services = c.get('services')
 
-    await services.cases.unlinkReportEvent(reportId, id)
+    await services.cases.unlinkReportEvent(reportId, id, c.get('hubId') ?? '')
 
     await audit(services.audit, 'reportUnlinkedFromEvent', pubkey, {
       eventId: id,
@@ -471,7 +481,7 @@ events.get('/:id/reports',
   async (c) => {
     const id = c.req.param('id')
     const services = c.get('services')
-    const reports = await services.cases.listEventReports(id)
+    const reports = await services.cases.listEventReports(id, c.get('hubId') ?? '')
     return c.json({ links: reports })
   },
 )

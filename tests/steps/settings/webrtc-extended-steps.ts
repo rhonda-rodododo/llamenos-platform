@@ -31,28 +31,29 @@ Then('the {string} option should be disabled', async ({ page }, optionText: stri
 })
 
 When('I enable the WebRTC toggle', async ({ page }) => {
-  // The WebRTC toggle is within the telephony-provider settings section
-  const telephonySection = page.getByTestId(TestIds.TELEPHONY_PROVIDER)
-  const hasSect = await telephonySection.isVisible({ timeout: 5000 }).catch(() => false)
-  if (hasSect) {
-    const toggle = telephonySection.getByRole('switch').first()
-    const hasToggle = await toggle.isVisible({ timeout: 3000 }).catch(() => false)
-    if (hasToggle) {
-      await toggle.click()
-      return
-    }
-  }
-  // Fallback: try label-based lookup
-  const labelToggle = page.getByLabel(/webrtc|browser calling/i).first()
-  const hasLabel = await labelToggle.isVisible({ timeout: 3000 }).catch(() => false)
-  if (hasLabel) {
-    await labelToggle.click()
-  }
+  const toggle = page.getByTestId(TestIds.WEBRTC_ENABLED_SWITCH)
+  await expect(toggle).toHaveAttribute('aria-checked', 'false')
+  await toggle.click()
+  await expect(toggle).toHaveAttribute('aria-checked', 'true')
 })
 
+Then('the WebRTC toggle should not be offered', async ({ page }) => {
+  await expect(page.getByTestId(TestIds.WEBRTC_ENABLED_SWITCH)).toHaveCount(0)
+})
+
+Then(
+  'the in-app audio notice should mark {string} as {string}',
+  async ({ page }, provider: string, inAppAudio: string) => {
+    const notice = page.getByTestId(TestIds.IN_APP_AUDIO_NOTICE)
+    await expect(notice).toHaveAttribute('data-provider', provider)
+    await expect(notice).toHaveAttribute('data-in-app-audio', inAppAudio)
+  },
+)
+
 When('I switch the provider to {string}', async ({ page }, provider: string) => {
-  const select = page.locator('select').first()
+  const select = page.getByTestId(TestIds.PROVIDER_SELECT)
   await select.selectOption(provider)
+  await expect(select).toHaveValue(provider)
 })
 
 When('I fill in Twilio credentials with WebRTC config', async ({ page }) => {
