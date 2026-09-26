@@ -121,6 +121,12 @@ export const TestIds = {
   RECORDING_PLAYER: 'recording-player',
   RECORDING_PLAY_BTN: 'recording-play-btn',
   ACTIVE_CALL_PANEL: 'active-call-panel',
+  /** Incoming (ringing) call row; append `-<callId>` via rowTestId */
+  INCOMING_CALL_ROW: 'incoming-call-row',
+  /** Answer button inside an incoming call row; append `-<callId>` via rowTestId */
+  ANSWER_CALL_BTN: 'answer-call-btn',
+  /** Hub label shown on a call when the user is a member of several hubs */
+  CALL_HUB_LABEL: 'call-hub-label',
   CALL_TIMER: 'call-timer',
   BAN_BTN: 'ban-btn',
   BAN_REASON_INPUT: 'ban-reason-input',

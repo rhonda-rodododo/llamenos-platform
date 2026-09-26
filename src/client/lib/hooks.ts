@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { useRelaySubscription } from './relay/hooks'
-import { useConfig } from './config'
+import { useRelaySubscriptions } from './relay/hooks'
+import { useMemberHubIds } from './member-hubs'
 import { startRinging, stopRinging } from './notifications'
 import {
   getMyShiftStatus,
@@ -9,7 +9,7 @@ import {
   answerCall as apiAnswerCall,
   hangupCall as apiHangupCall,
   reportCallSpam as apiReportSpam,
-  type ActiveCall,
+  type HubCall,
   type ShiftStatus,
   type Conversation,
 } from './api'
@@ -32,32 +32,40 @@ const CONVERSATION_KINDS = [KIND_MESSAGE_NEW, KIND_CONVERSATION_ASSIGNED]
 /**
  * Hook to manage real-time call state via WebSocket relay + REST polling fallback.
  *
- * Real-time updates arrive via WebSocket subscription. REST polling (every 15s)
- * acts as a safety net for missed events or relay downtime.
+ * Multi-hub axiom: calls are received from EVERY hub the user is a member of,
+ * regardless of which hub is active in the UI. Each call carries the hub it
+ * belongs to, and answer / hang up / spam target that hub — never the active one.
+ *
+ * Real-time updates arrive via one WebSocket subscription per member hub. REST
+ * polling (every 15s, per member hub) acts as a safety net for missed events or
+ * relay downtime.
  *
  * Call actions (answer, hangup, spam) are POST requests to REST endpoints.
  * The server is the sole authority for call state mutations.
  */
 export function useCalls() {
-  const [calls, setCalls] = useState<ActiveCall[]>([])
-  const [currentCall, setCurrentCall] = useState<ActiveCall | null>(null)
-  const { currentHubId } = useConfig()
+  const [calls, setCalls] = useState<HubCall[]>([])
+  const [currentCall, setCurrentCall] = useState<HubCall | null>(null)
+  const memberHubIds = useMemberHubIds()
   const currentCallRef = useRef(currentCall)
   currentCallRef.current = currentCall
+  const callsRef = useRef(calls)
+  callsRef.current = calls
 
-  // --- WebSocket subscription for real-time call events ---
-  useRelaySubscription(currentHubId, CALL_KINDS, (_kind, content: LlamenosEvent) => {
+  // --- WebSocket subscriptions for real-time call events (every member hub) ---
+  useRelaySubscriptions(memberHubIds, CALL_KINDS, (_kind, content: LlamenosEvent, hubId) => {
     switch (content.type) {
       case 'call:ring': {
-        const call = content as LlamenosEvent & { callId: string; callerLast4?: string; startedAt: string }
+        const call = content as LlamenosEvent & { callId: string; callerLast4?: string; startedAt?: string }
         setCalls(prev => {
           if (prev.some(c => c.id === call.callId)) return prev
           return [...prev, {
             id: call.callId,
+            hubId,
             callerNumber: '[redacted]',
             callerLast4: call.callerLast4,
             answeredBy: null,
-            startedAt: call.startedAt,
+            startedAt: call.startedAt ?? new Date().toISOString(),
             status: 'ringing' as const,
             hasTranscription: false,
             hasVoicemail: false,
@@ -67,7 +75,7 @@ export function useCalls() {
         break
       }
       case 'call:update': {
-        const update = content as LlamenosEvent & { callId: string; status: ActiveCall['status']; answeredBy?: string }
+        const update = content as LlamenosEvent & { callId: string; status: HubCall['status']; answeredBy?: string }
         setCalls(prev => {
           if (update.status === 'completed') {
             return prev.filter(c => c.id !== update.callId)
@@ -100,67 +108,86 @@ export function useCalls() {
     }
   })
 
-  // --- REST polling fallback (every 15s) ---
+  // --- REST polling fallback (every 15s, every member hub) ---
+  const memberHubKey = memberHubIds.join(',')
   useEffect(() => {
+    if (!memberHubKey) return
+    const hubIds = memberHubKey.split(',')
     let mounted = true
 
     const poll = () => {
-      listActiveCalls()
-        .then(({ calls: polledCalls }) => {
+      Promise.allSettled(hubIds.map(hubId => listActiveCalls(hubId)))
+        .then(results => {
           if (!mounted) return
+          const polledCalls: HubCall[] = []
+          const failedHubs = new Set<string>()
+          results.forEach((result, i) => {
+            if (result.status === 'fulfilled') polledCalls.push(...result.value.calls)
+            else failedHubs.add(hubIds[i])
+          })
+          if (failedHubs.size > 0) {
+            console.error('[calls] Background call polling failed for hubs:', [...failedHubs].join(','))
+          }
+          // A hub whose poll failed keeps its known calls — one unreachable hub must
+          // not make another hub's ringing call vanish (and vice versa).
+          const next = [...polledCalls, ...callsRef.current.filter(c => failedHubs.has(c.hubId))]
           setCalls(prev => {
-            const prevIds = prev.map(c => `${c.id}:${c.status}`).sort().join(',')
-            const newIds = polledCalls.map(c => `${c.id}:${c.status}`).sort().join(',')
-            return prevIds === newIds ? prev : polledCalls
+            const prevIds = prev.map(c => `${c.hubId}:${c.id}:${c.status}`).sort().join(',')
+            const newIds = next.map(c => `${c.hubId}:${c.id}:${c.status}`).sort().join(',')
+            return prevIds === newIds ? prev : next
           })
           setCurrentCall(prev => {
             if (!prev) return prev
-            return polledCalls.some(c => c.id === prev.id) ? prev : null
+            return next.some(c => c.id === prev.id) ? prev : null
           })
-        })
-        .catch(() => {
-          console.error('[calls] Background call polling failed')
         })
     }
 
     poll() // Seed initial state on mount
     const interval = setInterval(poll, 15_000)
     return () => { mounted = false; clearInterval(interval) }
-  }, [])
+  }, [memberHubKey])
 
-  // --- Call actions via REST ---
+  // --- Call actions via REST, always against the call's own hub ---
 
   const answerCall = useCallback(async (callId: string) => {
+    const call = callsRef.current.find(c => c.id === callId)
+    if (!call) return
     stopRinging()
-    const call = calls.find(c => c.id === callId)
-    if (call) {
-      setCurrentCall({ ...call, status: 'in-progress' })
-    }
+    setCurrentCall({ ...call, status: 'in-progress' })
     try {
-      await apiAnswerCall(callId)
+      await apiAnswerCall(callId, call.hubId)
     } catch {
       // Revert optimistic update on failure
       setCurrentCall(null)
     }
-  }, [calls])
+  }, [])
+
+  const hubOf = useCallback((callId: string): string | undefined =>
+    (currentCallRef.current?.id === callId ? currentCallRef.current : callsRef.current.find(c => c.id === callId))?.hubId,
+  [])
 
   const hangupCall = useCallback(async (callId: string) => {
+    const hubId = hubOf(callId)
     setCurrentCall(null)
+    if (!hubId) return
     try {
-      await apiHangupCall(callId)
+      await apiHangupCall(callId, hubId)
     } catch {
       // Call may already be ended — safe to ignore
     }
-  }, [])
+  }, [hubOf])
 
   const reportSpam = useCallback(async (callId: string) => {
+    const hubId = hubOf(callId)
     setCurrentCall(null)
+    if (!hubId) return
     try {
-      await apiReportSpam(callId)
+      await apiReportSpam(callId, hubId)
     } catch {
       // Report may fail if call already ended — safe to ignore
     }
-  }, [])
+  }, [hubOf])
 
   return {
     calls,
@@ -205,10 +232,10 @@ export function useShiftStatus() {
  */
 export function useConversations() {
   const [conversations, setConversations] = useState<Conversation[]>([])
-  const { currentHubId } = useConfig()
+  const memberHubIds = useMemberHubIds()
 
-  // --- WebSocket subscription for conversation events ---
-  useRelaySubscription(currentHubId, CONVERSATION_KINDS, (_kind, content: LlamenosEvent) => {
+  // --- WebSocket subscriptions for conversation events (every member hub) ---
+  useRelaySubscriptions(memberHubIds, CONVERSATION_KINDS, (_kind, content: LlamenosEvent) => {
     switch (content.type) {
       case 'conversation:new': {
         const { conversationId } = content as LlamenosEvent & { conversationId: string }

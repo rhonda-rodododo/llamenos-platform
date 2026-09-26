@@ -183,7 +183,12 @@ export class RelayConnection {
     this.subscriptions.delete(subId)
     this.pendingSubscriptions = this.pendingSubscriptions.filter(s => s.id !== subId)
 
-    if (this.ws?.readyState === WebSocket.OPEN && this.authenticated) {
+    // The server's unsubscribe is per hub, not per subscription — it drops every kind this
+    // connection subscribed on that hub. Only send it once no local subscription still
+    // needs the hub, otherwise unmounting one consumer (e.g. the dashboard's call list)
+    // would silence every other consumer of the same hub (root layout, blasts, …).
+    const hubStillNeeded = [...this.subscriptions.values()].some(s => s.hubId === sub.hubId)
+    if (!hubStillNeeded && this.ws?.readyState === WebSocket.OPEN && this.authenticated) {
       this.ws.send(JSON.stringify({ type: 'unsubscribe', hubId: sub.hubId }))
     }
   }
