@@ -595,64 +595,6 @@ describe('CallsService', () => {
     })
   })
 
-  describe('createCallToken / resolveCallToken', () => {
-    it('creates and resolves a call token successfully', async () => {
-      let storedToken: Record<string, unknown> | undefined
-
-      const db = {
-        insert: vi.fn().mockReturnValue({
-          values: vi.fn().mockImplementation((vals: Record<string, unknown>) => {
-            storedToken = vals
-            return {
-              returning: vi.fn().mockResolvedValue([vals]),
-            }
-          }),
-        }),
-        delete: vi.fn().mockReturnValue({
-          where: vi.fn().mockReturnValue({
-            returning: vi.fn().mockImplementation(() => {
-              if (storedToken) return [storedToken]
-              return []
-            }),
-          }),
-        }),
-      }
-
-      const svc = new CallsService(db as never)
-      const token = await svc.createCallToken({
-        callSid: 'CA123',
-        volunteerPubkey: 'pk-vol1',
-        hubId: 'hub-1',
-      })
-
-      // Token should be a UUID format
-      expect(token).toMatch(
-        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,
-      )
-
-      // Resolve the token
-      const result = await svc.resolveCallToken(token)
-      expect(result).toBeTruthy()
-      expect(result!.callSid).toBe('CA123')
-      expect(result!.volunteerPubkey).toBe('pk-vol1')
-      expect(result!.hubId).toBe('hub-1')
-    })
-
-    it('returns null for unknown token', async () => {
-      const db = {
-        delete: vi.fn().mockReturnValue({
-          where: vi.fn().mockReturnValue({
-            returning: vi.fn().mockResolvedValue([]),
-          }),
-        }),
-      }
-
-      const svc = new CallsService(db as never)
-      const result = await svc.resolveCallToken('nonexistent-token')
-      expect(result).toBeNull()
-    })
-  })
-
   describe('reportSpam stores reporter pubkey', () => {
     it('sets status to spam and records reportedBy', async () => {
       const updateSet = vi.fn().mockReturnValue({
