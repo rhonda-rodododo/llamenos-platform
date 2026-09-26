@@ -26,7 +26,8 @@ vi.mock('./api/client', async (importActual) => ({
     requested.push({ path, method: options?.method ?? 'GET' })
     if (path === '/hubs') return { hubs: [{ id: 'hub-A' }, { id: 'hub-B' }] }
     if (path === '/hubs/hub-B/calls/active') {
-      return { calls: [{ id: 'CA-on-hub-B', callerNumber: '[redacted]', startedAt: '2026-01-01T00:00:00Z', status: 'ringing' }] }
+      // Wire shape: the server sends the raw active_calls row, keyed callId (not id)
+      return { calls: [{ callId: 'CA-on-hub-B', hubId: 'hub-B', callerNumber: '[redacted]', startedAt: '2026-01-01T00:00:00Z', status: 'ringing' }] }
     }
     if (path.endsWith('/calls/active')) return { calls: [] }
     return {}

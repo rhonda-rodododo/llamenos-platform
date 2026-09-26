@@ -12,12 +12,27 @@ export type { CallRecord }
 export type HubCall = ActiveCall & { hubId: string }
 
 /**
+ * Wire shape of a `/calls/active` row as the server sends it today: the raw
+ * `active_calls` row, keyed `callId` and carrying `hubId` — not
+ * `activeCallResponseSchema`, which says `id` and has no hub. (The route's schema
+ * conformance test feeds a mock with `id`, so the drift is invisible to it.)
+ * Tolerate both keys until the protocol schema and the route agree.
+ */
+type ActiveCallWire = Omit<ActiveCall, 'id'> & { id?: string; callId?: string }
+
+/**
  * List the active calls of ONE hub, tagging each with that hub. Callers that
  * cover every member hub fan this out per hub; the active hub is irrelevant.
+ * The hub is the one we asked, not anything the row claims about itself.
  */
 export async function listActiveCalls(hubId: string): Promise<{ calls: HubCall[] }> {
-  const { calls } = await request<{ calls: ActiveCall[] }>(hubPath(hubId, '/calls/active'))
-  return { calls: calls.map(call => ({ ...call, hubId })) }
+  const { calls } = await request<{ calls: ActiveCallWire[] }>(hubPath(hubId, '/calls/active'))
+  return {
+    calls: calls.flatMap(({ callId, ...call }) => {
+      const id = call.id ?? callId
+      return id ? [{ ...call, id, hubId }] : []
+    }),
+  }
 }
 
 export async function getCallHistory(params?: { page?: number; limit?: number; search?: string; dateFrom?: string; dateTo?: string; status?: 'completed' | 'unanswered' }) {
