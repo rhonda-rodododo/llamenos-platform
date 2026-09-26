@@ -9,7 +9,6 @@
  * Times are expressed as offsets from "now" (seed time) so the schedule and
  * call log always look current after each reset.
  */
-import { DEMO_ACCOUNTS } from '@shared/demo-accounts'
 import type { MessagingChannelType } from '@protocol/schemas/settings'
 
 /** Stable hub identity so a re-seed replaces the previous demo hub instead of adding another. */
@@ -20,17 +19,11 @@ export const DEMO_HUB = {
   description: 'Fictional demonstration hub. All people, numbers and notes are invented sample data.',
 } as const
 
-const accountByName = (name: string) => {
-  const account = DEMO_ACCOUNTS.find(a => a.name === name)
-  if (!account) throw new Error(`Demo account "${name}" missing from DEMO_ACCOUNTS`)
-  return account.pubkey
-}
-
-/** The demo cast, by signing pubkey. */
+/** Display names of the demo accounts the dataset is written around (see @shared/demo-accounts). */
 export const DEMO_CAST = {
-  admin: accountByName('Demo Admin'),
-  maria: accountByName('Maria Santos'),
-  james: accountByName('James Chen'),
+  admin: 'Demo Admin',
+  maria: 'Maria Santos',
+  james: 'James Chen',
 } as const
 
 type Volunteer = 'maria' | 'james'
@@ -68,7 +61,7 @@ export interface DemoCall {
   note?: string
 }
 
-/** Twelve calls across the last fortnight, newest first. Nine carry a note. */
+/** Twelve calls across the last fortnight, newest first. Eight carry a note. */
 export const DEMO_CALLS: ReadonlyArray<DemoCall> = [
   {
     key: 'call-01', hoursAgo: 3, durationSeconds: 612, callerLast4: '0142', answeredBy: 'james',

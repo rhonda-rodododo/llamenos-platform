@@ -9,7 +9,7 @@ import { getTestPushLog, clearTestPushLog } from '../lib/push-dispatch'
 import { getApnsBundleId, getApnsVoipTopic } from '../lib/apns-topic'
 import { seedDemoDataset } from '../services/demo-seeder'
 import { DEMO_HUB } from '../lib/demo-dataset'
-import { DEMO_ACCOUNTS } from '@shared/demo-accounts'
+import { demoIdentities } from '../lib/demo-identities'
 
 /**
  * Decode a pubkey (hex only — npub1 bech32 encoding is no longer supported).
@@ -739,9 +739,8 @@ dev.delete('/test-seed-demo', async (c) => {
     return c.json({ error: 'Not Found' }, 404)
   }
   const services = c.get('services')
-  const { hubs } = await services.settings.getHubs()
-  if (hubs.some(h => h.id === DEMO_HUB.id)) await services.settings.deleteHub(DEMO_HUB.id)
-  for (const account of DEMO_ACCOUNTS) {
+  await services.settings.purgeHub(DEMO_HUB.id)
+  for (const account of demoIdentities()) {
     await services.identity.deleteUser(account.pubkey).catch(() => {})
   }
   return c.json({ ok: true })

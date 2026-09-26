@@ -25,9 +25,9 @@ import {
   DEMO_SHIFTS,
 } from '../lib/demo-dataset'
 import { demoReader, sealForReaders, type DemoReader } from '../lib/demo-crypto'
+import { demoIdentities, demoIdentityByName } from '../lib/demo-identities'
 import { encryptContactIdentifier, hashPhone } from '../lib/crypto'
 import { LABEL_CALL_META, LABEL_MESSAGE, LABEL_NOTE_KEY } from '@shared/crypto-labels'
-import { DEMO_ACCOUNTS } from '@shared/demo-accounts'
 import type { Hub } from '@shared/types'
 import type { MessagingChannelType } from '@protocol/schemas/settings'
 
@@ -58,9 +58,9 @@ type Cast = { admin: DemoReader; maria: DemoReader; james: DemoReader }
 
 function loadCast(): Cast {
   return {
-    admin: demoReader(DEMO_CAST.admin),
-    maria: demoReader(DEMO_CAST.maria),
-    james: demoReader(DEMO_CAST.james),
+    admin: demoReader(demoIdentityByName(DEMO_CAST.admin)),
+    maria: demoReader(demoIdentityByName(DEMO_CAST.maria)),
+    james: demoReader(demoIdentityByName(DEMO_CAST.james)),
   }
 }
 
@@ -84,7 +84,8 @@ export async function seedDemoDataset(
   env: DemoSeedEnv,
   now: Date = new Date(),
 ): Promise<DemoSeedSummary> {
-  for (const account of DEMO_ACCOUNTS) {
+  const accounts = demoIdentities()
+  for (const account of accounts) {
     const user = await services.identity.getUserInternal(account.pubkey)
     if (!user) {
       throw new ServiceError(409, `Demo account ${account.name} does not exist — initialise demo accounts before seeding`)
@@ -101,9 +102,8 @@ export async function seedDemoDataset(
 
   // ── Replace: dropping the hub cascades through every hub-scoped table ─────
   await services.settings.ensureInit({ ENVIRONMENT: env.ENVIRONMENT })
-  const { hubs } = await services.settings.getHubs()
-  if (hubs.some(h => h.id === hubId)) await services.settings.deleteHub(hubId)
-  // deleteHub also removes users that belonged only to that hub — put the demo accounts back
+  await services.settings.purgeHub(hubId)
+  // purgeHub also removes users that belonged only to that hub — put the demo accounts back
   await services.identity.ensureInit(undefined, true)
 
   // ── Hub + membership ──────────────────────────────────────────────────────
@@ -113,12 +113,12 @@ export async function seedDemoDataset(
     slug: DEMO_HUB.slug,
     description: DEMO_HUB.description,
     status: 'active',
-    createdBy: DEMO_CAST.admin,
+    createdBy: cast.admin.pubkey,
     createdAt: ago(24 * 14).toISOString(),
     updatedAt: now.toISOString(),
   }
   await services.settings.createHub(hub)
-  for (const account of DEMO_ACCOUNTS) {
+  for (const account of accounts) {
     const roleIds = account.roleIds.includes('role-super-admin') ? ['role-hub-admin'] : account.roleIds
     await services.identity.setHubRole({ pubkey: account.pubkey, hubId, roleIds })
   }
@@ -320,7 +320,7 @@ export async function seedDemoDataset(
 
   // ── Audit trail (hash-chained, appended oldest → newest) ─────────────────
   const auditEvents = [
-    ...DEMO_ADMIN_AUDIT_ACTIONS.map(e => ({ at: ago(e.hoursAgo), action: e.action, actor: DEMO_CAST.admin, details: e.details })),
+    ...DEMO_ADMIN_AUDIT_ACTIONS.map(e => ({ at: ago(e.hoursAgo), action: e.action, actor: cast.admin.pubkey, details: e.details })),
     ...callEvents,
   ].sort((a, b) => a.at.getTime() - b.at.getTime())
   let previousMs = 0
@@ -359,7 +359,7 @@ export async function resetDemoData(
 
   // Hub-scoped rows are not reachable through the global resets below — drop each hub first.
   const { hubs } = await services.settings.getHubs()
-  for (const hub of hubs) await services.settings.deleteHub(hub.id)
+  for (const hub of hubs) await services.settings.purgeHub(hub.id)
 
   await services.audit.reset()
   await services.identity.reset(env.DEMO_MODE === 'true', env.ENVIRONMENT, env.DEMO_MODE_CONFIRM)

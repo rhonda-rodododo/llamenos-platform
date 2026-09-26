@@ -16,7 +16,7 @@ import { hkdfSha256, hpkeSeal, randomBytes, symmetricEncrypt } from '@llamenos/c
 import { bytesToHex, hexToBytes, utf8ToBytes } from '@shared/encoding'
 import { LABEL_DEVICE_ENCRYPTION_SEED } from '@shared/crypto-labels'
 import type { RecipientEnvelope } from '@shared/types'
-import { DEMO_SEEDS } from './demo-seeds'
+import type { DemoIdentity } from './demo-identities'
 
 /** An account that can read demo content: identified by its signing pubkey, sealed to its X25519 key. */
 export interface DemoReader {
@@ -39,11 +39,9 @@ export function deriveDemoEncryptionPubkey(signingSeedHex: string): string {
   return bytesToHex(x25519.getPublicKey(encryptionSeed))
 }
 
-/** Resolve a demo account by signing pubkey. Throws if the account has no seed material. */
-export function demoReader(pubkey: string): DemoReader {
-  const seed = DEMO_SEEDS[pubkey]
-  if (!seed) throw new Error(`No demo seed for account ${pubkey.slice(0, 8)}…`)
-  return { pubkey, encryptionPubkey: deriveDemoEncryptionPubkey(seed) }
+/** A demo account as an envelope reader: addressed by signing pubkey, sealed to its derived X25519 key. */
+export function demoReader(identity: DemoIdentity): DemoReader {
+  return { pubkey: identity.pubkey, encryptionPubkey: deriveDemoEncryptionPubkey(identity.seedHex) }
 }
 
 function base64url(bytes: Uint8Array): string {
