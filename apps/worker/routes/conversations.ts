@@ -464,7 +464,7 @@ conversations.post('/:id/messages',
     audit(c.get('services').audit, 'messageSent', pubkey, {
       conversationId: id,
       channel: conv.channelType,
-    })
+    }, undefined, conv.hubId ?? null)
 
     return c.json(msg, 201)
   },
@@ -517,7 +517,7 @@ conversations.patch('/:id',
 
     audit(c.get('services').audit, body.status === 'closed' ? 'conversationClosed' : 'conversationUpdated', pubkey, {
       conversationId: id,
-    })
+    }, undefined, conv.hubId ?? null)
 
     return c.json(updated)
   },
@@ -608,7 +608,7 @@ conversations.post('/:id/claim',
     audit(c.get('services').audit, 'conversationClaimed', pubkey, {
       conversationId: id,
       channelType: conv.channelType,
-    })
+    }, undefined, conv.hubId ?? null)
 
     return c.json(claimed)
   },

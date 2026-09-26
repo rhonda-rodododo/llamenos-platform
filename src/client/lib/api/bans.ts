@@ -1,4 +1,4 @@
-import { request, hp } from './client'
+import { request, hp, hubPath } from './client'
 import type { BanEntry } from '@protocol/schemas'
 
 export type { BanEntry }
@@ -16,9 +16,9 @@ export async function addBan(data: { phone: string; reason: string }) {
   })
 }
 
-export async function banAndHangup(callId: string, reason?: string) {
+export async function banAndHangup(callId: string, hubId: string, reason?: string) {
   return request<{ banned: boolean; hungUp: boolean }>(
-    hp(`/calls/${callId}/ban`),
+    hubPath(hubId, `/calls/${callId}/ban`),
     { method: 'POST', body: JSON.stringify({ reason }) },
   )
 }

@@ -46,6 +46,15 @@ Feature: Audit Integrity
     Then the verification result should be invalid
     And the verification result should identify the broken entry
 
+  # ── Concurrent Appends (#1045) ───────────────────────────────────
+
+  Scenario: Concurrent audited writes keep the hash chain linear
+    Given an admin performs 20 concurrent operations
+    When the audit chain is verified via the API endpoint
+    Then the verification result should be valid
+    And the verification result should report at least 20 checked entries
+    And no two audit entries should share the same previousEntryHash
+
   # ── Tamper Detection ─────────────────────────────────────────────
 
   Scenario: Audit entries are tamper-detectable

@@ -277,6 +277,9 @@ calls.post('/:callId/answer',
 
     try {
       const result = await services.calls.answerCall(hubId, callId, pubkey)
+      await audit(services.audit, 'callAnswered', pubkey, {
+        callerLast4: result.callerLast4 || '',
+      }, undefined, result.hubId || hubId || null)
       return c.json({ call: result })
     } catch (err) {
       if (err instanceof Error && 'status' in err && (err as { status: number }).status === 409) {
@@ -424,7 +427,7 @@ calls.post('/:callId/ban',
     }
 
     if (banned) {
-      await audit(services.audit, 'numberBanned', pubkey, { callId })
+      await audit(services.audit, 'numberBanned', pubkey, { callId }, undefined, call.hubId || hubId || null)
     }
 
     return c.json({ banned, hungUp: true })

@@ -203,7 +203,7 @@ files.post('/:id/share', requirePermission('files:share'),
     // Add the new envelope to the file record via service
     await services.conversations.addFileRecipient(fileId, body.envelope, body.encryptedMetadata)
 
-    await audit(services.audit, 'fileShared', pubkey, { fileId, sharedWith: body.envelope.pubkey })
+    await audit(services.audit, 'fileShared', pubkey, { fileId, sharedWith: body.envelope.pubkey }, undefined, null)
 
     return c.json({ ok: true })
   })

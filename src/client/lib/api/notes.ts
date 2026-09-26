@@ -1,4 +1,4 @@
-import { request, hp } from './client'
+import { request, hp, hubPath } from './client'
 import type { EncryptedNote, ConversationMessage } from '@protocol/schemas'
 
 export type { EncryptedNote }
@@ -22,8 +22,9 @@ export async function createNote(data: {
   encryptedContent: string
   authorEnvelope?: import('@shared/types').KeyEnvelope
   adminEnvelopes?: import('@shared/types').RecipientEnvelope[]
-}) {
-  return request<{ note: EncryptedNote }>(hp('/notes'), {
+}, hubId?: string) {
+  // A note about a call belongs to the call's hub, which may not be the active one.
+  return request<{ note: EncryptedNote }>(hubId ? hubPath(hubId, '/notes') : hp('/notes'), {
     method: 'POST',
     body: JSON.stringify(data),
   })

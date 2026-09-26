@@ -93,8 +93,8 @@ export function useDraft(key: string) {
     setIsDirty(true)
   }, [])
 
-  const setFieldValue = useCallback((fieldId: string, value: string | number | boolean) => {
-    setFields(prev => ({ ...prev, [fieldId]: value }))
+  const setFieldValue = useCallback((fieldName: string, value: string | number | boolean) => {
+    setFields(prev => ({ ...prev, [fieldName]: value }))
     setIsDirty(true)
   }, [])
 

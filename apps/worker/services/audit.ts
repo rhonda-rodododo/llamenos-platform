@@ -5,7 +5,12 @@
  * helper that delegated to the DO via fetch.
  *
  * The hash chain guarantees tamper detection: each entry stores the SHA-256
- * hash of the previous entry. Verification walks the chain backward.
+ * hash of the previous entry. Verification walks the chain forward in append
+ * order.
+ *
+ * Chains are per hub (`hub_id`), plus one platform chain (`hub_id IS NULL`).
+ * Append order is `created_at` then `id`; `log()` guarantees `created_at` is
+ * strictly increasing within a chain (see there), so the order is total.
  */
 import { eq, and, asc, desc, sql, count, gte, lte, inArray } from 'drizzle-orm'
 import { sha256 } from '@noble/hashes/sha2.js'
@@ -133,6 +138,18 @@ export function computeEntryHash(entry: {
   return bytesToHex(sha256(utf8ToBytes(content)))
 }
 
+const VERIFY_PAGE_SIZE = 2000
+
+/** Rows of one chain: a hub's, or the platform chain when `hubId` is undefined. */
+function chainCondition(hubId: string | null | undefined) {
+  return hubId ? eq(auditLog.hubId, hubId) : sql`${auditLog.hubId} IS NULL`
+}
+
+/** Advisory-lock key text for a chain. Distinct chains may share a hashtext bucket; that only over-serialises. */
+function chainLockKey(hubId: string | null | undefined): string {
+  return `audit:${hubId ?? 'platform'}`
+}
+
 // ---------------------------------------------------------------------------
 // Service
 // ---------------------------------------------------------------------------
@@ -143,14 +160,21 @@ export class AuditService {
   /**
    * Append an entry to the hash-chained audit log.
    *
-   * Uses `SELECT ... FOR UPDATE` inside a transaction to serialise
-   * concurrent writes and guarantee a correct hash chain.
+   * Appends to one chain are serialised with a transaction-scoped advisory
+   * lock taken BEFORE the tip is read. `SELECT … FOR UPDATE` on the tip row is
+   * not enough: under READ COMMITTED a waiter re-reads the row it locked, not
+   * the newer tip the winner inserted, so both entries chain from the same
+   * predecessor (forked chain), and an empty chain has no row to lock at all.
+   *
+   * `created_at` is taken after the lock and forced strictly past the tip's,
+   * so append order is recoverable from `created_at` alone even when two
+   * writers' wall clocks tie or disagree.
    */
   async log(
     action: string,
     actorPubkey: string,
     details: Record<string, unknown> = {},
-    hubId?: string,
+    hubId?: string | null,
     /** Explicit timestamp — only for seeding historical demo data. Entries must be appended in chronological order. */
     at?: Date,
   ): Promise<AuditEntry> {
@@ -160,19 +184,24 @@ export class AuditService {
     }
 
     const id = crypto.randomUUID()
-    const createdAt = (at ?? new Date()).toISOString()
 
     return await this.db.transaction(async (tx) => {
-      // Get latest entry hash with FOR UPDATE to serialise chain writes
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${chainLockKey(hubId)}))`)
+
       const [latest] = await tx
-        .select({ entryHash: auditLog.entryHash })
+        .select({ entryHash: auditLog.entryHash, createdAt: auditLog.createdAt })
         .from(auditLog)
-        .where(hubId ? eq(auditLog.hubId, hubId) : sql`${auditLog.hubId} IS NULL`)
-        .orderBy(desc(auditLog.createdAt))
+        .where(chainCondition(hubId))
+        .orderBy(desc(auditLog.createdAt), desc(auditLog.id))
         .limit(1)
-        .for('update')
 
       const previousEntryHash = latest?.entryHash ?? null
+
+      let createdAtMs = (at ?? new Date()).getTime()
+      if (latest && createdAtMs <= latest.createdAt.getTime()) {
+        createdAtMs = latest.createdAt.getTime() + 1
+      }
+      const createdAt = new Date(createdAtMs).toISOString()
 
       const entryHash = computeEntryHash({
         id,
@@ -274,7 +303,7 @@ export class AuditService {
         .select()
         .from(auditLog)
         .where(where)
-        .orderBy(desc(auditLog.createdAt))
+        .orderBy(desc(auditLog.createdAt), desc(auditLog.id))
         .limit(limit)
         .offset(offset),
       this.db
@@ -306,7 +335,7 @@ export class AuditService {
       .select()
       .from(auditLog)
       .where(and(...conditions))
-      .orderBy(asc(auditLog.createdAt))
+      .orderBy(asc(auditLog.createdAt), asc(auditLog.id))
   }
 
   /**
@@ -317,8 +346,8 @@ export class AuditService {
     const [row] = await this.db
       .select({ entryHash: auditLog.entryHash })
       .from(auditLog)
-      .where(hubId ? eq(auditLog.hubId, hubId) : sql`${auditLog.hubId} IS NULL`)
-      .orderBy(desc(auditLog.createdAt))
+      .where(chainCondition(hubId))
+      .orderBy(desc(auditLog.createdAt), desc(auditLog.id))
       .limit(1)
 
     return row?.entryHash ?? null
@@ -327,7 +356,7 @@ export class AuditService {
   /**
    * Verify the integrity of the hash chain for a hub (or global if no hubId).
    *
-   * Walks entries in chronological order and checks:
+   * Walks entries in append order (created_at, id) and checks:
    * 1. Each entry's stored entryHash matches the recomputed hash
    * 2. Each entry's previousEntryHash matches the prior entry's entryHash
    *
@@ -339,9 +368,7 @@ export class AuditService {
   ): Promise<ChainVerificationResult> {
     const { limit, offset = 0 } = options
 
-    const condition = hubId
-      ? eq(auditLog.hubId, hubId)
-      : sql`${auditLog.hubId} IS NULL`
+    const condition = chainCondition(hubId)
 
     // Get total count first
     const [{ total }] = await this.db
@@ -363,7 +390,7 @@ export class AuditService {
         .select({ entryHash: auditLog.entryHash })
         .from(auditLog)
         .where(condition)
-        .orderBy(asc(auditLog.createdAt))
+        .orderBy(asc(auditLog.createdAt), asc(auditLog.id))
         .limit(1)
         .offset(offset - 1)
 
@@ -375,7 +402,7 @@ export class AuditService {
       .select()
       .from(auditLog)
       .where(condition)
-      .orderBy(asc(auditLog.createdAt))
+      .orderBy(asc(auditLog.createdAt), asc(auditLog.id))
 
     const entries = limit != null
       ? await baseQuery.limit(limit).offset(offset)
@@ -400,6 +427,14 @@ export class AuditService {
             reason: 'previousEntryHash mismatch',
           },
         }
+      }
+
+      // GDPR erasure rewrites actorPubkey/details in place and stamps
+      // erasedAt (services/erasure.ts), so an erased entry can no longer be
+      // re-hashed. Its chain linkage is still checked above.
+      if (entry.erasedAt) {
+        previousHash = entry.entryHash
+        continue
       }
 
       // Recompute the hash and check it matches stored entryHash
@@ -435,6 +470,40 @@ export class AuditService {
     return { valid: true, totalEntries, checkedEntries: entries.length }
   }
 
+  /**
+   * Hub ids that have an audit chain, plus `null` for the platform chain.
+   */
+  async listChainHubIds(): Promise<Array<string | null>> {
+    const rows = await this.db
+      .selectDistinct({ hubId: auditLog.hubId })
+      .from(auditLog)
+    return rows.map((r) => r.hubId)
+  }
+
+  /**
+   * Verify an entire chain, reading it in pages so a large log is never
+   * loaded at once. Returns the first failure found, or a valid result
+   * covering every entry.
+   */
+  async verifyFullChain(
+    hubId: string | undefined,
+    pageSize = VERIFY_PAGE_SIZE,
+  ): Promise<ChainVerificationResult> {
+    let offset = 0
+    let total = 0
+    for (;;) {
+      const page = await this.verifyChain(hubId, { limit: pageSize, offset })
+      total = page.totalEntries
+      if (!page.valid) {
+        return { ...page, checkedEntries: offset + page.checkedEntries }
+      }
+      offset += page.checkedEntries
+      if (page.checkedEntries === 0 || offset >= total) {
+        return { valid: true, totalEntries: total, checkedEntries: offset }
+      }
+    }
+  }
+
   /** Clear all audit log entries (test/demo reset only). */
   async reset(): Promise<void> {
     await this.db.delete(auditLog)
@@ -451,8 +520,8 @@ export async function audit(
   event: string,
   actorPubkey: string,
   details: Record<string, unknown> = {},
-  ctx?: { request: Request; hmacSecret: string },
-  hubId?: string,
+  ctx: { request: Request; hmacSecret: string } | undefined,
+  hubId: string | null,
 ): Promise<void> {
   const meta: Record<string, unknown> = {}
   if (ctx) {

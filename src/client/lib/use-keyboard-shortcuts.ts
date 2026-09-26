@@ -3,7 +3,7 @@ import { useNavigate } from '@tanstack/react-router'
 import { useAuth } from './auth'
 import { useToast } from './toast'
 import { useNoteSheet } from './note-sheet-context'
-import { getRingingCallIds, getCurrentCallId } from './call-state'
+import { getRingingCalls, getCurrentCall } from './call-state'
 import { answerCall, hangupCall } from './api'
 import { stopRinging } from './notifications'
 
@@ -59,10 +59,10 @@ export function useKeyboardShortcuts() {
 
       // Ctrl/Cmd+Shift+A — Answer call
       if (mod && e.shiftKey && e.key === 'A') {
-        const ringing = getRingingCallIds()
+        const ringing = getRingingCalls()
         if (ringing.length > 0) {
           e.preventDefault()
-          answerCall(ringing[0]).catch(() => {
+          answerCall(ringing[0].id, ringing[0].hubId).catch(() => {
             toast('Failed to answer call', 'error')
           })
           stopRinging()
@@ -72,10 +72,10 @@ export function useKeyboardShortcuts() {
 
       // Ctrl/Cmd+Shift+H — Hang up
       if (mod && e.shiftKey && e.key === 'H') {
-        const currentId = getCurrentCallId()
-        if (currentId) {
+        const current = getCurrentCall()
+        if (current) {
           e.preventDefault()
-          hangupCall(currentId).catch(() => {
+          hangupCall(current.id, current.hubId).catch(() => {
             toast('Failed to hang up call', 'error')
           })
         }

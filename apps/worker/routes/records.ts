@@ -396,7 +396,7 @@ records.post('/convert-from-report',
       recordId: result.recordId,
       reportId: body.reportId,
       entityTypeId: body.entityTypeId,
-    })
+    }, undefined, c.get('hubId') ?? null)
 
     return c.json({ ...result, autoAssigned, assignedTo }, 201)
   },
@@ -584,7 +584,7 @@ records.post('/',
       recordId: record.id,
       entityTypeId: record.entityTypeId,
       caseNumber: record.caseNumber,
-    })
+    }, undefined, c.get('hubId') ?? null)
 
     return c.json(record, 201)
   },
@@ -640,7 +640,7 @@ records.patch('/:id',
       recordId: id,
     })
 
-    await audit(services.audit, 'recordUpdated', pubkey, { recordId: id })
+    await audit(services.audit, 'recordUpdated', pubkey, { recordId: id }, undefined, c.get('hubId') ?? null)
 
     return c.json(updated)
   },
@@ -672,7 +672,7 @@ records.delete('/:id',
 
     await services.cases.delete(id)
 
-    await audit(services.audit, 'recordDeleted', pubkey, { recordId: id })
+    await audit(services.audit, 'recordDeleted', pubkey, { recordId: id }, undefined, c.get('hubId') ?? null)
 
     return c.json({ ok: true })
   },
@@ -710,7 +710,7 @@ records.post('/:id/contacts',
       recordId: id,
       contactId: body.contactId,
       role: body.role,
-    })
+    }, undefined, c.get('hubId') ?? null)
 
     return c.json(result, 201)
   },
@@ -746,7 +746,7 @@ records.delete('/:id/contacts/:contactId',
     await audit(services.audit, 'recordContactUnlinked', pubkey, {
       recordId: id,
       contactId,
-    })
+    }, undefined, c.get('hubId') ?? null)
 
     return c.json({ ok: true })
   },
@@ -895,7 +895,7 @@ records.post('/:id/assign',
     await audit(services.audit, 'recordAssigned', pubkey, {
       recordId: id,
       assignedPubkeys: body.pubkeys,
-    })
+    }, undefined, c.get('hubId') ?? null)
 
     return c.json(result)
   },
@@ -942,7 +942,7 @@ records.post('/:id/unassign',
     await audit(services.audit, 'recordUnassigned', pubkey, {
       recordId: id,
       unassignedPubkey: body.pubkey,
-    })
+    }, undefined, c.get('hubId') ?? null)
 
     return c.json(result)
   },
@@ -1043,7 +1043,7 @@ records.post('/:id/interactions',
     await audit(services.audit, 'interactionCreated', pubkey, {
       caseId: id,
       interactionType: body.interactionType,
-    })
+    }, undefined, c.get('hubId') ?? null)
 
     return c.json(interaction, 201)
   },
@@ -1079,7 +1079,7 @@ records.delete('/:id/interactions/:interactionId',
     await audit(services.audit, 'interactionDeleted', pubkey, {
       caseId: id,
       interactionId,
-    })
+    }, undefined, c.get('hubId') ?? null)
 
     return c.json({ ok: true })
   },
@@ -1121,7 +1121,7 @@ records.post('/:id/reports',
     await audit(services.audit, 'reportLinkedToCase', pubkey, {
       caseId: id,
       reportId: body.reportId,
-    })
+    }, undefined, c.get('hubId') ?? null)
 
     return c.json(result, 201)
   },
@@ -1157,7 +1157,7 @@ records.delete('/:id/reports/:reportId',
     await audit(services.audit, 'reportUnlinkedFromCase', pubkey, {
       caseId: id,
       reportId,
-    })
+    }, undefined, c.get('hubId') ?? null)
 
     return c.json({ ok: true })
   },
@@ -1284,7 +1284,7 @@ records.post('/:id/notify-contacts',
       recordId: id,
       notified,
       skipped,
-    })
+    }, undefined, c.get('hubId') ?? null)
 
     return c.json(response)
   },
@@ -1314,7 +1314,7 @@ records.post('/merge',
 
     const result = await services.cases.mergeRecords(hubId, primaryId, secondaryId)
 
-    await audit(services.audit, 'recordMerged', pubkey, { primaryId, secondaryId })
+    await audit(services.audit, 'recordMerged', pubkey, { primaryId, secondaryId }, undefined, c.get('hubId') ?? null)
     return c.json(result)
   },
 )

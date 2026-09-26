@@ -505,6 +505,9 @@ describe('auth routes', () => {
         expect.anything(),
         'volunteerOnBreak',
         'aabb1122eeff3344',
+        {},
+        undefined,
+        null,
       )
     })
   })

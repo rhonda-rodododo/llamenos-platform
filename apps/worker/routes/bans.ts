@@ -65,7 +65,7 @@ bans.post('/',
       reason: body.reason ?? '',
       bannedBy: pubkey,
     })
-    await audit(services.audit, 'numberBanned', pubkey, { phoneHash }, undefined, hubId ?? undefined)
+    await audit(services.audit, 'numberBanned', pubkey, { phoneHash }, undefined, hubId ?? null)
     return c.json({ ban: { phone: ban.phoneDisplay ?? ban.phone, phoneHash: ban.phone, reason: ban.reason, bannedBy: ban.bannedBy, bannedAt: ban.bannedAt } })
   },
 )
@@ -103,7 +103,7 @@ bans.post('/bulk',
       phoneDisplay: p.length >= 4 ? `***${p.slice(-4)}` : '***',
     }))
     const added = await services.records.bulkAddBans(entries, body.reason ?? '', pubkey, hubId)
-    await audit(services.audit, 'numberBanned', pubkey, { count: body.phones.length, bulk: true }, undefined, hubId ?? undefined)
+    await audit(services.audit, 'numberBanned', pubkey, { count: body.phones.length, bulk: true }, undefined, hubId ?? null)
     return c.json({ count: added })
   },
 )
@@ -134,7 +134,7 @@ bans.delete('/:phoneHash',
     const isHash = /^[0-9a-f]{64}$/i.test(phoneHash)
     const hash = isHash ? phoneHash : hashPhone(phoneHash, c.env.HMAC_SECRET)
     await services.records.removeBan(hash, hubId)
-    await audit(services.audit, 'numberUnbanned', pubkey, {}, undefined, hubId ?? undefined)
+    await audit(services.audit, 'numberUnbanned', pubkey, {}, undefined, hubId ?? null)
     return c.json({ ok: true })
   },
 )

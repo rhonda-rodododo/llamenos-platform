@@ -46,7 +46,7 @@ uploads.post('/entity-file',
     const uploadedAt = new Date().toISOString()
 
     await c.env.R2_BUCKET.put(`entity-files/${fileId}`, buffer)
-    await audit(services.audit, 'entityFileUploaded', pubkey, { fileId, size: blob.size })
+    await audit(services.audit, 'entityFileUploaded', pubkey, { fileId, size: blob.size }, undefined, null)
 
     return c.json({ fileId, uploadedAt }, 201)
   },
@@ -97,7 +97,7 @@ uploads.post('/init',
       conversationId: body.conversationId,
       totalSize: body.totalSize,
       totalChunks: body.totalChunks,
-    })
+    }, undefined, null)
 
     return c.json({ uploadId, totalChunks: body.totalChunks })
   },
@@ -285,7 +285,7 @@ uploads.post('/:id/complete',
     // Mark file as complete via service
     await services.conversations.markFileComplete(uploadId)
 
-    await audit(services.audit, 'fileUploadCompleted', pubkey, { uploadId })
+    await audit(services.audit, 'fileUploadCompleted', pubkey, { uploadId }, undefined, null)
 
     return c.json({ fileId: uploadId, status: 'complete' })
   },

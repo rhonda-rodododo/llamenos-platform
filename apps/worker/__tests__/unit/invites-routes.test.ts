@@ -276,6 +276,8 @@ describe('invites routes', () => {
         'inviteRevoked',
         'creator-pk',
         expect.objectContaining({ code: 'INV-123' }),
+        undefined,
+        null,
       )
     })
   })

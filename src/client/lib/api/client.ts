@@ -87,7 +87,10 @@ const NON_QUEUEABLE_PATHS = [
 ]
 
 function isQueueablePath(path: string): boolean {
-  return !NON_QUEUEABLE_PATHS.some(prefix => path.startsWith(prefix))
+  // Hub-scoped paths (`/hubs/<id>/calls/…`) are judged by the path under the hub prefix,
+  // otherwise `/calls/` would never match and an offline answer/hangup would be queued.
+  const unscoped = path.replace(/^\/hubs\/[^/]+/, '')
+  return !NON_QUEUEABLE_PATHS.some(prefix => unscoped.startsWith(prefix))
 }
 
 export const REQUEST_TIMEOUT_MS = 15_000
@@ -257,6 +260,15 @@ export function getActiveHub(): string | null { return activeHubId }
 /** Prefix a path with the active hub scope. No-op when no hub is active. */
 export function hp(path: string): string {
   return activeHubId ? `/hubs/${activeHubId}${path}` : path
+}
+
+/**
+ * Prefix a path with an explicit hub scope, independent of the active hub.
+ * Use this for anything that belongs to a specific hub regardless of what the
+ * user is browsing — incoming calls, conversations, notifications (multi-hub axiom).
+ */
+export function hubPath(hubId: string, path: string): string {
+  return `/hubs/${hubId}${path}`
 }
 
 // --- Public config (no auth) ---

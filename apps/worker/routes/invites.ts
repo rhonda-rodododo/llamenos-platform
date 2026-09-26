@@ -146,7 +146,7 @@ invites.post('/',
     }
 
     const result = await services.identity.createInvite({ ...body, createdBy: pubkey })
-    await audit(services.audit, 'inviteCreated', pubkey, { name: body.name })
+    await audit(services.audit, 'inviteCreated', pubkey, { name: body.name }, undefined, null)
     return c.json(result, 201)
   },
 )
@@ -173,7 +173,7 @@ invites.delete('/:code',
     const pubkey = c.get('pubkey')
     const code = c.req.param('code')
     await services.identity.revokeInvite(code)
-    await audit(services.audit, 'inviteRevoked', pubkey, { code })
+    await audit(services.audit, 'inviteRevoked', pubkey, { code }, undefined, null)
     return c.json({ ok: true })
   },
 )

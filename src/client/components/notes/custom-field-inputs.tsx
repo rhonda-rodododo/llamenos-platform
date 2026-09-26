@@ -26,8 +26,10 @@ export function CustomFieldInputs({ fields, values, onChange, errors, disabled, 
 
   if (fields.length === 0) return null
 
-  function update(fieldId: string, value: FieldValue) {
-    onChange({ ...values, [fieldId]: value })
+  // Values are keyed by field `name` (the machine-readable key per PROTOCOL.md
+  // Appendix B) — the same key iOS and Android use inside NotePayload.fields.
+  function update(fieldName: string, value: FieldValue) {
+    onChange({ ...values, [fieldName]: value })
   }
 
   return (
@@ -35,15 +37,15 @@ export function CustomFieldInputs({ fields, values, onChange, errors, disabled, 
       <p className="text-xs font-medium text-muted-foreground">{t('customFields.title')}</p>
       {fields.map(field => {
         const id = `${idPrefix}-${field.id}`
-        const value = values[field.id]
-        const error = errors?.[field.id]
+        const value = values[field.name]
+        const error = errors?.[field.name]
         return (
           <div key={field.id} className="space-y-1.5">
             <Label htmlFor={id} className="flex items-center gap-1.5 text-sm">
               {field.label}
               {field.required && <span className="text-destructive">*</span>}
             </Label>
-            {renderFieldInput(field, id, value, v => update(field.id, v), disabled, t)}
+            {renderFieldInput(field, id, value, v => update(field.name, v), disabled, t)}
             {error && <p role="alert" className="text-xs text-destructive">{error}</p>}
           </div>
         )
@@ -53,7 +55,7 @@ export function CustomFieldInputs({ fields, values, onChange, errors, disabled, 
 }
 
 /**
- * Validate custom field values. Returns a map of field ID → error message.
+ * Validate custom field values. Returns a map of field name → error message.
  * Empty map means all valid.
  */
 export function validateCustomFields(
@@ -67,26 +69,26 @@ export function validateCustomFields(
     if (!opts?.isAdmin && !field.visibleToUsers) continue
     if (!opts?.isAdmin && !field.editableByUsers) continue
 
-    const value = values[field.id]
+    const value = values[field.name]
     if (field.required && (value === undefined || value === '' || value === false)) {
-      errors[field.id] = t('customFields.fieldRequired', { label: field.label })
+      errors[field.name] = t('customFields.fieldRequired', { label: field.label })
     }
     if (field.type === 'text' || field.type === 'textarea') {
       const str = (value as string) || ''
       if (field.validation?.minLength && str.length > 0 && str.length < field.validation.minLength) {
-        errors[field.id] = t('customFields.tooShort', { min: field.validation.minLength })
+        errors[field.name] = t('customFields.tooShort', { min: field.validation.minLength })
       }
       if (field.validation?.maxLength && str.length > field.validation.maxLength) {
-        errors[field.id] = t('customFields.tooLong', { max: field.validation.maxLength })
+        errors[field.name] = t('customFields.tooLong', { max: field.validation.maxLength })
       }
     }
     if (field.type === 'number' && value !== undefined && value !== '') {
       const num = Number(value)
       if (field.validation?.min !== undefined && num < field.validation.min) {
-        errors[field.id] = t('customFields.tooLow', { min: field.validation.min })
+        errors[field.name] = t('customFields.tooLow', { min: field.validation.min })
       }
       if (field.validation?.max !== undefined && num > field.validation.max) {
-        errors[field.id] = t('customFields.tooHigh', { max: field.validation.max })
+        errors[field.name] = t('customFields.tooHigh', { max: field.validation.max })
       }
     }
   }

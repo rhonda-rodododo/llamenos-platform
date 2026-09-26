@@ -164,7 +164,7 @@ reports.post('/',
     await audit(services.audit, 'reportCreated', pubkey, {
       conversationId: conversation.id,
       category: body.category,
-    })
+    }, undefined, conversation.hubId ?? null)
 
     return c.json(conversation, 201)
   },
@@ -423,7 +423,7 @@ reports.post('/:id/assign',
       status: 'active',
     })
 
-    await audit(services.audit, 'reportAssigned', pubkey, { reportId: id, assignedTo: body.assignedTo })
+    await audit(services.audit, 'reportAssigned', pubkey, { reportId: id, assignedTo: body.assignedTo }, undefined, updated.hubId ?? null)
 
     // Publish assignment event to the report's hub — clients subscribe per hub
     publishEvent(c.env, KIND_CONVERSATION_ASSIGNED, {
@@ -471,7 +471,7 @@ reports.patch('/:id',
 
     const updated = await services.conversations.update(id, patchBody)
 
-    await audit(services.audit, 'reportUpdated', pubkey, { reportId: id, ...body })
+    await audit(services.audit, 'reportUpdated', pubkey, { reportId: id, ...body }, undefined, updated.hubId ?? null)
     return c.json(updated)
   },
 )
@@ -588,7 +588,7 @@ reports.post('/:id/records',
     await audit(services.audit, 'caseLinkedToReport', pubkey, {
       reportId,
       caseId: body.caseId,
-    })
+    }, undefined, c.get('hubId') ?? null)
 
     return c.json(result, 201)
   },
@@ -624,7 +624,7 @@ reports.delete('/:id/records/:caseId',
     await audit(services.audit, 'caseUnlinkedFromReport', pubkey, {
       reportId,
       caseId,
-    })
+    }, undefined, c.get('hubId') ?? null)
 
     return c.json({ ok: true })
   },

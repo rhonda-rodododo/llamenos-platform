@@ -4,7 +4,7 @@
  *   2. User-Agent stored as SHA-256 hash, not plaintext
  *   3. Country field removed from audit logs
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { sha256 } from '@noble/hashes/sha2.js'
 import { bytesToHex } from '@noble/hashes/utils.js'
 import { utf8ToBytes } from '@noble/ciphers/utils.js'
@@ -64,13 +64,13 @@ function makeAuditService() {
   const db = {
     transaction: vi.fn().mockImplementation(async (fn: (tx: unknown) => Promise<unknown>) => {
       const tx = {
+        // per-chain advisory lock taken before the tip is read
+        execute: vi.fn().mockResolvedValue([]),
         select: vi.fn().mockReturnValue({
           from: vi.fn().mockReturnValue({
             where: vi.fn().mockReturnValue({
               orderBy: vi.fn().mockReturnValue({
-                limit: vi.fn().mockReturnValue({
-                  for: vi.fn().mockResolvedValue([]),
-                }),
+                limit: vi.fn().mockResolvedValue([]),
               }),
             }),
           }),
@@ -100,7 +100,7 @@ describe('audit() metadata', () => {
       headers: { 'User-Agent': rawUa, 'CF-Connecting-IP': '1.2.3.4' },
     })
 
-    await audit(svc, 'login', 'system', {}, { request: req, hmacSecret: TEST_HMAC_SECRET })
+    await audit(svc, 'login', 'system', {}, { request: req, hmacSecret: TEST_HMAC_SECRET }, null)
 
     expect(rows).toHaveLength(1)
     const details = rows[0].details as Record<string, unknown>
@@ -119,7 +119,7 @@ describe('audit() metadata', () => {
       headers: { 'User-Agent': rawUa },
     })
 
-    await audit(svc, 'login', 'system', {}, { request: req, hmacSecret: TEST_HMAC_SECRET })
+    await audit(svc, 'login', 'system', {}, { request: req, hmacSecret: TEST_HMAC_SECRET }, null)
 
     const details = rows[0].details as Record<string, unknown>
     expect(details.ua).toBe(expectedHash)
@@ -130,11 +130,11 @@ describe('audit() metadata', () => {
 
     const { svc: svc1, rows: rows1 } = makeAuditService()
     const req1 = new Request('https://example.com/', { headers: { 'User-Agent': rawUa } })
-    await audit(svc1, 'login', 'system', {}, { request: req1, hmacSecret: TEST_HMAC_SECRET })
+    await audit(svc1, 'login', 'system', {}, { request: req1, hmacSecret: TEST_HMAC_SECRET }, null)
 
     const { svc: svc2, rows: rows2 } = makeAuditService()
     const req2 = new Request('https://example.com/', { headers: { 'User-Agent': rawUa } })
-    await audit(svc2, 'login', 'system', {}, { request: req2, hmacSecret: TEST_HMAC_SECRET })
+    await audit(svc2, 'login', 'system', {}, { request: req2, hmacSecret: TEST_HMAC_SECRET }, null)
 
     const ua1 = (rows1[0].details as Record<string, unknown>).ua
     const ua2 = (rows2[0].details as Record<string, unknown>).ua
@@ -144,11 +144,11 @@ describe('audit() metadata', () => {
   it('different UAs produce different hashes', async () => {
     const { svc: svc1, rows: rows1 } = makeAuditService()
     const req1 = new Request('https://example.com/', { headers: { 'User-Agent': 'BotA/1.0' } })
-    await audit(svc1, 'login', 'system', {}, { request: req1, hmacSecret: TEST_HMAC_SECRET })
+    await audit(svc1, 'login', 'system', {}, { request: req1, hmacSecret: TEST_HMAC_SECRET }, null)
 
     const { svc: svc2, rows: rows2 } = makeAuditService()
     const req2 = new Request('https://example.com/', { headers: { 'User-Agent': 'BotB/2.0' } })
-    await audit(svc2, 'login', 'system', {}, { request: req2, hmacSecret: TEST_HMAC_SECRET })
+    await audit(svc2, 'login', 'system', {}, { request: req2, hmacSecret: TEST_HMAC_SECRET }, null)
 
     const ua1 = (rows1[0].details as Record<string, unknown>).ua
     const ua2 = (rows2[0].details as Record<string, unknown>).ua
@@ -158,7 +158,7 @@ describe('audit() metadata', () => {
   it('stores null ua when no User-Agent header is present', async () => {
     const { svc, rows } = makeAuditService()
     const req = new Request('https://example.com/')
-    await audit(svc, 'login', 'system', {}, { request: req, hmacSecret: TEST_HMAC_SECRET })
+    await audit(svc, 'login', 'system', {}, { request: req, hmacSecret: TEST_HMAC_SECRET }, null)
     const details = rows[0].details as Record<string, unknown>
     expect(details.ua).toBeNull()
   })
@@ -168,7 +168,7 @@ describe('audit() metadata', () => {
     const req = new Request('https://example.com/', {
       headers: { 'CF-IPCountry': 'US', 'User-Agent': 'test/1.0' },
     })
-    await audit(svc, 'login', 'system', {}, { request: req, hmacSecret: TEST_HMAC_SECRET })
+    await audit(svc, 'login', 'system', {}, { request: req, hmacSecret: TEST_HMAC_SECRET }, null)
     const details = rows[0].details as Record<string, unknown>
     expect(details).not.toHaveProperty('country')
   })
@@ -178,7 +178,7 @@ describe('audit() metadata', () => {
     const req = new Request('https://example.com/', {
       headers: { 'CF-Connecting-IP': '203.0.113.5', 'User-Agent': 'test/1.0' },
     })
-    await audit(svc, 'login', 'system', {}, { request: req, hmacSecret: TEST_HMAC_SECRET })
+    await audit(svc, 'login', 'system', {}, { request: req, hmacSecret: TEST_HMAC_SECRET }, null)
     const details = rows[0].details as Record<string, unknown>
     expect(details.ip).toBeDefined()
     expect(details.ip).not.toBe('203.0.113.5')
@@ -187,7 +187,7 @@ describe('audit() metadata', () => {
 
   it('stores no metadata when ctx is not provided', async () => {
     const { svc, rows } = makeAuditService()
-    await audit(svc, 'settingsUpdated', 'system', { key: 'val' })
+    await audit(svc, 'settingsUpdated', 'system', { key: 'val' }, undefined, null)
     const details = rows[0].details as Record<string, unknown>
     expect(details).not.toHaveProperty('ip')
     expect(details).not.toHaveProperty('ua')

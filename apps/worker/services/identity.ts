@@ -604,7 +604,11 @@ export class IdentityService {
 
       if (!invite) throw new ServiceError(400, 'Invalid, expired, or already-used invite code')
 
-      // Create volunteer
+      // Create volunteer. An existing pubkey must not surface as an unhandled
+      // unique-key violation (500): ON CONFLICT DO NOTHING + explicit 409. Throwing
+      // rolls back the claim above, so the invite stays redeemable.
+      // TODO(#1037): once invites carry a hub, merge the grant into the existing
+      // user's hubRoles instead of rejecting.
       const [volRow] = await tx.insert(users).values({
         pubkey: data.pubkey,
         displayName: invite.name,
@@ -621,7 +625,9 @@ export class IdentityService {
         profileCompleted: false,
         onBreak: false,
         callPreference: 'phone',
-      }).returning()
+      }).onConflictDoNothing({ target: users.pubkey }).returning()
+
+      if (!volRow) throw new ServiceError(409, 'A user with this key already exists')
 
       return { volunteer: sanitizeUser(rowToUser(volRow)) }
     })

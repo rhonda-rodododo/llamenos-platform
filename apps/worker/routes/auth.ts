@@ -228,7 +228,7 @@ auth.post('/me/logout',
       const token = authHeader.slice(8).trim()
       await services.identity.revokeSession(token)
     }
-    await audit(services.audit, 'logout', pubkey)
+    await audit(services.audit, 'logout', pubkey, {}, undefined, null)
     return c.json({ ok: true })
   },
 )
@@ -284,7 +284,7 @@ auth.patch('/me/availability',
     const pubkey = c.get('pubkey')
     const body = c.req.valid('json')
     await services.identity.updateUser(pubkey, { onBreak: body.onBreak }, false)
-    await audit(services.audit, body.onBreak ? 'volunteerOnBreak' : 'volunteerAvailable', pubkey)
+    await audit(services.audit, body.onBreak ? 'volunteerOnBreak' : 'volunteerAvailable', pubkey, {}, undefined, null)
     return c.json({ ok: true })
   },
 )
@@ -319,7 +319,7 @@ auth.patch('/me/transcription',
       }
     }
     await services.identity.updateUser(pubkey, { transcriptionEnabled: body.enabled }, false)
-    await audit(services.audit, 'transcriptionToggled', pubkey, { enabled: body.enabled })
+    await audit(services.audit, 'transcriptionToggled', pubkey, { enabled: body.enabled }, undefined, null)
     return c.json({ ok: true })
   },
 )

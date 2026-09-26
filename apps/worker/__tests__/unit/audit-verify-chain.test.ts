@@ -119,6 +119,38 @@ describe('AuditService.verifyChain', () => {
     expect(result.firstBrokenEntry!.reason).toBe('entryHash mismatch')
   })
 
+  it('accepts a GDPR-erased entry whose content was rewritten, but still checks its linkage', async () => {
+    const { db } = setupVerifyDb()
+    const service = new AuditService(db as any)
+
+    const chain = buildValidChain()
+    // Erasure rewrites actorPubkey in place and stamps erasedAt; the hash can no longer be recomputed.
+    chain[1] = { ...chain[1], actorPubkey: '[erased]', erasedAt: new Date() } as typeof chain[1]
+    db.$setSelectResults([[{ total: 3 }], chain])
+    expect(await service.verifyChain('hub-1')).toEqual({ valid: true, totalEntries: 3, checkedEntries: 3 })
+
+    // ...but breaking the linkage of an erased entry is still caught.
+    const broken = buildValidChain()
+    broken[1] = { ...broken[1], previousEntryHash: 'x'.repeat(64), actorPubkey: '[erased]', erasedAt: new Date() } as typeof broken[1]
+    db.$setSelectResults([[{ total: 3 }], broken])
+    const result = await service.verifyChain('hub-1')
+    expect(result.valid).toBe(false)
+    expect(result.firstBrokenEntry!.reason).toBe('previousEntryHash mismatch')
+  })
+
+  it('does not accept a tampered entry merely because erasedAt is null', async () => {
+    const { db } = setupVerifyDb()
+    const service = new AuditService(db as any)
+
+    const chain = buildValidChain()
+    chain[1] = { ...chain[1], actorPubkey: 'f'.repeat(64), erasedAt: null } as typeof chain[1]
+    db.$setSelectResults([[{ total: 3 }], chain])
+
+    const result = await service.verifyChain('hub-1')
+    expect(result.valid).toBe(false)
+    expect(result.firstBrokenEntry!.reason).toBe('entryHash mismatch')
+  })
+
   it('detects a broken previousEntryHash linkage', async () => {
     const { db } = setupVerifyDb()
     const service = new AuditService(db as any)
@@ -183,5 +215,37 @@ describe('AuditService.verifyChain', () => {
 
     const result = await service.verifyChain('hub-1', { offset: 1 })
     expect(result).toEqual({ valid: true, totalEntries: 3, checkedEntries: 2 })
+  })
+})
+
+describe('AuditService.verifyFullChain', () => {
+  it('verifies a chain across several pages, linking each page to its predecessor', async () => {
+    const { db } = setupVerifyDb()
+    const service = new AuditService(db as any)
+    const [e1, e2, e3] = buildValidChain()
+
+    db.$setSelectResults([
+      [{ total: 3 }], [e1, e2], // page 1
+      [{ total: 3 }], [{ entryHash: e2.entryHash }], [e3], // page 2: count, predecessor, entries
+    ])
+
+    expect(await service.verifyFullChain('hub-1', 2)).toEqual({ valid: true, totalEntries: 3, checkedEntries: 3 })
+  })
+
+  it('reports a break found on a later page at its absolute position', async () => {
+    const { db } = setupVerifyDb()
+    const service = new AuditService(db as any)
+    const [e1, e2] = buildValidChain()
+    const forked = makeChainEntry('e3', 'logout', '2026-01-01T00:02:00.000Z', e1.entryHash) // chains from e1, not e2
+
+    db.$setSelectResults([
+      [{ total: 3 }], [e1, e2],
+      [{ total: 3 }], [{ entryHash: e2.entryHash }], [forked],
+    ])
+
+    const result = await service.verifyFullChain('hub-1', 2)
+    expect(result.valid).toBe(false)
+    expect(result.firstBrokenEntry).toMatchObject({ id: 'e3', seqIndex: 2, reason: 'previousEntryHash mismatch' })
+    expect(result.checkedEntries).toBe(2)
   })
 })
