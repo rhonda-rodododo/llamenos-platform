@@ -33,21 +33,35 @@
     # (no FCM — see deploy/PUSH_NOTIFICATIONS.md). A staging backend without
     # it looks healthy but can never wake an Android device for a call, so a
     # demo/staging deploy REFUSES to proceed without it (issue #959).
+    #
+    # ntfy_domain must be a subdomain of this deployment's own `domain`, rather
+    # than a hard-coded literal: `domain` is the one the mobile clients pin
+    # (llamenos-hotline.org for the official build, #971/#726), so the guard
+    # follows whatever domain the inventory and the pins use. The Android app
+    # never connects to ntfy itself (the ntfy distributor app does), and the
+    # backend publishes only to configured ntfy origins (#963), so the ntfy
+    # host needs no pin of its own — only to sit under the staging domain.
     - name: Assert the ntfy push relay is enabled and publicly addressable
       ansible.builtin.assert:
         that:
           - llamenos_ntfy_enabled | default(false) | bool
           - ntfy_domain is defined
           - ntfy_domain | length > 0
+          - domain is defined
+          - domain | length > 0
           - ntfy_domain != domain
-          - ntfy_domain.endswith('.llamenos.org')
+          - ntfy_domain.endswith('.' ~ domain)
         fail_msg: |
           REFUSING TO DEPLOY: the staging/demo backend must run the ntfy push relay,
           otherwise Android testers can never be rung for an incoming call.
 
+          ntfy_domain must be a subdomain of `domain` (the pinned domain,
+          llamenos-hotline.org for the official build), with real DNS + TLS,
+          reachable from testers' phones.
+
           Set in demo_vars.yml:
             llamenos_ntfy_enabled: true
-            ntfy_domain: "push.<your staging host>.llamenos.org"   # real DNS + TLS, reachable from testers' phones
+            ntfy_domain: "push.{{ domain | default('<staging host>') }}"
 
           Current values:
             llamenos_ntfy_enabled: {{ llamenos_ntfy_enabled | default(false) }}
