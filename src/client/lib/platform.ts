@@ -11,7 +11,7 @@
  * Import from here instead of directly from @tauri-apps/*.
  */
 
-import { LABEL_NOTE_KEY, LABEL_MESSAGE, LABEL_CALL_META } from '@shared/crypto-labels'
+import { LABEL_NOTE_KEY, LABEL_MESSAGE, LABEL_CALL_META, HKDF_CONTEXT_DRAFTS, HKDF_CONTEXT_EXPORT } from '@shared/crypto-labels'
 
 // ── Backend detection ────────────────────────────────────────────────
 
@@ -1105,14 +1105,14 @@ export async function decryptTranscription(
  * Drafts are local-only (localStorage), encrypted with the hub key held in Rust CryptoState.
  */
 export async function encryptDraft(plaintext: string): Promise<string> {
-  return encryptHubField(plaintext, 'llamenos:drafts')
+  return encryptHubField(plaintext, HKDF_CONTEXT_DRAFTS)
 }
 
 /**
  * Decrypt draft data encrypted with encryptDraft.
  */
 export async function decryptDraft(ciphertextHex: string): Promise<string | null> {
-  return decryptHubField(ciphertextHex, 'llamenos:drafts')
+  return decryptHubField(ciphertextHex, HKDF_CONTEXT_DRAFTS)
 }
 
 /**
@@ -1120,7 +1120,7 @@ export async function decryptDraft(ciphertextHex: string): Promise<string | null
  * Returns hex-encoded ciphertext suitable for binary download.
  */
 export async function encryptExport(jsonString: string): Promise<string> {
-  return encryptHubField(jsonString, 'llamenos:export')
+  return encryptHubField(jsonString, HKDF_CONTEXT_EXPORT)
 }
 
 
