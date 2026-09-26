@@ -589,66 +589,135 @@ describe('CasesService.listEvents', () => {
 // linkEvent / unlinkEvent / listCaseEvents / listEventRecords
 // ---------------------------------------------------------------------------
 
+const HUB = 'hub-1'
+const legacyEvent = { id: 'event-1', hubId: HUB }
+const recordEvent = { id: 'event-1', hubId: HUB, category: 'event' }
+
 describe('CasesService.linkEvent', () => {
   it('throws 404 when case not found', async () => {
     const { db, service } = setup()
     db.$setSelectResult([]) // case not found
 
-    await expect(service.linkEvent('nonexistent', 'event-1', 'pk-admin')).rejects.toMatchObject({ status: 404 })
+    await expect(service.linkEvent('nonexistent', 'event-1', 'pk-admin', HUB)).rejects.toMatchObject({ status: 404 })
   })
 
-  it('throws 404 when event not found', async () => {
+  it('throws 404 when neither a legacy event nor an event record exists', async () => {
     const { db, service } = setup()
     db.$setSelectResults([
       [{ id: 'case-1' }],
-      [], // event not found
+      [], // no legacy event
+      [], // no record-backed event
     ])
 
-    await expect(service.linkEvent('case-1', 'nonexistent', 'pk-admin')).rejects.toMatchObject({ status: 404 })
+    await expect(service.linkEvent('case-1', 'nonexistent', 'pk-admin', HUB)).rejects.toMatchObject({ status: 404 })
+  })
+
+  it('throws 404 when the event belongs to another hub', async () => {
+    const { db, service } = setup()
+    db.$setSelectResults([
+      [{ id: 'case-1' }],
+      [{ id: 'event-1', hubId: 'other-hub' }],
+      [],
+    ])
+
+    await expect(service.linkEvent('case-1', 'event-1', 'pk-admin', HUB)).rejects.toMatchObject({ status: 404 })
+  })
+
+  it('throws 404 when the record is not event-category', async () => {
+    const { db, service } = setup()
+    db.$setSelectResults([
+      [{ id: 'case-1' }],
+      [],
+      [{ id: 'event-1', hubId: HUB, category: 'case' }],
+    ])
+
+    await expect(service.linkEvent('case-1', 'event-1', 'pk-admin', HUB)).rejects.toMatchObject({ status: 404 })
+  })
+
+  it('throws 404 when the event record belongs to another hub', async () => {
+    const { db, service } = setup()
+    db.$setSelectResults([
+      [{ id: 'case-1' }],
+      [],
+      [{ id: 'event-1', hubId: 'other-hub', category: 'event' }],
+    ])
+
+    await expect(service.linkEvent('case-1', 'event-1', 'pk-admin', HUB)).rejects.toMatchObject({ status: 404 })
   })
 
   it('throws 409 when already linked', async () => {
     const { db, service } = setup()
     db.$setSelectResults([
       [{ id: 'case-1' }],
-      [{ id: 'event-1' }],
+      [legacyEvent],
       [makeCaseEventRow()], // existing link
     ])
 
-    await expect(service.linkEvent('case-1', 'event-1', 'pk-admin')).rejects.toMatchObject({ status: 409 })
+    await expect(service.linkEvent('case-1', 'event-1', 'pk-admin', HUB)).rejects.toMatchObject({ status: 409 })
   })
 
-  it('creates link and updates counts', async () => {
+  it('creates link to a legacy event and updates counts', async () => {
     const { db, service } = setup()
     db.$setSelectResults([
       [{ id: 'case-1' }],
-      [{ id: 'event-1' }],
+      [legacyEvent],
       [], // no existing link
     ])
     db.$setInsertResult([makeCaseEventRow()])
 
-    const result = await service.linkEvent('case-1', 'event-1', 'pk-admin')
+    const result = await service.linkEvent('case-1', 'event-1', 'pk-admin', HUB)
     expect(result.caseId).toBe('case-1')
     expect(result.eventId).toBe('event-1')
-    expect(db.update).toHaveBeenCalled() // event caseCount + record eventIds
+    expect(db.update).toHaveBeenCalledTimes(2) // event caseCount + record eventIds
+  })
+
+  it('creates link to an event-category record (the events shown in the UI)', async () => {
+    const { db, service } = setup()
+    db.$setSelectResults([
+      [{ id: 'case-1' }],
+      [], // not in the legacy events table
+      [recordEvent],
+      [], // no existing link
+    ])
+    db.$setInsertResult([makeCaseEventRow()])
+
+    const result = await service.linkEvent('case-1', 'event-1', 'pk-admin', HUB)
+    expect(result.eventId).toBe('event-1')
+    expect(db.update).toHaveBeenCalledTimes(1) // only the case's eventIds
   })
 })
 
 describe('CasesService.unlinkEvent', () => {
-  it('throws 404 when link not found', async () => {
+  it('throws 404 when event not found', async () => {
     const { db, service } = setup()
     db.$setSelectResult([])
 
-    await expect(service.unlinkEvent('case-1', 'event-1')).rejects.toMatchObject({ status: 404 })
+    await expect(service.unlinkEvent('case-1', 'event-1', HUB)).rejects.toMatchObject({ status: 404 })
+  })
+
+  it('throws 404 when link not found', async () => {
+    const { db, service } = setup()
+    db.$setSelectResults([[legacyEvent], []])
+
+    await expect(service.unlinkEvent('case-1', 'event-1', HUB)).rejects.toMatchObject({ status: 404 })
   })
 
   it('removes link and updates counts', async () => {
     const { db, service } = setup()
-    db.$setSelectResult([makeCaseEventRow()])
+    db.$setSelectResults([[legacyEvent], [makeCaseEventRow()]])
 
-    await service.unlinkEvent('case-1', 'event-1')
+    await service.unlinkEvent('case-1', 'event-1', HUB)
     expect(db.delete).toHaveBeenCalled()
-    expect(db.update).toHaveBeenCalled()
+    expect(db.update).toHaveBeenCalledTimes(2)
+  })
+
+  it('removes link to an event-category record', async () => {
+    const { db, service } = setup()
+    db.$setSelectResults([[], [recordEvent], [makeCaseEventRow()]])
+
+    await service.unlinkEvent('case-1', 'event-1', HUB)
+    expect(db.delete).toHaveBeenCalled()
+    expect(db.update).toHaveBeenCalledTimes(1)
   })
 })
 
@@ -677,18 +746,44 @@ describe('CasesService.listEventRecords', () => {
     const { db, service } = setup()
     db.$setSelectResult([])
 
-    await expect(service.listEventRecords('nonexistent')).rejects.toMatchObject({ status: 404 })
+    await expect(service.listEventRecords('nonexistent', HUB)).rejects.toMatchObject({ status: 404 })
   })
 
   it('returns case links for event', async () => {
     const { db, service } = setup()
     db.$setSelectResults([
-      [{ id: 'event-1' }],
+      [legacyEvent],
       [makeCaseEventRow(), makeCaseEventRow({ caseId: 'case-2' })],
     ])
 
-    const result = await service.listEventRecords('event-1')
+    const result = await service.listEventRecords('event-1', HUB)
     expect(result).toHaveLength(2)
+  })
+
+  it('returns case links for an event-category record', async () => {
+    const { db, service } = setup()
+    db.$setSelectResults([[], [recordEvent], [makeCaseEventRow()], []])
+
+    const result = await service.listEventRecords('event-1', HUB)
+    expect(result).toHaveLength(1)
+  })
+
+  it('also reports records nested under an event record as links, without duplicates', async () => {
+    const { db, service } = setup()
+    const createdAt = new Date()
+    db.$setSelectResults([
+      [],
+      [recordEvent],
+      [makeCaseEventRow({ caseId: 'case-1' })],
+      [
+        { id: 'case-1', createdBy: 'pk-admin', createdAt }, // already linked explicitly
+        { id: 'case-2', createdBy: 'pk-volunteer', createdAt },
+      ],
+    ])
+
+    const result = await service.listEventRecords('event-1', HUB)
+    expect(result.map((l) => l.caseId)).toEqual(['case-1', 'case-2'])
+    expect(result[1]).toMatchObject({ eventId: 'event-1', linkedBy: 'pk-volunteer', linkedAt: createdAt })
   })
 })
 
@@ -702,49 +797,72 @@ describe('CasesService.linkReportEvent', () => {
     db.$setSelectResult([])
 
     await expect(
-      service.linkReportEvent('report-1', 'nonexistent', 'pk-admin'),
+      service.linkReportEvent('report-1', 'nonexistent', 'pk-admin', HUB),
+    ).rejects.toMatchObject({ status: 404 })
+  })
+
+  it('throws 404 when the event belongs to another hub', async () => {
+    const { db, service } = setup()
+    db.$setSelectResults([[{ id: 'event-1', hubId: 'other-hub' }], []])
+
+    await expect(
+      service.linkReportEvent('report-1', 'event-1', 'pk-admin', HUB),
     ).rejects.toMatchObject({ status: 404 })
   })
 
   it('throws 409 when already linked', async () => {
     const { db, service } = setup()
     db.$setSelectResults([
-      [{ id: 'event-1' }],
+      [legacyEvent],
       [{ reportId: 'report-1', eventId: 'event-1' }], // existing
     ])
 
     await expect(
-      service.linkReportEvent('report-1', 'event-1', 'pk-admin'),
+      service.linkReportEvent('report-1', 'event-1', 'pk-admin', HUB),
     ).rejects.toMatchObject({ status: 409 })
   })
 
   it('creates report-event link and increments reportCount', async () => {
     const { db, service } = setup()
     db.$setSelectResults([
-      [{ id: 'event-1' }],
+      [legacyEvent],
       [], // no existing link
     ])
     db.$setInsertResult([{ reportId: 'report-1', eventId: 'event-1', linkedBy: 'pk-admin' }])
 
-    const result = await service.linkReportEvent('report-1', 'event-1', 'pk-admin')
+    const result = await service.linkReportEvent('report-1', 'event-1', 'pk-admin', HUB)
     expect(result.reportId).toBe('report-1')
     expect(db.update).toHaveBeenCalled()
+  })
+
+  it('links a report to an event-category record', async () => {
+    const { db, service } = setup()
+    db.$setSelectResults([
+      [], // not in the legacy events table
+      [recordEvent],
+      [], // no existing link
+    ])
+    db.$setInsertResult([{ reportId: 'report-1', eventId: 'event-1', linkedBy: 'pk-admin' }])
+
+    const result = await service.linkReportEvent('report-1', 'event-1', 'pk-admin', HUB)
+    expect(result.eventId).toBe('event-1')
+    expect(db.update).toHaveBeenCalledTimes(1) // record reportCount
   })
 })
 
 describe('CasesService.unlinkReportEvent', () => {
   it('throws 404 when link not found', async () => {
     const { db, service } = setup()
-    db.$setSelectResult([])
+    db.$setSelectResults([[legacyEvent], []])
 
-    await expect(service.unlinkReportEvent('report-1', 'event-1')).rejects.toMatchObject({ status: 404 })
+    await expect(service.unlinkReportEvent('report-1', 'event-1', HUB)).rejects.toMatchObject({ status: 404 })
   })
 
   it('removes link and decrements reportCount', async () => {
     const { db, service } = setup()
-    db.$setSelectResult([{ reportId: 'report-1', eventId: 'event-1' }])
+    db.$setSelectResults([[legacyEvent], [{ reportId: 'report-1', eventId: 'event-1' }]])
 
-    await service.unlinkReportEvent('report-1', 'event-1')
+    await service.unlinkReportEvent('report-1', 'event-1', HUB)
     expect(db.delete).toHaveBeenCalled()
     expect(db.update).toHaveBeenCalled()
   })
@@ -755,17 +873,25 @@ describe('CasesService.listEventReports', () => {
     const { db, service } = setup()
     db.$setSelectResult([])
 
-    await expect(service.listEventReports('nonexistent')).rejects.toMatchObject({ status: 404 })
+    await expect(service.listEventReports('nonexistent', HUB)).rejects.toMatchObject({ status: 404 })
   })
 
   it('returns report links for event', async () => {
     const { db, service } = setup()
     db.$setSelectResults([
-      [{ id: 'event-1' }],
+      [legacyEvent],
       [{ reportId: 'report-1', eventId: 'event-1' }],
     ])
 
-    const result = await service.listEventReports('event-1')
+    const result = await service.listEventReports('event-1', HUB)
+    expect(result).toHaveLength(1)
+  })
+
+  it('returns report links for an event-category record', async () => {
+    const { db, service } = setup()
+    db.$setSelectResults([[], [recordEvent], [{ reportId: 'report-1', eventId: 'event-1' }]])
+
+    const result = await service.listEventReports('event-1', HUB)
     expect(result).toHaveLength(1)
   })
 })

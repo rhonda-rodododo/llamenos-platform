@@ -42,7 +42,9 @@ import {
   createVolunteerViaApi,
   createReportViaApi,
   createRoleViaApi,
+  createHubViaApi,
   apiGet,
+  apiPost,
 } from '../../api-helpers'
 
 // ── Local State ────────────────────────────────────────────────────
@@ -68,6 +70,10 @@ interface CmsState {
   lastEvent?: Record<string, unknown>
   eventRecordLinks?: { links: Record<string, unknown>[] }
   eventReportLinks?: { links: Record<string, unknown>[] }
+  /** An event-category CASE RECORD (what the UI's Events page lists), as opposed to a legacy events-table row. */
+  lastEventRecord?: Record<string, unknown>
+  otherHubEventRecord?: Record<string, unknown>
+  otherHubId?: string
   // Interactions
   lastInteraction?: Record<string, unknown>
   interactionListResult?: { interactions: Record<string, unknown>[]; total: number }
@@ -570,6 +576,82 @@ When('the admin links the record to the event', async ({ request, world }) => {
 Then('the event should have {int} linked record', async ({ request, world }, count: number) => {
   const result = await listEventRecordsViaApi(request, getCmsState(world).lastEvent!.id as string)
   expect(result.links.length).toBe(count)
+})
+
+Given('an event record of type {string} exists', async ({ request, world }, typeName: string) => {
+  const entityTypeId = await resolveEventEntityTypeId(world, request, typeName)
+  const hubId = getScenarioState(world).hubId
+  getCmsState(world).lastEventRecord = await createRecordViaApi(request, entityTypeId, { hubId })
+})
+
+When('the admin links the record to the event record', async ({ request, world }) => {
+  await linkRecordToEventViaApi(
+    request,
+    getCmsState(world).lastEventRecord!.id as string,
+    getCmsState(world).lastRecord!.id as string,
+    undefined,
+    getScenarioState(world).hubId,
+  )
+})
+
+Then('the event record should have {int} linked record', async ({ request, world }, count: number) => {
+  const result = await listEventRecordsViaApi(
+    request,
+    getCmsState(world).lastEventRecord!.id as string,
+    undefined,
+    getScenarioState(world).hubId,
+  )
+  expect(result.links.length).toBe(count)
+})
+
+When('the admin links the report to the event record', async ({ request, world }) => {
+  await linkReportToEventViaApi(
+    request,
+    getCmsState(world).lastEventRecord!.id as string,
+    getCmsState(world).lastReportId!,
+    undefined,
+    getScenarioState(world).hubId,
+  )
+})
+
+Then('the event record should have {int} linked report', async ({ request, world }, count: number) => {
+  const result = await listEventReportsViaApi(
+    request,
+    getCmsState(world).lastEventRecord!.id as string,
+    undefined,
+    getScenarioState(world).hubId,
+  )
+  expect(result.links.length).toBe(count)
+})
+
+Given('an event record exists in another hub', async ({ request, world }) => {
+  const otherHubId = await createHubViaApi(request, `Other Hub ${Date.now()}`)
+  const entityType = await createEntityTypeViaApi(request, { name: 'Protest', category: 'event', hubId: otherHubId })
+  getCmsState(world).otherHubId = otherHubId
+  getCmsState(world).otherHubEventRecord = await createRecordViaApi(request, entityType.id as string, { hubId: otherHubId })
+})
+
+When('the admin links the record to the other hub\'s event record', async ({ request, world }) => {
+  // Authenticated as an admin of both hubs, but addressed through THIS scenario's hub:
+  // the event id must not resolve across the hub boundary.
+  const result = await apiPost(
+    request,
+    `/hubs/${getScenarioState(world).hubId}/events/${getCmsState(world).otherHubEventRecord!.id as string}/records`,
+    { recordId: getCmsState(world).lastRecord!.id as string },
+  )
+  setLastResponse(world, { status: result.status, data: result.data })
+})
+
+When('the admin links the record to the non-event record', async ({ request, world }) => {
+  const records = getCmsState(world).records
+  const target = records[records.length - 1]
+  const source = records[records.length - 2]
+  const result = await apiPost(
+    request,
+    `/hubs/${getScenarioState(world).hubId}/events/${target.id as string}/records`,
+    { recordId: source.id as string },
+  )
+  setLastResponse(world, { status: result.status, data: result.data })
 })
 
 Given('a report exists', async ({ request, world }) => {

@@ -29,6 +29,7 @@ import {
   caseInteractions,
   evidence,
   custodyEntries,
+  entityTypeDefinitions,
 } from '../db/schema'
 import { conversations } from '../db/schema/conversations'
 import type { ConvertFromReportResponse } from '@protocol/schemas/records'
@@ -899,6 +900,84 @@ export class CasesService {
   }
 
   // =========================================================================
+  // Event resolution (shared by case-event and report-event linking)
+  // =========================================================================
+
+  /**
+   * Resolve the target of an event link within a hub.
+   *
+   * Events are entity types with `category: 'event'`, so the events shown in
+   * the UI are case records. The legacy `events` table is still honoured for
+   * rows created through `POST /events`. Either kind is scoped to the caller's
+   * hub — an id from another hub is indistinguishable from a missing one.
+   */
+  private async resolveEventTarget(
+    eventId: string,
+    hubId: string,
+  ): Promise<'legacy' | 'record'> {
+    const legacy = await this.db
+      .select({ id: events.id, hubId: events.hubId })
+      .from(events)
+      .where(eq(events.id, eventId))
+    if (legacy.length > 0 && (legacy[0].hubId ?? '') === hubId) {
+      return 'legacy'
+    }
+
+    const recordEvent = await this.db
+      .select({
+        id: caseRecords.id,
+        hubId: caseRecords.hubId,
+        category: entityTypeDefinitions.category,
+      })
+      .from(caseRecords)
+      .leftJoin(
+        entityTypeDefinitions,
+        eq(caseRecords.entityTypeId, entityTypeDefinitions.id),
+      )
+      .where(eq(caseRecords.id, eventId))
+    if (
+      recordEvent.length > 0 &&
+      recordEvent[0].category === 'event' &&
+      (recordEvent[0].hubId ?? '') === hubId
+    ) {
+      return 'record'
+    }
+
+    throw new ServiceError(404, 'Event not found')
+  }
+
+  /** Adjust the denormalised linked-report counter on whichever row backs the event. */
+  private async adjustEventReportCount(
+    target: 'legacy' | 'record',
+    eventId: string,
+    delta: 1 | -1,
+  ): Promise<void> {
+    if (target === 'legacy') {
+      await this.db
+        .update(events)
+        .set({
+          reportCount:
+            delta === 1
+              ? sql`${events.reportCount} + 1`
+              : sql`GREATEST(0, ${events.reportCount} - 1)`,
+          updatedAt: new Date(),
+        })
+        .where(eq(events.id, eventId))
+      return
+    }
+    await this.db
+      .update(caseRecords)
+      .set({
+        reportCount:
+          delta === 1
+            ? sql`${caseRecords.reportCount} + 1`
+            : sql`GREATEST(0, ${caseRecords.reportCount} - 1)`,
+        updatedAt: new Date(),
+      })
+      .where(eq(caseRecords.id, eventId))
+  }
+
+  // =========================================================================
   // Case-Event Linking
   // =========================================================================
 
@@ -906,23 +985,18 @@ export class CasesService {
     caseId: string,
     eventId: string,
     linkedBy: string,
+    hubId: string,
   ): Promise<CaseEventRow> {
-    // Verify both exist
+    // Verify both exist and belong to the caller's hub
     const record = await this.db
       .select({ id: caseRecords.id })
       .from(caseRecords)
-      .where(eq(caseRecords.id, caseId))
+      .where(and(eq(caseRecords.id, caseId), eq(caseRecords.hubId, hubId)))
     if (record.length === 0) {
       throw new ServiceError(404, 'Record not found')
     }
 
-    const event = await this.db
-      .select({ id: events.id })
-      .from(events)
-      .where(eq(events.id, eventId))
-    if (event.length === 0) {
-      throw new ServiceError(404, 'Event not found')
-    }
+    const target = await this.resolveEventTarget(eventId, hubId)
 
     // Check for existing link
     const existing = await this.db
@@ -938,14 +1012,17 @@ export class CasesService {
       .values({ caseId, eventId, linkedBy })
       .returning()
 
-    // Update event caseCount
-    await this.db
-      .update(events)
-      .set({
-        caseCount: sql`${events.caseCount} + 1`,
-        updatedAt: new Date(),
-      })
-      .where(eq(events.id, eventId))
+    // Legacy events carry a denormalised case count; record-backed events
+    // derive theirs from the case_events rows.
+    if (target === 'legacy') {
+      await this.db
+        .update(events)
+        .set({
+          caseCount: sql`${events.caseCount} + 1`,
+          updatedAt: new Date(),
+        })
+        .where(eq(events.id, eventId))
+    }
 
     // Update record eventIds
     await this.db
@@ -959,7 +1036,13 @@ export class CasesService {
     return link
   }
 
-  async unlinkEvent(caseId: string, eventId: string): Promise<void> {
+  async unlinkEvent(
+    caseId: string,
+    eventId: string,
+    hubId: string,
+  ): Promise<void> {
+    const target = await this.resolveEventTarget(eventId, hubId)
+
     const existing = await this.db
       .select()
       .from(caseEvents)
@@ -972,14 +1055,15 @@ export class CasesService {
       .delete(caseEvents)
       .where(and(eq(caseEvents.caseId, caseId), eq(caseEvents.eventId, eventId)))
 
-    // Update event caseCount
-    await this.db
-      .update(events)
-      .set({
-        caseCount: sql`GREATEST(0, ${events.caseCount} - 1)`,
-        updatedAt: new Date(),
-      })
-      .where(eq(events.id, eventId))
+    if (target === 'legacy') {
+      await this.db
+        .update(events)
+        .set({
+          caseCount: sql`GREATEST(0, ${events.caseCount} - 1)`,
+          updatedAt: new Date(),
+        })
+        .where(eq(events.id, eventId))
+    }
 
     // Update record eventIds
     await this.db
@@ -1006,20 +1090,44 @@ export class CasesService {
       .where(eq(caseEvents.caseId, caseId))
   }
 
-  /** List records linked to an event (inverse of listCaseEvents). */
-  async listEventRecords(eventId: string): Promise<CaseEventRow[]> {
-    const event = await this.db
-      .select({ id: events.id })
-      .from(events)
-      .where(eq(events.id, eventId))
-    if (event.length === 0) {
-      throw new ServiceError(404, 'Event not found')
-    }
+  /**
+   * List records linked to an event (inverse of listCaseEvents).
+   *
+   * For a record-backed event, the records nested under it (`parentRecordId`,
+   * which is how the desktop Events page attaches cases) count as linked too;
+   * they are reported as links so both attachment styles read back the same.
+   */
+  async listEventRecords(eventId: string, hubId: string): Promise<CaseEventRow[]> {
+    const target = await this.resolveEventTarget(eventId, hubId)
 
-    return this.db
+    const links = await this.db
       .select()
       .from(caseEvents)
       .where(eq(caseEvents.eventId, eventId))
+    if (target === 'legacy') return links
+
+    const children = await this.db
+      .select({
+        id: caseRecords.id,
+        createdBy: caseRecords.createdBy,
+        createdAt: caseRecords.createdAt,
+      })
+      .from(caseRecords)
+      .where(
+        and(eq(caseRecords.parentRecordId, eventId), eq(caseRecords.hubId, hubId)),
+      )
+    const linked = new Set(links.map((l) => l.caseId))
+    return [
+      ...links,
+      ...children
+        .filter((c) => !linked.has(c.id))
+        .map((c) => ({
+          caseId: c.id,
+          eventId,
+          linkedAt: c.createdAt,
+          linkedBy: c.createdBy,
+        })),
+    ]
   }
 
   // =========================================================================
@@ -1030,15 +1138,9 @@ export class CasesService {
     reportId: string,
     eventId: string,
     linkedBy: string,
+    hubId: string,
   ): Promise<ReportEventRow> {
-    // Verify event exists
-    const event = await this.db
-      .select({ id: events.id })
-      .from(events)
-      .where(eq(events.id, eventId))
-    if (event.length === 0) {
-      throw new ServiceError(404, 'Event not found')
-    }
+    const target = await this.resolveEventTarget(eventId, hubId)
 
     // Check for existing link
     const existing = await this.db
@@ -1056,19 +1158,18 @@ export class CasesService {
       .values({ reportId, eventId, linkedBy })
       .returning()
 
-    // Update event reportCount
-    await this.db
-      .update(events)
-      .set({
-        reportCount: sql`${events.reportCount} + 1`,
-        updatedAt: new Date(),
-      })
-      .where(eq(events.id, eventId))
+    await this.adjustEventReportCount(target, eventId, 1)
 
     return link
   }
 
-  async unlinkReportEvent(reportId: string, eventId: string): Promise<void> {
+  async unlinkReportEvent(
+    reportId: string,
+    eventId: string,
+    hubId: string,
+  ): Promise<void> {
+    const target = await this.resolveEventTarget(eventId, hubId)
+
     const existing = await this.db
       .select()
       .from(reportEvents)
@@ -1085,24 +1186,11 @@ export class CasesService {
         and(eq(reportEvents.reportId, reportId), eq(reportEvents.eventId, eventId)),
       )
 
-    // Update event reportCount
-    await this.db
-      .update(events)
-      .set({
-        reportCount: sql`GREATEST(0, ${events.reportCount} - 1)`,
-        updatedAt: new Date(),
-      })
-      .where(eq(events.id, eventId))
+    await this.adjustEventReportCount(target, eventId, -1)
   }
 
-  async listEventReports(eventId: string): Promise<ReportEventRow[]> {
-    const event = await this.db
-      .select({ id: events.id })
-      .from(events)
-      .where(eq(events.id, eventId))
-    if (event.length === 0) {
-      throw new ServiceError(404, 'Event not found')
-    }
+  async listEventReports(eventId: string, hubId: string): Promise<ReportEventRow[]> {
+    await this.resolveEventTarget(eventId, hubId)
 
     return this.db
       .select()
