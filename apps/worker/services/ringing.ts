@@ -9,6 +9,7 @@ import { withRetry, isRetryableError } from '../lib/retry'
 import { getCircuitBreaker } from '../lib/circuit-breaker'
 import { incCounter } from '../routes/metrics'
 import { hashPhone } from '../lib/crypto'
+import { resolveHubPermissions } from '@shared/permissions'
 
 const logger = createLogger('ringing')
 
@@ -51,9 +52,18 @@ export async function startParallelRinging(
     // Get user details (including call preference)
     const { users: allUsers } = await services.identity.getUsers()
 
-    // Availability rules: a volunteer must be active and not on break.
+    // Hub access: only ring people who could actually answer this hub's call.
+    // Same rule `hubContext` applies to the answer route — any effective permission in
+    // the hub (global role or hub-scoped role). Without this a stale shift entry or a
+    // fallback group naming a user from another hub would push "a caller is waiting"
+    // to someone with no business in this hub. Global-scope calls (hubId '') have no hub.
+    const { roles: allRoles } = hubId !== '' ? await services.settings.getRoles() : { roles: [] }
+    const hasHubAccess = (v: (typeof allUsers)[number]) =>
+      hubId === '' || resolveHubPermissions(v.roles ?? [], v.hubRoles ?? [], allRoles, hubId).length > 0
+
+    // Availability rules: a volunteer must be active, on break-free, and a member of the hub.
     const pickAvailable = (pubkeys: string[]) =>
-      allUsers.filter(v => pubkeys.includes(v.pubkey) && v.active && !v.onBreak)
+      allUsers.filter(v => pubkeys.includes(v.pubkey) && v.active && !v.onBreak && hasHubAccess(v))
 
     // All available on-shift users (for Nostr relay notification)
     let available = pickAvailable(onShiftPubkeys)
