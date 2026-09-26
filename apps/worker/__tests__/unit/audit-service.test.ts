@@ -24,21 +24,21 @@ function makeAuditRow(overrides: Record<string, unknown> = {}) {
 
 /**
  * Build a mock db suitable for AuditService.
- * AuditService.log() uses db.transaction() with SELECT ... FOR UPDATE.
- * We model this by running the callback immediately with a tx that proxies
+ * AuditService.log() uses db.transaction(): take a per-chain advisory lock
+ * (tx.execute), then read the tip (tx.select). We model this by running the callback immediately with a tx that proxies
  * back to the same mock db.
  *
  * The tx select chain is implemented as a fluent builder that resolves to
- * the configured result — supporting .where().orderBy().limit().for().
+ * the configured result — supporting .where().orderBy().limit().
  */
 function setupAuditDb() {
   const { db, reset } = createMockDb(['auditLog'])
 
-  /** Build a fully chainable select that supports FOR UPDATE */
+  /** Build a fully chainable select */
   function makeSelectChain(result: unknown[]) {
     const terminal = Promise.resolve(result) as any
     // Add all chain methods as no-ops that return the same terminal promise
-    const methods = ['from', 'where', 'orderBy', 'limit', 'offset', 'groupBy', 'for']
+    const methods = ['from', 'where', 'orderBy', 'limit', 'offset', 'groupBy']
     for (const m of methods) {
       terminal[m] = () => terminal
     }
@@ -81,7 +81,7 @@ function setupAuditDb() {
     async (fn: (tx: unknown) => Promise<unknown>) => fn(txProxy),
   )
 
-  return { db, reset }
+  return { db, reset, txSelect: selectWithFor }
 }
 
 /** A valid 64-char hex string for use as HMAC secret in audit() helper tests */
@@ -158,7 +158,7 @@ describe('AuditService.log', () => {
     const prevHash = 'c'.repeat(64)
 
     // Return an existing entry with a hash
-    db.$setSelectResults([[{ entryHash: prevHash }]])
+    db.$setSelectResults([[{ entryHash: prevHash, createdAt: new Date('2026-01-01T00:00:00.000Z') }]])
 
     // The inserted row should have previousEntryHash set
     const insertedRow = makeAuditRow({ previousEntryHash: prevHash })
@@ -179,6 +179,71 @@ describe('AuditService.log', () => {
 
     const result = await service.log('login', 'a'.repeat(64), {}, 'hub-1')
     expect(result.previousEntryHash).toBeNull()
+  })
+
+  /** The values object passed to the (first) insert inside log(). */
+  function insertedValues(db: ReturnType<typeof setupAuditDb>['db']) {
+    const insertResult = (db.insert as unknown as { mock: { results: Array<{ value: { values: { mock: { calls: unknown[][] } } } }> } }).mock.results[0]
+    return insertResult.value.values.mock.calls[0][0] as { id: string; createdAt: unknown; entryHash: string; previousEntryHash: string | null }
+  }
+
+  it('takes the chain advisory lock before reading the tip', async () => {
+    const { db, txSelect } = setupAuditDb()
+    const service = new AuditService(db as any)
+
+    db.$setSelectResults([[]])
+    db.$setInsertResult([makeAuditRow()])
+
+    await service.log('login', 'a'.repeat(64), {}, 'hub-1')
+
+    // An empty chain has no tip row to FOR UPDATE and a waiter would re-read a
+    // stale tip, so the lock must be an advisory lock acquired first.
+    expect(db.execute).toHaveBeenCalledTimes(1)
+    expect(db.execute.mock.invocationCallOrder[0]).toBeLessThan(txSelect.mock.invocationCallOrder[0])
+  })
+
+  it('forces created_at strictly past the tip so append order is total', async () => {
+    const { db } = setupAuditDb()
+    const service = new AuditService(db as any)
+    const prevHash = 'c'.repeat(64)
+    // Tip stamped in the future relative to this writer's clock (skew / same-ms tie).
+    const tipCreatedAt = new Date(Date.now() + 60_000)
+
+    db.$setSelectResults([[{ entryHash: prevHash, createdAt: tipCreatedAt }]])
+    db.$setInsertResult([makeAuditRow()])
+
+    await service.log('noteCreated', 'a'.repeat(64), { k: 'v' }, 'hub-1')
+
+    const values = insertedValues(db)
+    // createdAt is passed as a `${iso}::timestamptz` SQL fragment; the ISO string is its first param.
+    const chunks = (values.createdAt as { queryChunks: unknown[] }).queryChunks
+    const iso = chunks.find((c) => typeof c === 'string' && c.startsWith('20')) as string
+    expect(new Date(iso).getTime()).toBe(tipCreatedAt.getTime() + 1)
+    expect(values.previousEntryHash).toBe(prevHash)
+    // The stored hash must have been computed over the bumped timestamp.
+    expect(values.entryHash).toBe(computeEntryHash({
+      id: values.id,
+      action: 'noteCreated',
+      actorPubkey: 'a'.repeat(64),
+      createdAt: iso,
+      details: { k: 'v' },
+      previousEntryHash: prevHash,
+    }))
+  })
+
+  it('uses the current time when it is already past the tip', async () => {
+    const { db } = setupAuditDb()
+    const service = new AuditService(db as any)
+    const before = Date.now()
+
+    db.$setSelectResults([[{ entryHash: 'c'.repeat(64), createdAt: new Date(before - 60_000) }]])
+    db.$setInsertResult([makeAuditRow()])
+
+    await service.log('noteCreated', 'a'.repeat(64), {}, 'hub-1')
+
+    const chunks = (insertedValues(db).createdAt as { queryChunks: unknown[] }).queryChunks
+    const iso = chunks.find((c) => typeof c === 'string' && c.startsWith('20')) as string
+    expect(new Date(iso).getTime()).toBeGreaterThanOrEqual(before)
   })
 
   it('returns the inserted audit entry', async () => {

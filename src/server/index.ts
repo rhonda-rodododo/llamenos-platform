@@ -163,6 +163,8 @@ console.log('[llamenos] Event outbox initialized (drain: 30s, cleanup: 5m)')
 services.scheduler.start({
   blastsService: services.blasts,
   settingsService: services.settings,
+  auditService: services.audit,
+  identityService: services.identity,
   resolveAdapter: async (channel: MessagingChannelType) => {
     try {
       return await getMessagingAdapterFromService(channel, services.settings, hmacSecret)

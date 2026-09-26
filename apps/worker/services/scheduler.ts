@@ -30,9 +30,14 @@ import {
   startReEncryptionWorker,
   stopReEncryptionWorker,
 } from '../lib/re-encryption-worker'
+import {
+  startAuditChainVerifyWorker,
+  stopAuditChainVerifyWorker,
+} from '../lib/audit-chain-verify-worker'
 import type { RetentionService } from './retention'
 import type { ErasureService } from './erasure'
 import type { AuditService } from './audit'
+import type { IdentityService } from './identity'
 import { createLogger } from '../lib/logger'
 
 const logger = createLogger('services.scheduler')
@@ -47,6 +52,7 @@ export interface TaskSchedulerDeps {
   retentionService?: RetentionService
   auditService?: AuditService
   erasureService?: ErasureService
+  identityService?: IdentityService
 }
 
 export class TaskScheduler {
@@ -84,6 +90,13 @@ export class TaskScheduler {
         })
       }
 
+      if (deps.auditService && deps.identityService) {
+        startAuditChainVerifyWorker({
+          auditService: deps.auditService,
+          identityService: deps.identityService,
+        })
+      }
+
       if (deps.erasureService && deps.auditService) {
         startErasureExpiryWorker({
           erasureService: deps.erasureService,
@@ -111,6 +124,7 @@ export class TaskScheduler {
     stopBlastWorker()
     stopScheduledBlastPoller()
     stopRetentionPurgeWorker()
+    stopAuditChainVerifyWorker()
     stopErasureExpiryWorker()
     stopReEncryptionWorker()
 

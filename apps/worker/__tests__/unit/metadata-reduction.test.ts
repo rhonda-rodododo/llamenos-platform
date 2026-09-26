@@ -4,7 +4,7 @@
  *   2. User-Agent stored as SHA-256 hash, not plaintext
  *   3. Country field removed from audit logs
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { sha256 } from '@noble/hashes/sha2.js'
 import { bytesToHex } from '@noble/hashes/utils.js'
 import { utf8ToBytes } from '@noble/ciphers/utils.js'
@@ -64,13 +64,13 @@ function makeAuditService() {
   const db = {
     transaction: vi.fn().mockImplementation(async (fn: (tx: unknown) => Promise<unknown>) => {
       const tx = {
+        // per-chain advisory lock taken before the tip is read
+        execute: vi.fn().mockResolvedValue([]),
         select: vi.fn().mockReturnValue({
           from: vi.fn().mockReturnValue({
             where: vi.fn().mockReturnValue({
               orderBy: vi.fn().mockReturnValue({
-                limit: vi.fn().mockReturnValue({
-                  for: vi.fn().mockResolvedValue([]),
-                }),
+                limit: vi.fn().mockResolvedValue([]),
               }),
             }),
           }),
