@@ -95,10 +95,13 @@ class TriageSteps : BaseSteps() {
             Log.w("TriageSteps", "No triage report cards available to tap")
         }
 
-        // Wait for triage detail to load
+        // Wait for the detail screen to *finish loading*, i.e. resolve to a report, not-found
+        // or error. "triage-detail-title" is the TopAppBar title and is composed on the very
+        // first frame — while the detail ViewModel is still fetching the report and only a
+        // spinner is shown — so it must not count as "loaded" (waiting on it lets the next
+        // step run before the convert button exists).
         composeRule.waitUntil(10_000) {
-            composeRule.onAllNodesWithTag("triage-detail-title").fetchSemanticsNodes().isNotEmpty() ||
-                composeRule.onAllNodesWithTag("triage-detail-report-title").fetchSemanticsNodes().isNotEmpty() ||
+            composeRule.onAllNodesWithTag("triage-detail-report-title").fetchSemanticsNodes().isNotEmpty() ||
                 composeRule.onAllNodesWithTag("triage-not-found").fetchSemanticsNodes().isNotEmpty() ||
                 composeRule.onAllNodesWithTag("triage-detail-error").fetchSemanticsNodes().isNotEmpty()
         }
@@ -106,13 +109,15 @@ class TriageSteps : BaseSteps() {
 
     @When("I tap the convert to case button")
     fun iTapTheConvertToCaseButton() {
-        try {
-            onNodeWithTag("triage-convert-button").performScrollTo()
-            onNodeWithTag("triage-convert-button").performClick()
-            composeRule.waitForIdle()
-        } catch (_: Throwable) {
-            Log.w("TriageSteps", "Convert to case button not available")
+        // The scenario seeds triage-eligible reports, so the button must exist. Wait for it
+        // and let a missing button fail here, loudly, instead of swallowing the error and
+        // timing out later in the confirmation-dialog step.
+        composeRule.waitUntil(10_000) {
+            composeRule.onAllNodesWithTag("triage-convert-button").fetchSemanticsNodes().isNotEmpty()
         }
+        onNodeWithTag("triage-convert-button").performScrollTo()
+        onNodeWithTag("triage-convert-button").performClick()
+        composeRule.waitForIdle()
     }
 
     // ---- Then ----
@@ -195,8 +200,6 @@ class TriageSteps : BaseSteps() {
         composeRule.waitUntil(10_000) {
             composeRule.onAllNodesWithTag("triage-convert-dialog").fetchSemanticsNodes().isNotEmpty()
         }
-        val found = assertAnyTagDisplayed(
-            "triage-convert-dialog", "triage-detail-title",
-        )
+        onNodeWithTag("triage-convert-dialog").assertIsDisplayed()
     }
 }
