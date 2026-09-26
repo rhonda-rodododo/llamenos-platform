@@ -102,11 +102,13 @@ export async function startParallelRinging(
       status: 'ringing',
     })
 
-    // Publish call ring event to Nostr relay
+    // Publish the ring to the hub the call arrived on — relay clients subscribe
+    // per hub, so a ring without its hub reaches nobody (and must never be
+    // published to a catch-all channel every user could read).
     publishEvent(env, KIND_CALL_RING, {
       type: 'call:ring',
       callId: callSid,
-    })
+    }, hubId)
 
     // Dispatch VoIP push notifications to mobile volunteers with registered VoIP tokens.
     // Skip VoIP push for global-scope (hubId='') calls — mobile clients require a real hub ID to route the call.
