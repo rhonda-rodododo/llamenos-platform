@@ -86,6 +86,33 @@ Feature: Demo mock telephony
     When the admin simulates an incoming call
     Then the response status should be 422
 
+  # #1017: out-of-shift calls ring the CALLED hub's own fallback group. volunteersNotified is
+  # the count the real ringing service selected, so these fail if the wrong group is read or
+  # if a user with no access to the hub is rung.
+  @backend @demo-mode @calls
+  Scenario: The hub's own fallback group rings when no one is on shift
+    Given a volunteer who is not on shift is in the hub fallback group
+    And the hub uses the mock telephony provider
+    When the admin simulates an incoming call
+    Then the response status should be 200
+    And the simulated call should have notified 1 volunteers
+
+  @backend @demo-mode @calls
+  Scenario: The instance-wide fallback group is never rung for a hub's call
+    Given a volunteer is in the instance-wide fallback group
+    And the hub uses the mock telephony provider
+    When the admin simulates an incoming call
+    Then the response status should be 422
+
+  @backend @demo-mode @calls
+  Scenario: A fallback volunteer who belongs only to another hub is not rung
+    Given a volunteer who is not on shift is in the hub fallback group
+    And a volunteer who belongs only to another hub is also in the hub fallback group
+    And the hub uses the mock telephony provider
+    When the admin simulates an incoming call
+    Then the response status should be 200
+    And the simulated call should have notified 1 volunteers
+
   @backend @demo-mode @calls
   Scenario: A hub that has not selected the mock cannot be simulated against
     Given 1 volunteers are on shift
