@@ -214,7 +214,7 @@ settings.patch('/spam',
     const services = c.get('services')
     const hubId = targetHubId(c)
     const result = await services.settings.updateSpamSettings(body, hubId)
-    await audit(services.audit, 'spamMitigationToggled', pubkey, body as Record<string, unknown>, undefined, hubId)
+    await audit(services.audit, 'spamMitigationToggled', pubkey, body as Record<string, unknown>, undefined, hubId ?? null)
     return c.json(result)
   },
 )
@@ -267,7 +267,7 @@ settings.patch('/call',
     const services = c.get('services')
     const hubId = targetHubId(c)
     const result = await services.settings.updateCallSettings(body, hubId)
-    await audit(services.audit, 'callSettingsUpdated', pubkey, body as Record<string, unknown>, undefined, hubId)
+    await audit(services.audit, 'callSettingsUpdated', pubkey, body as Record<string, unknown>, undefined, hubId ?? null)
     return c.json(result)
   },
 )

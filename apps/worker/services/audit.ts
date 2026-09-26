@@ -150,7 +150,7 @@ export class AuditService {
     action: string,
     actorPubkey: string,
     details: Record<string, unknown> = {},
-    hubId?: string,
+    hubId?: string | null,
     /** Explicit timestamp — only for seeding historical demo data. Entries must be appended in chronological order. */
     at?: Date,
   ): Promise<AuditEntry> {
@@ -451,8 +451,8 @@ export async function audit(
   event: string,
   actorPubkey: string,
   details: Record<string, unknown> = {},
-  ctx?: { request: Request; hmacSecret: string },
-  hubId?: string,
+  ctx: { request: Request; hmacSecret: string } | undefined,
+  hubId: string | null,
 ): Promise<void> {
   const meta: Record<string, unknown> = {}
   if (ctx) {

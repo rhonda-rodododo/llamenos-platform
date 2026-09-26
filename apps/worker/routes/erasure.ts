@@ -117,7 +117,7 @@ erasure.post(
       pubkey,
       { requestId: request.id },
       undefined,
-      hubId ?? undefined,
+      hubId ?? null,
     )
 
     return c.json({
@@ -183,7 +183,7 @@ erasure.post(
         coApproverPubkey: body.coApproverPubkey,
       },
       undefined,
-      hubId ?? undefined,
+      hubId ?? null,
     )
 
     return c.json({

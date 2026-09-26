@@ -91,8 +91,8 @@ function deviceCtx(c: Context<AppEnv>): { request: Request; hmacSecret: string }
  * globally and under /hubs/:hubId — undefined outside a hub-scoped request,
  * matching the hub scoping of the case record the evidence belongs to.
  */
-function hubIdOf(c: Context<AppEnv>): string | undefined {
-  return c.get('hubId') ?? undefined
+function hubIdOf(c: Context<AppEnv>): string | null {
+  return c.get('hubId') ?? null
 }
 
 // ============================================================
