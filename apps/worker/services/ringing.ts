@@ -9,6 +9,7 @@ import { withRetry, isRetryableError } from '../lib/retry'
 import { getCircuitBreaker } from '../lib/circuit-breaker'
 import { incCounter } from '../routes/metrics'
 import { hashPhone } from '../lib/crypto'
+import { resolveHubPermissions } from '@shared/permissions'
 
 const logger = createLogger('ringing')
 
@@ -25,8 +26,8 @@ type RingableUser = Awaited<ReturnType<Services['identity']['getUsers']>>['users
 
 /**
  * Resolve the volunteers a call for this hub rings: on-shift (or the hub's
- * fallback group when nobody is on shift), filtered to those who are active and
- * not on break. If every on-shift volunteer is unavailable the fallback group is
+ * fallback group when nobody is on shift), filtered to those who are active,
+ * not on break, and have access to the hub. If every on-shift volunteer is unavailable the fallback group is
  * tried with the same rules.
  *
  * Shared by the ringing path and the answer path so "who may answer" can never
@@ -53,9 +54,18 @@ export async function resolveRingableVolunteers(
 
   const { users: allUsers } = await services.identity.getUsers()
 
-  // Availability rules: a volunteer must be active and not on break.
+  // Hub access: only ring people who could actually answer this hub's call.
+  // Same rule `hubContext` applies to the answer route — any effective permission in
+  // the hub (global role or hub-scoped role). Without this a stale shift entry or a
+  // fallback group naming a user from another hub would push "a caller is waiting"
+  // to someone with no business in this hub. Global-scope calls (hubId '') have no hub.
+  const { roles: allRoles } = hubId !== '' ? await services.settings.getRoles() : { roles: [] }
+  const hasHubAccess = (v: RingableUser) =>
+    hubId === '' || resolveHubPermissions(v.roles ?? [], v.hubRoles ?? [], allRoles, hubId).length > 0
+
+  // Availability rules: a volunteer must be active, not on break, and a member of the hub.
   const pickAvailable = (pubkeys: string[]) =>
-    allUsers.filter(v => pubkeys.includes(v.pubkey) && v.active && !v.onBreak)
+    allUsers.filter(v => pubkeys.includes(v.pubkey) && v.active && !v.onBreak && hasHubAccess(v))
 
   let available = pickAvailable(onShiftPubkeys)
 

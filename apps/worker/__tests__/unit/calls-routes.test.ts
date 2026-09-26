@@ -5,6 +5,8 @@ import { hashPhone } from '@worker/lib/crypto'
 import type { AppEnv } from '@worker/types'
 import { ServiceError } from '@worker/services/settings'
 import { cancelLosingLegs } from '@worker/services/ringing'
+import { DEFAULT_ROLES } from '@shared/permissions'
+import type { Role } from '@shared/permissions'
 
 // Ring-leg cancellation talks to the telephony provider — covered in ringing-service.test.ts.
 // Here we only assert the answer route invokes it (and only after winning).
@@ -109,16 +111,20 @@ function makeMockSettingsService() {
   return {
     getTelephonyProvider: vi.fn().mockResolvedValue(null),
     getFallbackGroup: vi.fn().mockResolvedValue({ userPubkeys: [] }),
+    getRoles: vi.fn().mockResolvedValue({ roles: DEFAULT_ROLES as unknown as Role[] }),
   }
 }
 
-/** Volunteers a call would ring: on shift, active, not on break. */
+/** Every roster user is a volunteer member of the hub the tests answer in. */
+const HUB_MEMBER = { roles: [] as string[], hubRoles: [{ hubId: 'hub-1', roleIds: ['role-volunteer'] }] }
+
+/** Volunteers a call would ring: on shift, active, not on break, members of hub-1. */
 function makeRingRoster(onShift: string[], users = onShift) {
   return {
     shifts: { getCurrentVolunteers: vi.fn().mockResolvedValue(onShift) },
     identity: {
       getUsers: vi.fn().mockResolvedValue({
-        users: users.map(pubkey => ({ pubkey, active: true, onBreak: false, callPreference: 'phone', phone: '+1555' })),
+        users: users.map(pubkey => ({ pubkey, active: true, onBreak: false, callPreference: 'phone', phone: '+1555', ...HUB_MEMBER })),
       }),
     },
   }
@@ -409,7 +415,7 @@ describe('Calls Routes', () => {
       const callsSvc = makeMockCallsService()
       const roster = makeRingRoster([ME])
       roster.identity.getUsers.mockResolvedValue({
-        users: [{ pubkey: ME, active: true, onBreak: true, callPreference: 'phone', phone: '+1555' }],
+        users: [{ pubkey: ME, active: true, onBreak: true, callPreference: 'phone', phone: '+1555', ...HUB_MEMBER }],
       })
       const { app } = answerApp(callsSvc, roster)
 
