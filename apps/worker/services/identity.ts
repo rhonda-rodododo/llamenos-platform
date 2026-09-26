@@ -210,6 +210,23 @@ export class IdentityService {
   }
 
   /**
+   * Pubkeys of all active super-admins — recipients of client-reported
+   * security alerts (e.g. certificate pin mismatches).
+   */
+  async listActiveSuperAdminPubkeys(): Promise<string[]> {
+    const rows = await this.db
+      .select({ pubkey: users.pubkey })
+      .from(users)
+      .where(
+        and(
+          eq(users.active, true),
+          sql`${users.roles} @> ARRAY['role-super-admin']::text[]`,
+        ),
+      )
+    return rows.map((r) => r.pubkey)
+  }
+
+  /**
    * Bootstrap the first admin. Fails if an admin already exists.
    */
   async bootstrapAdmin(pubkey: string): Promise<void> {
@@ -1457,7 +1474,8 @@ export class IdentityService {
   }
 
   async emitSecurityEvent(
-    userPubkey: string,
+    /** null for events reported by an unauthenticated client (e.g. cert pin mismatch). */
+    userPubkey: string | null,
     eventType: string,
     deviceId: string | null,
     metadata: Record<string, unknown> = {},
