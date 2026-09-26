@@ -13,7 +13,7 @@ interface Props {
 export function CustomFieldBadges({ fields, values }: Props) {
   const badges = fields
     .map(field => {
-      const val = values[field.id]
+      const val = values[field.name]
       if (val === undefined || val === '') return null
       const displayVal = field.type === 'checkbox'
         ? (val ? '\u2713' : '\u2717')
