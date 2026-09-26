@@ -12,6 +12,15 @@ import { hashPhone } from '../lib/crypto'
 
 const logger = createLogger('ringing')
 
+/** Outcome of a ringing attempt — `ringing: false` means no call record was created. */
+export interface ParallelRingingResult {
+  ringing: boolean
+  /** Why nothing rang (only set when `ringing` is false). */
+  reason?: 'no-volunteers' | 'no-available-volunteers' | 'error'
+  /** Number of available on-shift volunteers notified (relay / VoIP push / phone). */
+  volunteersNotified: number
+}
+
 export async function startParallelRinging(
   callSid: string,
   callerNumber: string,
@@ -19,7 +28,7 @@ export async function startParallelRinging(
   env: Env,
   services: Services,
   hubId: string,
-) {
+): Promise<ParallelRingingResult> {
   try {
     // Get on-shift volunteers
     let onShiftPubkeys = await services.shifts.getCurrentVolunteers(hubId)
@@ -34,7 +43,7 @@ export async function startParallelRinging(
 
     if (onShiftPubkeys.length === 0) {
       logger.info('No volunteers on shift or in fallback — skipping')
-      return
+      return { ringing: false, reason: 'no-volunteers', volunteersNotified: 0 }
     }
 
     // Get user details (including call preference)
@@ -60,7 +69,7 @@ export async function startParallelRinging(
 
     if (available.length === 0) {
       logger.info('No available volunteers — skipping')
-      return
+      return { ringing: false, reason: 'no-available-volunteers', volunteersNotified: 0 }
     }
 
     logger.info('Ringing volunteers', { callSid, total: available.length, phone: toRingPhone.length, browserVoip: browserVoip.length })
@@ -102,7 +111,7 @@ export async function startParallelRinging(
       const adapter = hubId !== ''
         ? await getHubTelephonyFromService(env, services.settings, hubId)
         : await getTelephonyFromService(env, services.settings)
-      if (!adapter) return
+      if (!adapter) return { ringing: true, volunteersNotified: available.length }
 
       // CRIT-W2: Generate opaque single-use call tokens per volunteer.
       // Tokens are embedded in callback URLs instead of raw pubkeys.
@@ -120,7 +129,7 @@ export async function startParallelRinging(
         }),
       )
 
-      if (volunteersWithTokens.length === 0) return
+      if (volunteersWithTokens.length === 0) return { ringing: true, volunteersNotified: available.length }
 
       const breaker = getCircuitBreaker({
         name: 'telephony:ringVolunteers',
@@ -150,7 +159,9 @@ export async function startParallelRinging(
         )
       )
     }
+    return { ringing: true, volunteersNotified: available.length }
   } catch (err) {
     logger.error('startParallelRinging failed', err)
+    return { ringing: false, reason: 'error', volunteersNotified: 0 }
   }
 }

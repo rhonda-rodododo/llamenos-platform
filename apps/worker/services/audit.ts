@@ -33,11 +33,12 @@ const EVENT_CATEGORIES: Record<string, string[]> = {
   calls: [
     'callAnswered', 'callEnded', 'callMissed',
     'spamReported', 'voicemailReceived',
+    'demoCallSimulated', 'demoCallerHungUp',
   ],
   settings: [
     'settingsUpdated', 'telephonyConfigured', 'transcriptionToggled',
     'ivrUpdated', 'customFieldsUpdated', 'spamSettingsUpdated',
-    'callSettingsUpdated',
+    'callSettingsUpdated', 'demoMockTelephonyToggled',
   ],
   shifts: [
     'shiftCreated', 'shiftUpdated', 'shiftDeleted',

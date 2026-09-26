@@ -86,7 +86,7 @@ export default defineConfig({
         features: "packages/test-specs/features/**/*.feature",
         steps: "tests/steps/backend/**/*.ts",
         featuresRoot: "packages/test-specs/features",
-        tags: "@backend and not @wip and not @fixme and not @global-setting",
+        tags: "@backend and not @wip and not @fixme and not @global-setting and not @demo-mode",
         // Desktop/mobile-only scenarios have steps not defined in backend — skip them
         missingSteps: "skip-scenario",
       }),
@@ -119,6 +119,27 @@ export default defineConfig({
         steps: "tests/steps/backend/**/*.ts",
         featuresRoot: "packages/test-specs/features",
         tags: "@backend and @global-setting and not @wip and not @fixme",
+        missingSteps: "skip-scenario",
+      }),
+      use: {
+        baseURL: process.env.TEST_HUB_URL || "http://localhost:3000",
+      },
+      fullyParallel: false,
+      workers: 1,
+      dependencies: ["bootstrap"],
+    },
+    {
+      // Serial project for @demo-mode scenarios (#723). They exercise the MockTelephonyAdapter,
+      // which is only constructible on a server started with DEMO_MODE=true and
+      // DEMO_MODE_CONFIRM set — so they are excluded from backend-bdd above (whose server is
+      // not in demo mode) and run here, opt-in, via `BDD_DEMO_MODE=true bun run test:backend:bdd`
+      // against a demo-mode server. They fail loudly (never skip) when the server is not.
+      ...defineBddProject({
+        name: "backend-bdd-demo-mode",
+        features: "packages/test-specs/features/**/*.feature",
+        steps: "tests/steps/backend/**/*.ts",
+        featuresRoot: "packages/test-specs/features",
+        tags: "@backend and @demo-mode and not @wip and not @fixme",
         missingSteps: "skip-scenario",
       }),
       use: {

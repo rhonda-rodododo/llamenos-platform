@@ -1,0 +1,96 @@
+/**
+ * Backend step definitions for the demo mock telephony provider (#723).
+ *
+ * Drives /hubs/:hubId/demo/telephony/* as the admin, then answers / hangs up as a volunteer
+ * through the ordinary calls endpoints — the same calls a tester's client makes.
+ * Requires a server started with DEMO_MODE=true + DEMO_MODE_CONFIRM (project backend-bdd-demo-mode).
+ */
+import { expect } from '@playwright/test'
+import { Given, When, Then } from './fixtures'
+import { getScenarioState } from './common.steps'
+import { setLastResponse } from './shared-state'
+import { apiPost, apiPut, listAuditLogViaApi } from '../../api-helpers'
+
+interface SimulatedCallResponse {
+  ok?: boolean
+  callId?: string
+  volunteersNotified?: number
+}
+
+function demoPath(hubId: string, suffix: string): string {
+  return `/hubs/${hubId}/demo/telephony${suffix}`
+}
+
+Given('the hub uses the mock telephony provider', async ({ request, world }) => {
+  const { hubId } = getScenarioState(world)
+  const res = await apiPut(request, demoPath(hubId, '/mock'), { enabled: true })
+  // Fail loudly when the server is not in demo mode — never pass vacuously.
+  expect(res.status, `enabling the mock failed (is the server running with DEMO_MODE=true?): ${JSON.stringify(res.data)}`).toBe(200)
+})
+
+async function simulate(
+  world: Record<string, unknown>,
+  request: Parameters<typeof apiPost>[0],
+  body: Record<string, unknown>,
+  seedHex?: string,
+) {
+  const state = getScenarioState(world)
+  const res = await apiPost<SimulatedCallResponse>(request, demoPath(state.hubId, '/simulate/incoming-call'), body, seedHex)
+  state.lastApiResponse = res
+  setLastResponse(world, res)
+  if (res.status === 200 && res.data.callId) state.callId = res.data.callId
+}
+
+When('the admin simulates an incoming call', async ({ request, world }) => {
+  await simulate(world, request, {})
+})
+
+When('the admin simulates an incoming call from {string}', async ({ request, world }, callerNumber: string) => {
+  await simulate(world, request, { callerNumber })
+})
+
+When('volunteer {int} tries to simulate an incoming call', async ({ request, world }, index: number) => {
+  const vol = getScenarioState(world).volunteers[index]
+  expect(vol).toBeDefined()
+  await simulate(world, request, {}, vol.deviceKey)
+})
+
+When('volunteer {int} answers the simulated call', async ({ request, world }, index: number) => {
+  const state = getScenarioState(world)
+  expect(state.callId).toBeTruthy()
+  const res = await apiPost(request, `/hubs/${state.hubId}/calls/${state.callId}/answer`, {}, state.volunteers[index].deviceKey)
+  state.lastApiResponse = res
+  setLastResponse(world, res)
+  expect(res.status).toBe(200)
+})
+
+When('volunteer {int} hangs up the simulated call', async ({ request, world }, index: number) => {
+  const state = getScenarioState(world)
+  expect(state.callId).toBeTruthy()
+  const res = await apiPost(request, `/hubs/${state.hubId}/calls/${state.callId}/hangup`, {}, state.volunteers[index].deviceKey)
+  state.lastApiResponse = res
+  setLastResponse(world, res)
+  expect(res.status).toBe(200)
+})
+
+When('the simulated caller hangs up', async ({ request, world }) => {
+  const state = getScenarioState(world)
+  expect(state.callId).toBeTruthy()
+  const res = await apiPost(request, demoPath(state.hubId, '/simulate/caller-hangup'), { callId: state.callId! })
+  state.lastApiResponse = res
+  setLastResponse(world, res)
+})
+
+Then('the simulated call should have notified {int} volunteers', async ({ world }, count: number) => {
+  const data = getScenarioState(world).lastApiResponse?.data as SimulatedCallResponse
+  expect(data.volunteersNotified).toBe(count)
+})
+
+Then('the audit log should record the simulated call', async ({ request, world }) => {
+  const state = getScenarioState(world)
+  expect(state.callId).toBeTruthy()
+  const { entries } = await listAuditLogViaApi(request, { hubId: state.hubId, limit: 100 })
+  const entry = entries.find(e => e.action === 'demoCallSimulated')
+  expect(entry, 'expected a demoCallSimulated audit entry').toBeDefined()
+  expect(entry!.details.callId).toBe(state.callId)
+})

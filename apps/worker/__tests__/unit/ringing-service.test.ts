@@ -245,10 +245,10 @@ describe('startParallelRinging', () => {
       new Error('DB connection failed'),
     )
 
-    // Should not throw — errors are caught and logged
+    // Should not throw — errors are caught, logged, and reported in the outcome
     await expect(
       startParallelRinging('CA-9', '+15551234567', 'http://localhost', makeEnv(), services, 'hub-1'),
-    ).resolves.toBeUndefined()
+    ).resolves.toEqual({ ringing: false, reason: 'error', volunteersNotified: 0 })
   })
 
   it('skips volunteers with empty pubkey — no token created', async () => {
