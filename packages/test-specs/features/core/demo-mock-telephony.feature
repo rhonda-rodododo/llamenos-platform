@@ -1,0 +1,68 @@
+Feature: Demo mock telephony
+  A demo or staging instance has no PSTN number, so an admin selects the mock telephony
+  provider for a hub and simulates an incoming call. The simulated call travels the real
+  routing path (ban check, shift and ring-group resolution, call:ring) and is then answered,
+  noted and ended through the ordinary calls and notes endpoints.
+
+  # These scenarios need a server started with DEMO_MODE=true and DEMO_MODE_CONFIRM set,
+  # so they run in their own project (backend-bdd-demo-mode) and never in the default one.
+  # The production refusal is covered by apps/worker/__tests__/unit/mock-telephony.test.ts,
+  # because a live server cannot be flipped into ENVIRONMENT=production.
+
+  @backend @demo-mode @calls
+  Scenario: Simulated call rings, is answered, noted and ended
+    Given 2 volunteers are on shift
+    And the hub uses the mock telephony provider
+    When the admin simulates an incoming call
+    Then the response status should be 200
+    And the simulated call should have notified 2 volunteers
+    And the call status should be "ringing"
+    When volunteer 0 answers the simulated call
+    Then the call status should be "in-progress"
+    When volunteer 0 creates a note for the active call
+    Then a note should exist linked to that call ID
+    When volunteer 0 hangs up the simulated call
+    Then the call status should be "completed"
+
+  @backend @demo-mode @calls
+  Scenario: The simulated caller can hang up before anyone answers
+    Given 1 volunteers are on shift
+    And the hub uses the mock telephony provider
+    When the admin simulates an incoming call
+    And the simulated caller hangs up
+    Then the response status should be 200
+    And the call status should be "unanswered"
+
+  @backend @demo-mode @calls @bans
+  Scenario: A banned caller is rejected before anything rings
+    Given 1 volunteers are on shift
+    And the hub uses the mock telephony provider
+    And "+15550142001" is on the ban list
+    When the admin simulates an incoming call from "+15550142001"
+    Then the response status should be 403
+
+  @backend @demo-mode @calls
+  Scenario: Nothing rings when no volunteer is on shift
+    Given the hub uses the mock telephony provider
+    When the admin simulates an incoming call
+    Then the response status should be 422
+
+  @backend @demo-mode @calls
+  Scenario: A hub that has not selected the mock cannot be simulated against
+    Given 1 volunteers are on shift
+    When the admin simulates an incoming call
+    Then the response status should be 409
+
+  @backend @demo-mode @calls
+  Scenario: Only an admin can simulate a call
+    Given 1 volunteers are on shift
+    And the hub uses the mock telephony provider
+    When volunteer 0 tries to simulate an incoming call
+    Then the response status should be 403
+
+  @backend @demo-mode @calls @audit
+  Scenario: Simulating a call is audit-logged
+    Given 1 volunteers are on shift
+    And the hub uses the mock telephony provider
+    When the admin simulates an incoming call
+    Then the audit log should record the simulated call

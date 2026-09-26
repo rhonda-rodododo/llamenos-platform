@@ -112,6 +112,21 @@ else
   reporter_record_suite "backend-bdd-global-setting" "$PARSED_PASSED" "$PARSED_FAILED" "$PARSED_SKIPPED"
 fi
 
+# Step 7: Run @demo-mode scenarios (#723) — opt-in. They need a server started with
+# DEMO_MODE=true + DEMO_MODE_CONFIRM=DESTROY_ALL_DATA (the MockTelephonyAdapter refuses to be
+# constructed otherwise), so they are excluded from the default project and only run when the
+# caller says the server is in demo mode. They fail loudly if that claim is wrong.
+if [[ "${BDD_DEMO_MODE:-false}" == "true" ]]; then
+  if reporter_run_step "backend-bdd-demo-mode" bunx playwright test --project=backend-bdd-demo-mode --no-deps; then
+    parse_playwright_results "$REPORTER_LOG_FILE"
+    reporter_record_suite "backend-bdd-demo-mode" "$PARSED_PASSED" "$PARSED_FAILED" "$PARSED_SKIPPED"
+  else
+    overall_result="fail"
+    parse_playwright_results "$REPORTER_LOG_FILE"
+    reporter_record_suite "backend-bdd-demo-mode" "$PARSED_PASSED" "$PARSED_FAILED" "$PARSED_SKIPPED"
+  fi
+fi
+
 reporter_summary "$overall_result"
 
 if [[ "$overall_result" == "fail" ]]; then
