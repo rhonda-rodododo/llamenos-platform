@@ -41,14 +41,20 @@
     mode: "0600"
   notify: Restart app service
 
-- name: Pull app image (if using registry)
+# Pull policy: `missing` (default) pulls only when the image is absent locally, so
+# an image put on the host with `docker save | ssh ... docker load` (the documented
+# install path — docs/deployment/first-deploy.md) is used as-is instead of being
+# re-pulled from a registry that does not have it. A registry-published image is
+# still pulled when absent. Set llamenos_app_image_pull_policy: always to force a
+# registry refresh on every run (e.g. a mutable tag you publish yourself).
+# No ignore_errors: if the image is neither loaded nor pullable this must fail here,
+# with the daemon's message, rather than surface later from the start task.
+- name: Pull app image if not present locally
   community.docker.docker_compose_v2:
     project_src: "{{ app_dir }}/services/app"
-    pull: always
+    pull: "{{ llamenos_app_image_pull_policy | default('missing') }}"
     state: present
     recreate: never
-  register: app_pull
-  ignore_errors: true
 
 - name: Start app service
   community.docker.docker_compose_v2:
