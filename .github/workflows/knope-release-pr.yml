@@ -18,10 +18,17 @@
 # for forks. It also retires the old anti-recursion caveat: a PAT-authored
 # PR triggers `pull_request` workflows normally.
 #
-# The PAT currently belongs to a human maintainer, which means release PRs
-# are self-authored. It moves to the fleet machine user (#773); that is a
-# rotation of this secret's value plus the git identity below, not a
-# workflow change.
+# The PAT belongs to the fleet machine user `llamenos-auto` (#773), and the
+# git identity below matches it.
+#
+# It MUST be a classic PAT with the `public_repo` scope. A fine-grained PAT
+# cannot work here: this repo is owned by a personal account, a fine-grained
+# PAT's resource owner is the token's own user, and a machine user that is
+# merely a collaborator on someone else's personal repo can therefore never be
+# granted access to it. Such a token still authenticates (`gh api user` works)
+# and can still read the public repo, but every write is a 403 — including a
+# plain, non-force push of a brand-new branch. The "Verify release token can
+# push" step below exists to fail loudly on exactly that.
 
 name: Knope — Prepare Release PR
 
@@ -78,12 +85,24 @@ jobs:
           fetch-depth: 0
           token: ${{ secrets.RELEASE_BOT_TOKEN }}
 
-      # Must match the account owning RELEASE_BOT_TOKEN; moves to the
-      # machine user when #773 lands.
+      # `gh api user` above only proves the token authenticates. Prove it can
+      # WRITE, before knope does any work: the receive-pack handshake is where
+      # a read-only token or a fine-grained PAT that cannot reach this repo is
+      # rejected (403), and --dry-run does that handshake without changing
+      # anything. --force so a non-fast-forward against an existing `release`
+      # branch is not mistaken for an auth failure.
+      - name: Verify release token can push
+        run: |
+          if ! git push --dry-run --force origin HEAD:refs/heads/release; then
+            echo "::error::RELEASE_BOT_TOKEN authenticates but cannot push to this repo (403). It must be a classic PAT with the public_repo scope owned by llamenos-auto — a fine-grained PAT cannot write to a repo owned by another personal account. Reissue it and re-set the secret: gh secret set RELEASE_BOT_TOKEN"
+            exit 1
+          fi
+
+      # Must match the account owning RELEASE_BOT_TOKEN (the machine user).
       - name: Configure git identity
         run: |
-          git config user.name "rhonda-rodododo"
-          git config user.email "rikki.schulte@gmail.com"
+          git config user.name "llamenos-auto"
+          git config user.email "333950803+llamenos-auto@users.noreply.github.com"
 
       - name: Install knope
         uses: knope-dev/action@19617851f9f13ab2f27a05989c55efb18aca3675 # v2.1.2
@@ -91,12 +110,28 @@ jobs:
           version: 0.22.4
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
+      # Tolerate exactly one failure: knope's `releases::no_release` — no
+      # commits since the last tag bump any version, so there is nothing to
+      # release. That error is raised by the PrepareRelease step, before
+      # anything is committed or pushed. Every other non-zero exit (a rejected
+      # push, a bad token, a knope crash) fails the job. This step used to be
+      # `continue-on-error: true`, which also swallowed a 403 on push and left
+      # release PRs silently dead while the workflow stayed green.
       - name: Prepare release PR
         env:
           GITHUB_TOKEN: ${{ secrets.RELEASE_BOT_TOKEN }}
-        # continue-on-error so this job passes when there are no
-        # version-bumping commits since the last release (knope errors
-        # out when PrepareRelease finds nothing to release). Auth failures
-        # are caught by the Verify release token step above.
-        continue-on-error: true
-        run: knope prepare-release --verbose
+        run: |
+          log="${RUNNER_TEMP}/knope-prepare-release.log"
+          set +e
+          knope prepare-release --verbose 2>&1 | tee "${log}"
+          status=${PIPESTATUS[0]}
+          set -e
+          if [ "${status}" -eq 0 ]; then
+            exit 0
+          fi
+          if grep -q 'releases::no_release' "${log}"; then
+            echo "::notice::No releasable commits since the last release tag; no release PR to open or update."
+            exit 0
+          fi
+          echo "::error::knope prepare-release failed (exit ${status}) for a reason other than 'nothing to release'. See the log above."
+          exit "${status}"
