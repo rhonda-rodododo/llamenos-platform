@@ -108,6 +108,16 @@ for name in "${SUPERVISORS[@]}"; do
 
   } > "$output"
 
+  # Assembled output is committed to a public repo. Two of its inputs live outside
+  # it (~/.claude/skills/...), so a hardcoded operator home/checkout path in one of
+  # them would silently re-leak the OS username on the next rebuild. Fail loudly.
+  if leak="$(grep -nE '/(home|Users)/[A-Za-z0-9._-]+/|/media/[A-Za-z0-9._-]+/' "$output")"; then
+    echo "ERROR: $output contains an operator-specific absolute path:" >&2
+    echo "$leak" >&2
+    echo "Fix it at its source (a fragment, or a file under $SKILL_DIR) — use \$DISPATCH_REPO / \$WORKTREE_BASE / ~." >&2
+    exit 1
+  fi
+
   built=$((built + 1))
   echo "BUILT: $output"
 done

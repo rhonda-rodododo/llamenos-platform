@@ -5,10 +5,13 @@ After=network-online.target
 
 [Service]
 Type=oneshot
-Environment=PATH=/home/rikki/.bun/bin:/home/rikki/.local/bin:/usr/local/bin:/usr/bin:/bin
-WorkingDirectory=/media/rikki/Main/projects/llamenos
+# %h is the unit owner's home directory (these are systemd USER units). There is
+# deliberately no WorkingDirectory=: the wrapper installed at
+# %h/.local/bin/llamenos-fleet is a symlink into the repo checkout and cd's there
+# itself (see orchestrator/bin/llamenos-fleet), so the checkout can live anywhere.
+Environment=PATH=%h/.bun/bin:%h/.local/bin:/usr/local/bin:/usr/bin:/bin
 EnvironmentFile=-%h/.llamenos-fleet/env
-ExecStart=/home/rikki/.local/bin/llamenos-fleet tick
+ExecStart=%h/.local/bin/llamenos-fleet tick
 # A pass that cannot run is not a failure: the lock, the halt file and the
 # breakers all exit cleanly on purpose, so systemd must not treat a quiet night
 # as a fault and back off.

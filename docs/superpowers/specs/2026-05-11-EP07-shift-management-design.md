@@ -8,6 +8,8 @@ phase: 2
 
 # Spec: EP07 — Shift Management
 
+> **Path placeholders:** `<llamenos-hotline>` = your checkout of the retired v1 `llamenos-hotline` repo.
+
 **Date:** 2026-05-11
 **Status:** Specced
 
@@ -571,11 +573,11 @@ Mobile uses list-based schedule views rather than a weekly calendar grid.
 
 ## References
 
-- v1 shift routes: `/home/rikki/projects/llamenos-hotline/src/server/routes/shifts.ts`
-- v1 shift service: `/home/rikki/projects/llamenos-hotline/src/server/services/shifts.ts`
-- v1 shift DB schema: `/home/rikki/projects/llamenos-hotline/src/server/db/schema/shifts.ts`
-- v1 React Query hooks: `/home/rikki/projects/llamenos-hotline/src/client/lib/queries/shifts.ts`
-- v1 shift page: `/home/rikki/projects/llamenos-hotline/src/client/routes/shifts.tsx`
+- v1 shift routes: `<llamenos-hotline>/src/server/routes/shifts.ts`
+- v1 shift service: `<llamenos-hotline>/src/server/services/shifts.ts`
+- v1 shift DB schema: `<llamenos-hotline>/src/server/db/schema/shifts.ts`
+- v1 React Query hooks: `<llamenos-hotline>/src/client/lib/queries/shifts.ts`
+- v1 shift page: `<llamenos-hotline>/src/client/routes/shifts.tsx`
 - v2 backend routes: `apps/worker/routes/shifts.ts`
 - v2 DB schema: `apps/worker/db/schema/shifts.ts`
 - v2 protocol schemas: `packages/protocol/schemas/shifts.ts`

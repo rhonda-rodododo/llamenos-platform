@@ -380,8 +380,8 @@ been reworded.
 a full backlog rescan (`tick.ts:458-472`).
 
 **Mechanism.** A new `watch` subcommand and a `llamenos-fleet-watch.service`
-(`Restart=always`, same `EnvironmentFile` and `WorkingDirectory` as the tick
-unit). It:
+(`Restart=always`, same `EnvironmentFile` and `llamenos-fleet` wrapper as the tick
+unit — the wrapper supplies the working directory). It:
 
 1. reads `GET /repos/{owner}/{repo}/events?per_page=100` with
    `If-None-Match: <stored etag>`, sleeping `X-Poll-Interval` seconds between

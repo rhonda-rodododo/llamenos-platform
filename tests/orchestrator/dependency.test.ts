@@ -102,7 +102,7 @@ describe('rulesReferenceDeadCommands', () => {
     expect(rulesReferenceDeadCommands('```bash\nbun run test:unit\n```')).toBe(true)
   })
   it('flags a fenced command referencing the retired sibling repo', () => {
-    expect(rulesReferenceDeadCommands('```bash\nDISPATCH_REPO=/media/rikki/Main/projects/llamenos-hotline\n```')).toBe(true)
+    expect(rulesReferenceDeadCommands('```bash\nDISPATCH_REPO=$WORKTREE_BASE/llamenos-hotline\n```')).toBe(true)
   })
   it('does not flag prose that merely names the retired repo to warn workers away from it', () => {
     expect(rulesReferenceDeadCommands('it is a different repo from the retired `llamenos-hotline` v1 project')).toBe(false)

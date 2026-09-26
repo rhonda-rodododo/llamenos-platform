@@ -169,7 +169,7 @@ describe('resolveDispatchModel', () => {
   })
 })
 
-// Real fixture: /home/rikki/fleet-android-765.log (2026-09-18/19, issue #817) —
+// Real fixture: ~/fleet-android-765.log (2026-09-18/19, issue #817) —
 // a Kimi/opencode worker that died on its very first API call with a bare
 // `{"type":"error",...}` event, no `{"type":"result",...}` wrapper at all.
 // dispatch-one.sh's own launcher-footer summary for this exact run recorded
@@ -343,9 +343,9 @@ const FLEET_BACKEND_705_STATUS_TEXT = [
 // `ledger.ts`'s `truncateNote` — the exact text `dispatch()`'s own launch
 // call threw before this fix.
 const FLEET_BACKEND_705_LAUNCH_ERROR =
-  'Command failed: /home/rikki/.claude/skills/supervising-dispatched-sessions/dispatch-one.sh --branch ' +
+  'Command failed: /home/operator/.claude/skills/supervising-dispatched-sessions/dispatch-one.sh --branch ' +
   'fleet/backend/705 --agent backend-supervisor --owns apps/worker/,sip-bridge/,signal-notifier/,tests/steps/ ' +
-  '--effort high --rules llamenos fleet-backend-705 /home/rikki/.llamenos-fleet/briefs/fleet-bac'
+  '--effort high --rules llamenos fleet-backend-705 /home/operator/.llamenos-fleet/briefs/fleet-bac'
 
 describe('resolveLaunchOutcome (issue #870)', () => {
   it('records the worker\'s own real SUCCESS + PR even though the launch call itself errored', () => {

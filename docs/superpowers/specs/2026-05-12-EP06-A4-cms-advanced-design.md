@@ -9,6 +9,8 @@ blocks: []
 
 # Spec: EP06-A4 — Advanced CMS
 
+> **Path placeholders:** `<llamenos-hotline>` = your checkout of the retired v1 `llamenos-hotline` repo.
+
 **Date:** 2026-05-12
 **Status:** Specced
 
@@ -340,7 +342,7 @@ Calendar and timeline views render from decrypted entity data client-side. No pr
 
 - Existing spec: `2026-03-21-cms-contact-management.md` — merge operations detail
 - Existing spec: `2026-03-21-cms-advanced-ui.md` — evidence custody and cross-hub detail
-- v1 contact import: `/home/rikki/projects/llamenos-hotline/src/server/routes/contacts-import.ts`
-- v1 bulk operations: `/home/rikki/projects/llamenos-hotline/src/server/routes/contacts/bulk.ts`
+- v1 contact import: `<llamenos-hotline>/src/server/routes/contacts-import.ts`
+- v1 bulk operations: `<llamenos-hotline>/src/server/routes/contacts/bulk.ts`
 - Evidence routes: `apps/worker/routes/evidence.ts`
 - Contacts v2 routes: `apps/worker/routes/contacts-v2.ts`

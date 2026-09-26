@@ -10,11 +10,11 @@
 
 **Epics:** `docs/epics/epic-269-ios-design-system-foundation.md` through `docs/epics/epic-273-ios-settings-admin-polish.md`
 
-**Build command:** `cd /Users/rhonda/projects/llamenos/apps/ios && xcodebuild build -project Llamenos.xcodeproj -scheme Llamenos -destination "platform=iOS Simulator,name=iPhone 17" 2>&1 | tee /tmp/build-output.log | grep --line-buffered -E '(BUILD|error:|warning:)'`
+**Build command:** `cd "$(git rev-parse --show-toplevel)/apps/ios" && xcodebuild build -project Llamenos.xcodeproj -scheme Llamenos -destination "platform=iOS Simulator,name=iPhone 17" 2>&1 | tee /tmp/build-output.log | grep --line-buffered -E '(BUILD|error:|warning:)'`
 
-**Test command:** `cd /Users/rhonda/projects/llamenos/apps/ios && xcodebuild test -project Llamenos.xcodeproj -scheme Llamenos -destination "platform=iOS Simulator,name=iPhone 17" -only-testing:LlamenosUITests 2>&1 | tee /tmp/uitest-output.log | grep --line-buffered -E '(Test Case|Executed|error:)'`
+**Test command:** `cd "$(git rev-parse --show-toplevel)/apps/ios" && xcodebuild test -project Llamenos.xcodeproj -scheme Llamenos -destination "platform=iOS Simulator,name=iPhone 17" -only-testing:LlamenosUITests 2>&1 | tee /tmp/uitest-output.log | grep --line-buffered -E '(Test Case|Executed|error:)'`
 
-**Regenerate xcodeproj after adding files:** `cd /Users/rhonda/projects/llamenos/apps/ios && xcodegen generate`
+**Regenerate xcodeproj after adding files:** `cd "$(git rev-parse --show-toplevel)/apps/ios" && xcodegen generate`
 
 ---
 
@@ -100,13 +100,13 @@ Each file follows this template (example for Background):
 
 **Step 2: Verify build compiles with new color sets**
 
-Run: `cd /Users/rhonda/projects/llamenos/apps/ios && xcodegen generate && xcodebuild build -project Llamenos.xcodeproj -scheme Llamenos -destination "platform=iOS Simulator,name=iPhone 17" 2>&1 | tail -5`
+Run: `cd "$(git rev-parse --show-toplevel)/apps/ios" && xcodegen generate && xcodebuild build -project Llamenos.xcodeproj -scheme Llamenos -destination "platform=iOS Simulator,name=iPhone 17" 2>&1 | tail -5`
 Expected: BUILD SUCCEEDED
 
 **Step 3: Commit**
 
 ```bash
-cd /Users/rhonda/projects/llamenos && git add apps/ios/Resources/Assets.xcassets/ && git commit -m "feat(ios): add 14 semantic color sets to asset catalog (Epic 269)"
+cd "$(git rev-parse --show-toplevel)" && git add apps/ios/Resources/Assets.xcassets/ && git commit -m "feat(ios): add 14 semantic color sets to asset catalog (Epic 269)"
 ```
 
 ---
@@ -219,7 +219,7 @@ final class StringTruncationTests: XCTestCase {
 
 **Step 2: Run tests to verify they fail**
 
-Run: `cd /Users/rhonda/projects/llamenos/apps/ios && xcodebuild test -project Llamenos.xcodeproj -scheme Llamenos -destination "platform=iOS Simulator,name=iPhone 17" -only-testing:LlamenosTests/StringTruncationTests 2>&1 | grep -E '(Test Case|error:|Executed)'`
+Run: `cd "$(git rev-parse --show-toplevel)/apps/ios" && xcodebuild test -project Llamenos.xcodeproj -scheme Llamenos -destination "platform=iOS Simulator,name=iPhone 17" -only-testing:LlamenosTests/StringTruncationTests 2>&1 | grep -E '(Test Case|error:|Executed)'`
 Expected: Compilation error — `truncatedNpub()` not defined
 
 **Step 3: Implement StringTruncation.swift**
@@ -301,7 +301,7 @@ Expected: All 6 tests PASS
 
 **Step 7: Regenerate xcodeproj and build**
 
-Run: `cd /Users/rhonda/projects/llamenos/apps/ios && xcodegen generate && xcodebuild build -project Llamenos.xcodeproj -scheme Llamenos -destination "platform=iOS Simulator,name=iPhone 17" 2>&1 | tail -5`
+Run: `cd "$(git rev-parse --show-toplevel)/apps/ios" && xcodegen generate && xcodebuild build -project Llamenos.xcodeproj -scheme Llamenos -destination "platform=iOS Simulator,name=iPhone 17" 2>&1 | tail -5`
 Expected: BUILD SUCCEEDED
 
 **Step 8: Commit**
@@ -766,7 +766,7 @@ git add apps/ios/Sources/App/LlamenosApp.swift apps/ios/Sources/Views/Components
 
 **Step 1: Find all bare .font() calls**
 
-Run: `cd /Users/rhonda/projects/llamenos/apps/ios && grep -rn '\.font(\.' Sources/Views/ | grep -v '.brand(' | grep -v 'brandMono' | grep -v '.system(' | head -50`
+Run: `cd "$(git rev-parse --show-toplevel)/apps/ios" && grep -rn '\.font(\.' Sources/Views/ | grep -v '.brand(' | grep -v 'brandMono' | grep -v '.system(' | head -50`
 
 This identifies every `.font(.body)`, `.font(.title)`, `.font(.caption)`, etc. that needs conversion to `.font(.brand(...))`.
 
@@ -830,7 +830,7 @@ Expected: All tests pass
 
 **Step 2: Run unit tests**
 
-Run: `cd /Users/rhonda/projects/llamenos/apps/ios && xcodebuild test -project Llamenos.xcodeproj -scheme Llamenos -destination "platform=iOS Simulator,name=iPhone 17" -only-testing:LlamenosTests 2>&1 | tee /tmp/unittest-output.log | grep --line-buffered -E '(Test Case|Executed|error:)'`
+Run: `cd "$(git rev-parse --show-toplevel)/apps/ios" && xcodebuild test -project Llamenos.xcodeproj -scheme Llamenos -destination "platform=iOS Simulator,name=iPhone 17" -only-testing:LlamenosTests 2>&1 | tee /tmp/unittest-output.log | grep --line-buffered -E '(Test Case|Executed|error:)'`
 Expected: All tests pass (including new StringTruncationTests)
 
 **Step 3: Commit if any test fixes were needed**
@@ -1458,7 +1458,7 @@ git add apps/ios/Tests/UI/ && git commit -m "feat(ios): update all XCUITests for
 
 **Step 1: Run ALL tests (unit + UI)**
 
-Run: `cd /Users/rhonda/projects/llamenos/apps/ios && xcodebuild test -project Llamenos.xcodeproj -scheme Llamenos -destination "platform=iOS Simulator,name=iPhone 17" 2>&1 | tee /tmp/final-test-output.log | grep --line-buffered -E '(Test Case|Executed|error:)'`
+Run: `cd "$(git rev-parse --show-toplevel)/apps/ios" && xcodebuild test -project Llamenos.xcodeproj -scheme Llamenos -destination "platform=iOS Simulator,name=iPhone 17" 2>&1 | tee /tmp/final-test-output.log | grep --line-buffered -E '(Test Case|Executed|error:)'`
 Expected: All tests pass
 
 **Step 2: Check for any leftover bare .font() calls**

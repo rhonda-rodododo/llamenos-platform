@@ -153,7 +153,7 @@ func testDashboardReflectsActualCallCount() {
 
 **Running:**
 ```bash
-cd /Users/rhonda/projects/llamenos/apps/ios && \
+cd "$(git rev-parse --show-toplevel)/apps/ios" && \
 xcodebuild test -project Llamenos.xcodeproj -scheme Llamenos \
   -destination "platform=iOS Simulator,name=iPhone 17" \
   -only-testing:LlamenosUITests 2>&1 | \

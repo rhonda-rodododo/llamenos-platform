@@ -1,5 +1,7 @@
 # Workflow Reform: Skills, CLAUDE.md, and Development Patterns
 
+> **Path placeholders:** `<project-slug>` = Claude Code's per-project directory name under `~/.claude/projects/` (the checkout path with `/` replaced by `-`).
+
 **Date**: 2026-03-19
 **Status**: Draft — awaiting workflow agent review findings
 **Priority**: Phase 0 — must execute before all other overhaul work
@@ -138,7 +140,7 @@ No hooks to remove — settings.json is clean.
 
 ## Memory File Updates
 
-The following memory entries in `~/.claude/projects/-home-rikki-projects-llamenos/memory/` reference obsolete patterns and need updating:
+The following memory entries in `~/.claude/projects/<project-slug>/memory/` reference obsolete patterns and need updating:
 
 - `MEMORY.md` — the `## Feature Development Workflow (CRITICAL — follow exactly)` section must be **replaced** with: "Feature development uses superpowers brainstorming → writing-plans → executing-plans. No custom phased BDD workflow."
 - `MEMORY.md` references `docs/plans/2026-03-14-case-management-*.md` — these are plan docs from the old workflow, should reference new superpowers specs

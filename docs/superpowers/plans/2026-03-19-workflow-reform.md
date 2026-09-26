@@ -1,5 +1,7 @@
 # Workflow Reform Implementation Plan
 
+> **Path placeholders:** `<project-slug>` = Claude Code's per-project directory name under `~/.claude/projects/` (the checkout path with `/` replaced by `-`).
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Remove all DO-era and 3-phase-BDD guidance from skills, CLAUDE.md, and memory files so Claude operates exclusively on superpowers workflows.
@@ -293,7 +295,7 @@ The current file is 309 lines. Target is approximately 185 lines (~40% reduction
 ### Task 8: Update memory MEMORY.md
 
 **Files:**
-- Modify: `~/.claude/projects/-home-rikki-projects-llamenos/memory/MEMORY.md`
+- Modify: `~/.claude/projects/<project-slug>/memory/MEMORY.md`
 
 - [ ] Find and remove the entire `## Feature Development Workflow (CRITICAL — follow exactly)` section (lines 86–121 in current file), which includes the three Phase subsections and the `### Epic File Quality Requirements` block.
 
@@ -331,6 +333,6 @@ The current file is 309 lines. Target is approximately 185 lines (~40% reduction
 - [ ] Run `grep "dev:node" ~/projects/llamenos/.claude/skills/test-orchestration/SKILL.md` — expect zero matches.
 - [ ] Run `grep "DO storage" ~/projects/llamenos/.claude/skills/release-deployment/SKILL.md` — expect zero matches.
 - [ ] Run `grep "TypeScript Post-Processor" ~/projects/llamenos/.claude/skills/protocol-schema-change/SKILL.md` — expect zero matches.
-- [ ] Run `grep "Feature Development Workflow (CRITICAL" ~/.claude/projects/-home-rikki-projects-llamenos/memory/MEMORY.md` — expect zero matches.
+- [ ] Run `grep "Feature Development Workflow (CRITICAL" ~/.claude/projects/<project-slug>/memory/MEMORY.md` — expect zero matches.
 - [ ] Confirm `wc -l ~/projects/llamenos/CLAUDE.md` reports ≤200 lines.
 - [ ] Commit: `git commit -m "chore: workflow reform verification complete"` (only if any last-minute fixes were made; skip if nothing changed)
