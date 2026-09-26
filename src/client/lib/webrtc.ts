@@ -1,18 +1,19 @@
 /**
  * WebRTC call handling for in-browser calling.
  *
- * This module provides a provider-agnostic interface for WebRTC calls.
- * Each telephony provider (Twilio, SignalWire, Vonage, Plivo) has its own
- * client SDK. This module abstracts over them, using dynamic imports to
- * load only the needed SDK.
+ * In-app audio is available for Twilio and SignalWire only (see
+ * `in-app-audio.ts`). For every other provider calls still ring volunteers'
+ * phones, but the app cannot carry the audio — `initWebRtc` reports that as
+ * the `unsupported` state instead of pretending to be ready.
  *
  * The actual media handling is done by the provider's SDK — this module
  * manages lifecycle (init, accept, hangup, mute) and exposes events.
  */
 
-import { getWebRtcToken } from './api'
+import { getWebRtcStatus, getWebRtcToken } from './api'
+import { supportsInAppAudio } from './in-app-audio'
 
-export type WebRtcState = 'idle' | 'initializing' | 'ready' | 'ringing' | 'connected' | 'error'
+export type WebRtcState = 'idle' | 'initializing' | 'ready' | 'ringing' | 'connected' | 'error' | 'unsupported'
 
 type StateChangeHandler = (state: WebRtcState, error?: string) => void
 
@@ -65,25 +66,20 @@ export async function initWebRtc(): Promise<void> {
   setState('initializing')
 
   try {
-    const { token, provider } = await getWebRtcToken()
-
-    switch (provider) {
-      case 'twilio':
-      case 'signalwire':
-        await initTwilioWebRtc(token)
-        break
-      case 'vonage':
-      case 'plivo':
-        // Vonage/Plivo use their own SDKs — for now we handle
-        // calls via the WebSocket notification path (answer triggers
-        // server-side bridging). Full browser audio will be added
-        // when provider SDKs are available.
-        console.debug(`[webrtc] ${provider} WebRTC: using WebSocket notification mode`)
-        setState('ready')
-        break
-      default:
-        throw new Error(`WebRTC not supported for provider: ${provider}`)
+    // Ask which provider is configured BEFORE requesting a token: providers
+    // without in-app audio have no token minter (the request would fail) or,
+    // for Vonage/Plivo, a token we have no client SDK to use.
+    const { provider } = await getWebRtcStatus()
+    if (provider && !supportsInAppAudio(provider)) {
+      // Calls ring the volunteer's phone. Say so instead of claiming to be
+      // ready with nothing to answer with.
+      console.debug(`[webrtc] ${provider} has no in-app audio; calls ring the phone only`)
+      setState('unsupported')
+      return
     }
+
+    const { token } = await getWebRtcToken()
+    await initTwilioWebRtc(token)
   } catch (err) {
     console.error('[webrtc] Init failed:', err)
     setState('error', err instanceof Error ? err.message : 'WebRTC initialization failed')
@@ -95,62 +91,56 @@ export async function initWebRtc(): Promise<void> {
  * Uses dynamic import to load the SDK only when needed.
  */
 async function initTwilioWebRtc(token: string): Promise<void> {
-  try {
-    // Dynamic import — only loads when WebRTC is actually used.
-    // Uses a variable to prevent TypeScript from resolving at compile time.
-    const sdkModule = '@twilio/voice-sdk'
-    const { Device } = await import(/* @vite-ignore */ sdkModule) as {
-      Device: new (token: string, opts: Record<string, unknown>) => TwilioDevice & { register: () => Promise<void> }
-    }
-    const device = new Device(token, {
-      closeProtection: true,
-      codecPreferences: ['opus', 'pcmu'],
+  // Dynamic import — only loads when WebRTC is actually used.
+  // Uses a variable to prevent TypeScript from resolving at compile time.
+  const sdkModule = '@twilio/voice-sdk'
+  const { Device } = await import(/* @vite-ignore */ sdkModule) as {
+    Device: new (token: string, opts: Record<string, unknown>) => TwilioDevice & { register: () => Promise<void> }
+  }
+  const device = new Device(token, {
+    closeProtection: true,
+    codecPreferences: ['opus', 'pcmu'],
+  })
+
+  device.on('registered', () => {
+    console.debug('[webrtc] Twilio Device registered')
+    setState('ready')
+  })
+
+  device.on('error', (...args: unknown[]) => {
+    const error = args[0] as { message?: string } | undefined
+    console.error('[webrtc] Twilio Device error:', error)
+    setState('error', error?.message || 'Device error')
+  })
+
+  device.on('incoming', (...args: unknown[]) => {
+    const conn = args[0] as TwilioConnection
+    console.debug('[webrtc] Incoming call via WebRTC')
+    activeConnection = conn
+    setState('ringing')
+
+    conn.on('accept', () => {
+      setState('connected')
     })
 
-    device.on('registered', () => {
-      console.debug('[webrtc] Twilio Device registered')
+    conn.on('disconnect', () => {
+      activeConnection = null
       setState('ready')
     })
 
-    device.on('error', (...args: unknown[]) => {
-      const error = args[0] as { message?: string } | undefined
-      console.error('[webrtc] Twilio Device error:', error)
-      setState('error', error?.message || 'Device error')
+    conn.on('reject', () => {
+      activeConnection = null
+      setState('ready')
     })
+  })
 
-    device.on('incoming', (...args: unknown[]) => {
-      const conn = args[0] as TwilioConnection
-      console.debug('[webrtc] Incoming call via WebRTC')
-      activeConnection = conn
-      setState('ringing')
+  device.on('unregistered', () => {
+    console.debug('[webrtc] Twilio Device unregistered')
+    setState('idle')
+  })
 
-      conn.on('accept', () => {
-        setState('connected')
-      })
-
-      conn.on('disconnect', () => {
-        activeConnection = null
-        setState('ready')
-      })
-
-      conn.on('reject', () => {
-        activeConnection = null
-        setState('ready')
-      })
-    })
-
-    device.on('unregistered', () => {
-      console.debug('[webrtc] Twilio Device unregistered')
-      setState('idle')
-    })
-
-    twilioDevice = device
-    await device.register()
-  } catch (err) {
-    // If @twilio/voice-sdk is not installed, fall back to WebSocket mode
-    console.warn('[webrtc] Twilio Voice SDK not available, using WebSocket notification mode:', err)
-    setState('ready')
-  }
+  twilioDevice = device
+  await device.register()
 }
 
 /**

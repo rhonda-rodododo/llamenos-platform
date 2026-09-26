@@ -4313,9 +4313,12 @@
     "enableWebrtc": "WebRTC 활성화",
     "envFallback": "Using environment variable defaults (Twilio)",
     "error": "Connection error",
-    "notImplemented": "This provider is not yet implemented. Please use Twilio or SignalWire.",
+    "inAppAudioSupported": "자원봉사자가 앱에서 전화를 받을 수 있습니다(앱 내 오디오).",
+    "inAppAudioUnsupported": "전화가 자원봉사자의 휴대폰으로 울립니다. 앱 내 오디오는 지원되지 않습니다.",
+    "inAppAudioUnsupportedWhy": "{{provider}}은(는) 아직 앱 내 오디오 연동이 없습니다. 자원봉사자 휴대폰으로의 동시 착신은 평소처럼 작동하지만 앱 안에서는 전화를 받을 수 없습니다. 앱 내 오디오가 필요하면 Twilio 또는 SignalWire를 사용하세요.",
     "phoneNumber": "Hotline Phone Number",
     "phoneNumberHelp": "The phone number callers dial (E.164 format)",
+    "phonesOnlySuffix": "휴대폰 전용",
     "privateKey": "Private Key",
     "provider": "Provider",
     "providerDescriptions": {

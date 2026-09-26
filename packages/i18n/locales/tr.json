@@ -1722,7 +1722,6 @@
     "description": "Aramaları yönetmek için kullanılan telefon sağlayıcısını yapılandırın",
     "enableWebrtc": "WebRTC Etkinleştir",
     "envFallback": "Ortam değişkeni varsayılanları kullanılıyor (Twilio)",
-    "notImplemented": "Bu sağlayıcı henüz uygulanmadı. Lütfen Twilio veya SignalWire kullanın.",
     "phoneNumber": "Hat Telefon Numarası",
     "phoneNumberHelp": "Arayanların çevirdiği telefon numarası (E.164 formatı)",
     "privateKey": "Özel Anahtar",
@@ -1753,7 +1752,11 @@
     "bridgeSecretHelp": "HMAC shared secret for authenticating bridge-worker communication (must not reuse ARI password)",
     "connected": "Connected",
     "disconnected": "Not connected",
-    "error": "Connection error"
+    "error": "Connection error",
+    "inAppAudioSupported": "Gönüllüler çağrıları uygulama içinde yanıtlayabilir (uygulama içi ses).",
+    "inAppAudioUnsupported": "Çağrılar gönüllülerin telefonlarında çalar; uygulama içi ses yok.",
+    "inAppAudioUnsupportedWhy": "{{provider}} için henüz uygulama içi ses entegrasyonu yok. Gönüllülerin telefonlarında paralel çaldırma normal şekilde çalışır ancak çağrılar uygulama içinde yanıtlanamaz. Uygulama içi ses için Twilio veya SignalWire kullanın.",
+    "phonesOnlySuffix": "yalnızca telefon"
   },
   "transcription": {
     "allowOptOut": "Gönüllülerin transkripsiyonu devre dışı bırakmasına izin ver",

@@ -1722,7 +1722,6 @@
     "description": "Habee bixiyaha taleefanka ee loo isticmaalo maamulidda wicitaannada",
     "enableWebrtc": "Shid WebRTC",
     "envFallback": "Waxaa la isticmaalayaa dejinta asalka ee deegaanka (Twilio)",
-    "notImplemented": "Bixiyahaan wali lama hirgelin. Fadlan isticmaal Twilio ama SignalWire.",
     "phoneNumber": "Lambarka Taleefanka Khadka",
     "phoneNumberHelp": "Lambarka wacayaashu garaacaan (qaabka E.164)",
     "privateKey": "Furaha Gaarka ah",
@@ -1753,7 +1752,11 @@
     "bridgeSecretHelp": "HMAC shared secret for authenticating bridge-worker communication (must not reuse ARI password)",
     "connected": "Connected",
     "disconnected": "Not connected",
-    "error": "Connection error"
+    "error": "Connection error",
+    "inAppAudioSupported": "Mutadawiciintu waxay ka jawaabi karaan wicitaannada gudaha app-ka (codka app-ka gudihiisa).",
+    "inAppAudioUnsupported": "Wicitaannadu waxay ku dhawaaqaan telefoonnada mutadawiciinta; codka app-ka gudihiisa ma jiro.",
+    "inAppAudioUnsupportedWhy": "{{provider}} weli ma laha isku-xirka codka app-ka gudihiisa. Isku-mar u dhawaaqista telefoonnada mutadawiciinta sida caadiga ah ayay u shaqaysaa, laakiin wicitaannada looma jawaabi karo gudaha app-ka. Isticmaal Twilio ama SignalWire si aad u hesho codka app-ka gudihiisa.",
+    "phonesOnlySuffix": "telefoonno keliya"
   },
   "transcription": {
     "allowOptOut": "U oggolow mutadawwiciinta inay damiyaan qoraal u rogidda",

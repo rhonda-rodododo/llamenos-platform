@@ -4313,9 +4313,12 @@
     "enableWebrtc": "启用 WebRTC",
     "envFallback": "Using environment variable defaults (Twilio)",
     "error": "Connection error",
-    "notImplemented": "This provider is not yet implemented. Please use Twilio or SignalWire.",
+    "inAppAudioSupported": "志愿者可以在应用内接听来电（应用内音频）。",
+    "inAppAudioUnsupported": "来电会响铃到志愿者的手机；不支持应用内音频。",
+    "inAppAudioUnsupportedWhy": "{{provider}} 尚未集成应用内音频。并行振铃到志愿者手机的功能照常可用，但无法在应用内接听来电。如需应用内音频，请使用 Twilio 或 SignalWire。",
     "phoneNumber": "Hotline Phone Number",
     "phoneNumberHelp": "The phone number callers dial (E.164 format)",
+    "phonesOnlySuffix": "仅限手机",
     "privateKey": "Private Key",
     "provider": "Provider",
     "providerDescriptions": {

@@ -4313,9 +4313,12 @@
     "enableWebrtc": "Activer WebRTC",
     "envFallback": "Using environment variable defaults (Twilio)",
     "error": "Connection error",
-    "notImplemented": "This provider is not yet implemented. Please use Twilio or SignalWire.",
+    "inAppAudioSupported": "Les bénévoles peuvent répondre aux appels dans l'application (audio dans l'application).",
+    "inAppAudioUnsupported": "Les appels sonnent sur les téléphones des bénévoles ; pas d'audio dans l'application.",
+    "inAppAudioUnsupportedWhy": "{{provider}} n'a pas encore d'intégration audio dans l'application. La sonnerie en parallèle sur les téléphones des bénévoles fonctionne normalement, mais les appels ne peuvent pas être pris dans l'application. Utilisez Twilio ou SignalWire pour l'audio dans l'application.",
     "phoneNumber": "Hotline Phone Number",
     "phoneNumberHelp": "The phone number callers dial (E.164 format)",
+    "phonesOnlySuffix": "téléphones uniquement",
     "privateKey": "Private Key",
     "provider": "Provider",
     "providerDescriptions": {

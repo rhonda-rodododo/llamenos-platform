@@ -47,6 +47,8 @@ export function WebRtcStatus() {
       <Monitor className="h-4 w-4 text-muted-foreground" />
       <Badge
         variant="outline"
+        data-testid="webrtc-status"
+        data-state={state}
         className={
           state === 'ready'
             ? 'border-green-500/50 text-green-700 dark:text-green-400'
@@ -71,6 +73,7 @@ export function WebRtcStatus() {
         {state === 'initializing' && t('common.loading')}
         {state === 'error' && t('common.error')}
         {state === 'idle' && t('settings.callPrefBrowser')}
+        {state === 'unsupported' && t('telephonyProvider.inAppAudioUnsupported')}
         {state === 'ringing' && t('calls.incoming')}
       </Badge>
     </div>

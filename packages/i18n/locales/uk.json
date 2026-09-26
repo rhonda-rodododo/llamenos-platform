@@ -1722,7 +1722,6 @@
     "description": "Налаштуйте провайдера телефонії для обробки дзвінків",
     "enableWebrtc": "Увімкнути WebRTC",
     "envFallback": "Використовуються змінні середовища за замовчуванням (Twilio)",
-    "notImplemented": "Цього провайдера ще не реалізовано. Використовуйте Twilio або SignalWire.",
     "phoneNumber": "Номер телефону гарячої лінії",
     "phoneNumberHelp": "Номер, на який дзвонять абоненти (формат E.164)",
     "privateKey": "Приватний ключ",
@@ -1753,7 +1752,11 @@
     "bridgeSecretHelp": "HMAC shared secret for authenticating bridge-worker communication (must not reuse ARI password)",
     "connected": "Connected",
     "disconnected": "Not connected",
-    "error": "Connection error"
+    "error": "Connection error",
+    "inAppAudioSupported": "Волонтери можуть відповідати на дзвінки в застосунку (аудіо в застосунку).",
+    "inAppAudioUnsupported": "Дзвінки надходять на телефони волонтерів; аудіо в застосунку недоступне.",
+    "inAppAudioUnsupportedWhy": "У {{provider}} поки немає інтеграції аудіо в застосунку. Паралельний виклик на телефони волонтерів працює як завжди, але відповідати на дзвінки всередині застосунку не можна. Для аудіо в застосунку використовуйте Twilio або SignalWire.",
+    "phonesOnlySuffix": "лише телефони"
   },
   "transcription": {
     "allowOptOut": "Дозволити волонтерам вимикати транскрипцію",

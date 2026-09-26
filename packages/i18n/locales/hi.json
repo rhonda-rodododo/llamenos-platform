@@ -4313,9 +4313,12 @@
     "enableWebrtc": "WebRTC सक्षम करें",
     "envFallback": "Using environment variable defaults (Twilio)",
     "error": "Connection error",
-    "notImplemented": "This provider is not yet implemented. Please use Twilio or SignalWire.",
+    "inAppAudioSupported": "स्वयंसेवक ऐप में कॉल का जवाब दे सकते हैं (ऐप में ऑडियो)।",
+    "inAppAudioUnsupported": "कॉल स्वयंसेवकों के फ़ोन पर बजती हैं; ऐप में ऑडियो उपलब्ध नहीं है।",
+    "inAppAudioUnsupportedWhy": "{{provider}} में अभी ऐप में ऑडियो का एकीकरण नहीं है। स्वयंसेवकों के फ़ोन पर समानांतर रिंग सामान्य रूप से काम करती है, लेकिन कॉल का जवाब ऐप के अंदर नहीं दिया जा सकता। ऐप में ऑडियो के लिए Twilio या SignalWire का उपयोग करें।",
     "phoneNumber": "Hotline Phone Number",
     "phoneNumberHelp": "The phone number callers dial (E.164 format)",
+    "phonesOnlySuffix": "केवल फ़ोन",
     "privateKey": "Private Key",
     "provider": "Provider",
     "providerDescriptions": {
