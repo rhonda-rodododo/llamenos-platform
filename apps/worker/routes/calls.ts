@@ -312,11 +312,11 @@ calls.post('/:callId/answer',
       type: 'call:update',
       callId,
       status: 'in-progress',
-    }, hubId || undefined)
+    }, hubId)
     publishEvent(c.env, KIND_PRESENCE_UPDATE, {
       type: 'presence:summary',
       callId,
-    }, hubId || undefined)
+    }, hubId)
 
     // First pickup wins: stop every phone that is still ringing.
     await cancelLosingLegs(c.env, services, hubId, callId)
