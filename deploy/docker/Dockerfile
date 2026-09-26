@@ -3,7 +3,8 @@
 # Builds:
 #   Stage 1: Install JS dependencies
 #   Stage 2: Build Rust crypto library (.so) for bun:ffi
-#   Stage 3 (`app`): Production image (API-only — desktop clients connect to this)
+#   Stage 3 (`app`): Production image (API-only — desktop clients connect to this);
+#     `app-base` plus a per-arch runtime pin (`app-amd64` / `app-arm64`)
 #   Stage 4-6 (`static`): Caddy image for docker-compose.production.yml's
 #     `caddy` service (built SPA + custom rate-limiting Caddy binary)
 #
@@ -14,6 +15,11 @@
 # (caddy), .github/workflows/{docker,release,ci,security-audit}.yml.
 #
 # Bun runs TypeScript natively — no esbuild transpilation step needed.
+
+# Set automatically by BuildKit to the architecture being built (amd64/arm64).
+# Declared in global scope so the `app` alias stage below can select the
+# per-architecture runtime variant (see "simdutf kernel pin").
+ARG TARGETARCH
 
 # Stage 1: Install runtime deps
 FROM oven/bun:1.4.2@sha256:9114c058aeae42162ee16dd5084b95fe9473970bb6bcb5b232ab1630f0546895 AS deps
@@ -50,7 +56,7 @@ RUN cargo build --release --manifest-path packages/crypto/Cargo.toml --features 
     && cp packages/crypto/target/release/libllamenos_core.so packages/crypto/dist/server/
 
 # Stage 3: Production
-FROM oven/bun:1.4.2-slim@sha256:cb3bbbb08e13a4a2ff400f24c7a2a1d5efa83f6ef8544d52d95a519631e2fc61 AS app
+FROM oven/bun:1.4.2-slim@sha256:cb3bbbb08e13a4a2ff400f24c7a2a1d5efa83f6ef8544d52d95a519631e2fc61 AS app-base
 # Pinned independently of .mise.toml's dev/CI `bun = "1.3.5"` — see the
 # `deps` stage comment above for why the two are allowed to diverge. Update
 # via Dependabot.
@@ -90,6 +96,8 @@ COPY --chown=llamenos:llamenos --from=rust-builder /build/packages/crypto/dist/s
 # Copy Drizzle SQL migrations + migration runner with correct ownership
 COPY --chown=llamenos:llamenos drizzle/migrations/ drizzle/migrations/
 COPY --chown=llamenos:llamenos scripts/run-migrations.ts scripts/run-migrations.ts
+# Startup invariant check for Bun's native text layer (run by the entrypoint)
+COPY --chown=llamenos:llamenos scripts/verify-runtime.ts scripts/verify-runtime.ts
 
 # Copy entrypoint (runs migrations then starts the app)
 COPY --chown=llamenos:llamenos deploy/docker/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
@@ -112,6 +120,44 @@ HEALTHCHECK --interval=15s --timeout=5s --start-period=30s --retries=5 \
 
 ENTRYPOINT ["docker-entrypoint.sh"]
 CMD []
+
+# ── simdutf kernel pin (amd64) ────────────────────────────────────────────
+# Bun >= 1.4.0 bundles simdutf 9.0.0 for all base64 / UTF-8 work — including
+# Bun.SQL's SCRAM-SHA-256 client proof, Buffer, TextDecoder and JSON. simdutf
+# picks its SIMD kernel from CPUID, and Bun's x64 build ships NO scalar
+# fallback kernel. On a VM whose virtual CPU model hides SSE4.2 in CPUID
+# (`kvm64`/`qemu64`, still the default CPU model on many KVM/Proxmox/OpenStack
+# VPS hosts) the hardware still executes SSE4.2 — so Bun itself starts — but
+# simdutf finds no usable kernel and falls back to its "unsupported" stub,
+# whose operations return 0 / empty. The observed result: an empty SCRAM proof
+# (PostgreSQL: "Malformed proof in client-final-message"), base64 encodes that
+# never return (the entrypoint hangs at "Running database migrations..."), and
+# non-ASCII strings silently decoded as "".
+#
+# Forcing the SSE4.2 (`westmere`) kernel is safe on every host this image can
+# run on: Bun 1.4's own x64 build executes SSE4.2 unconditionally at startup,
+# so a CPU that cannot run the westmere kernel cannot run Bun at all. The cost
+# on hosts with honest CPUID is using the SSE4.2 kernel instead of AVX2/AVX-512
+# for text/base64 — negligible at this service's request sizes. It is set as
+# image ENV (not in the entrypoint) so that EVERY bun process in the container
+# gets it: the HEALTHCHECK, `docker exec … bun …` admin commands, and the app.
+#
+# arm64 is unaffected (simdutf treats NEON as always present), so arm64 images
+# get no override. scripts/verify-runtime.ts (run by the entrypoint) fails the
+# container loudly if the text layer is ever broken again — e.g. a future Bun
+# renaming the `westmere` kernel — and scripts/image-smoke.sh exercises the
+# built image on a CPUID-masked KVM guest before every release.
+#
+# Exit condition: drop this override once upstream Bun ships simdutf's
+# fallback kernel (or otherwise stops selecting the stub on SSE4.2-capable
+# CPUs); scripts/image-smoke.sh --cpu kvm64 with the override removed must pass.
+FROM app-base AS app-amd64
+ENV SIMDUTF_FORCE_IMPLEMENTATION=westmere
+
+FROM app-base AS app-arm64
+
+# The target every consumer builds (`--target app` / compose `target: app`).
+FROM app-${TARGETARCH} AS app
 
 # ─────────────────────────────────────────────────────────────────────────
 # Stages below build the `static` target consumed by

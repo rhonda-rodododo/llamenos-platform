@@ -1,0 +1,74 @@
+# Boot the BUILT app image against PostgreSQL 17 — on the runner's CPU and on
+# a KVM guest whose virtual CPU model hides SSE4.2 (-cpu kvm64) — whenever
+# something that changes the image's runtime changes (notably Dependabot bumps
+# of the oven/bun base image).
+#
+# The release gate is the same pair of smokes in release.yml's `docker-stable`
+# job, which blocks the publish; this workflow is the earlier, PR-time signal.
+# Why the masked-CPU run exists: see the "simdutf kernel pin" block in
+# deploy/docker/Dockerfile and scripts/image-smoke.sh.
+name: Image Smoke
+
+on:
+  pull_request:
+    paths:
+      - 'deploy/docker/Dockerfile'
+      - 'deploy/docker/docker-entrypoint.sh'
+      - 'deploy/docker/docker-compose.yml'
+      - 'scripts/image-smoke.sh'
+      - 'scripts/verify-runtime.ts'
+      - 'scripts/run-migrations.ts'
+      - 'drizzle/migrations/**'
+      - 'bun.lockb'
+      - '.github/workflows/image-smoke.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: image-smoke-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - name: Build app image
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: deploy/docker/Dockerfile
+          target: app
+          load: true
+          push: false
+          tags: llamenos-image-smoke:${{ github.sha }}
+          # Read-only import of the public cache docker-buildcache.yml keeps
+          # warm; never exported from here.
+          cache-from: type=registry,ref=ghcr.io/${{ github.repository }}:buildcache
+
+      - name: Smoke image against PostgreSQL 17 (runner CPU)
+        env:
+          IMAGE: llamenos-image-smoke:${{ github.sha }}
+        run: scripts/image-smoke.sh "$IMAGE"
+
+      - name: Enable KVM for the CPUID-masked smoke
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
+            | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends qemu-system-x86 qemu-utils genisoimage
+
+      - name: Smoke image on a CPUID-masked KVM guest (-cpu kvm64)
+        env:
+          IMAGE: llamenos-image-smoke:${{ github.sha }}
+        run: scripts/image-smoke.sh --cpu kvm64 "$IMAGE"
