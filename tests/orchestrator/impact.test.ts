@@ -87,6 +87,19 @@ describe('classifyImpact', () => {
     ['knope.toml'],
     ['sip-bridge/src/ari-adapter.ts'],
     ['signal-notifier/src/contact-resolver.ts'],
+    // The security-sensitive subset of `scripts/` (#1066): the infra lane may
+    // write scripts/, so these must still reach a human — matching CODEOWNERS.
+    ['scripts/bootstrap-admin.ts'],
+    ['scripts/release/sign-artifacts.sh'],
+    ['scripts/release/promote-release.sh'],
+    ['scripts/build-iso.sh'],
+    ['scripts/iso-builder/late-command.sh'],
+    ['scripts/verify-build.sh'],
+    ['scripts/verify-iso.sh'],
+    ['scripts/generate-update-manifest.sh'],
+    ['scripts/generate-update-manifest.ts'],
+    ['scripts/inject-cert-pins.ts'],
+    ['scripts/extract-cert-pins.sh'],
   ])('treats %s as high impact', (f) => {
     expect(classifyImpact([f], 5).impact).toBe('high')
   })
@@ -94,6 +107,16 @@ describe('classifyImpact', () => {
   // Boundary-exact: ONLY `apps/desktop/src/crypto.rs` is restored above, not
   // the whole `apps/desktop/src/` directory — an ordinary desktop source file
   // stays low impact.
+  // Boundary-exact for scripts/ too: only the listed subset is high impact.
+  // The rest of scripts/ is ordinary infra-lane work and merges on green.
+  it.each([
+    ['scripts/test-integration-full.sh'],
+    ['scripts/dev-setup.sh'],
+    ['scripts/lib/platform-detect.sh'],
+  ])('does not escalate ordinary scripts/ file %s', (f) => {
+    expect(classifyImpact([f], 5).impact).toBe('low')
+  })
+
   it('does not escalate an ordinary desktop source file that is not the crypto IPC wrapper', () => {
     expect(classifyImpact(['apps/desktop/src/main.rs'], 5).impact).toBe('low')
   })
@@ -118,9 +141,11 @@ describe('classifyImpact', () => {
     ['apps/android/fastlane/Fastfile'],
     ['apps/desktop/tauri.conf.json'],
     ['packages/protocol/tools/codegen.ts'],
-    ['scripts/inject-cert-pins.ts'],
-    ['scripts/extract-cert-pins.sh'],
-    ['scripts/verify-build.sh'],
+    // `scripts/inject-cert-pins.ts`, `scripts/extract-cert-pins.sh` and
+    // `scripts/verify-build.sh` used to be in this list too. They were safe
+    // to narrow while no lane could write `scripts/` at all; #1066 gave it to
+    // the infra lane, so they are CODEOWNERS-owned and HIGH impact again —
+    // asserted with the rest of the scripts/ subset above.
     ['Dockerfile.build'],
   ])('treats %s as low impact (narrowed 2026-09-12 — no production users yet)', (f) => {
     expect(classifyImpact([f], 5).impact).toBe('low')

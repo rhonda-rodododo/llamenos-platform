@@ -88,6 +88,22 @@ export const HIGH_IMPACT_PATHS: readonly string[] = [
   'vitest.orchestrator.config.ts',
   'vitest.unit.config.ts',
 
+  // Key generation, release signing, the FDE installer image, build/ISO
+  // verification, the desktop updater manifest and certificate pinning — the
+  // security-sensitive subset of `scripts/`, which is otherwise ordinary
+  // infra-lane work. Matching CODEOWNERS entry for entry: a lane may author
+  // these, but one quiet edit here compromises every install, not one build.
+  'scripts/bootstrap-admin.ts',
+  'scripts/release/',
+  'scripts/build-iso.sh',
+  'scripts/iso-builder/',
+  'scripts/verify-build.sh',
+  'scripts/verify-iso.sh',
+  'scripts/generate-update-manifest.sh',
+  'scripts/generate-update-manifest.ts',
+  'scripts/inject-cert-pins.ts',
+  'scripts/extract-cert-pins.sh',
+
   // Deanonymization surfaces (PR #794, matching CODEOWNERS): sip-bridge/
   // routes PSTN calls and handles caller phone numbers; signal-notifier/
   // does HMAC-hashed contact resolution. Both are top-level, NOT under
