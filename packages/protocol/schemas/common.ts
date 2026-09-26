@@ -59,6 +59,7 @@ export const paginatedMeta = {
 
 /** Generic success response */
 export const okResponseSchema = z.object({ ok: z.boolean() })
+export type OkResponse = z.infer<typeof okResponseSchema>
 
 /** HPKE recipient envelope — used across notes, messages, files */
 export const recipientEnvelopeSchema = z.object({

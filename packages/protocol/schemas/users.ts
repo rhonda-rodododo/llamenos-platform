@@ -36,6 +36,15 @@ export type User = z.infer<typeof userAdminResponseSchema>
 export const userListResponseSchema = z.object({
   users: z.array(userResponseSchema),
 })
+export type UserListResponse = z.infer<typeof userListResponseSchema>
+
+/**
+ * The non-admin member shape — no `phone`. `GET /users` and `GET /users/:id` (via
+ * `createEntityRouter`'s `itemResponseSchema`) both validate against `userResponseSchema`,
+ * NOT `userAdminResponseSchema` (`User`, below) — see ll-api-schema-binding's binding
+ * report for where the client used to conflate the two.
+ */
+export type UserResponse = z.infer<typeof userResponseSchema>
 
 export const userMetricsResponseSchema = z.object({
   pubkey: z.string(),
@@ -59,6 +68,7 @@ export const createUserBodySchema = z.object({
   teamId: z.string().max(100).optional(),
   supervisorPubkey: pubkeySchema.optional(),
 })
+export type CreateUserBody = z.infer<typeof createUserBodySchema>
 
 export const updateUserBodySchema = z.object({
   name: z.string().min(1).max(200).optional(),
@@ -83,3 +93,4 @@ export const adminUpdateUserBodySchema = updateUserBodySchema.extend({
   teamId: z.string().max(100).optional(),
   supervisorPubkey: pubkeySchema.optional(),
 })
+export type AdminUpdateUserBody = z.infer<typeof adminUpdateUserBodySchema>
