@@ -7,8 +7,8 @@
  * and common.steps.ts respectively.
  */
 import { expect } from '@playwright/test'
-import { Given, When, Then, Before, getState, setState } from './fixtures'
-import { setLastResponse } from './shared-state'
+import { Given, When, Then, Before, After, getState, setState } from './fixtures'
+import { setLastResponse, getSharedState } from './shared-state'
 import { getScenarioState } from './common.steps'
 import type { TemplateSummary } from '../../api-helpers'
 import {
@@ -43,6 +43,7 @@ import {
   createReportViaApi,
   createRoleViaApi,
   createHubViaApi,
+  deleteHubViaApi,
   apiGet,
   apiPost,
 } from '../../api-helpers'
@@ -85,6 +86,10 @@ interface CmsState {
   accessLogResult?: { entries: Record<string, unknown>[]; total: number }
   // Report
   lastReportId?: string
+  // Contact cases tab (#797)
+  contactCases?: Array<{ recordId: string; caseNumber?: string; entityTypeLabel: string; role: string; status: string; createdAt: string }>
+  otherHubId?: string
+  otherHubContact?: Record<string, unknown>
   // Volunteer for permission tests
   volunteerDeviceKey?: string
   volunteerPubkey?: string
@@ -443,6 +448,51 @@ Then('the record should have {int} linked contact', async ({ request, world }, c
 Then('the linked contact should have role {string}', async ({ request, world }, role: string) => {
   const result = await listRecordContactsViaApi(request, getCmsState(world).lastRecord!.id as string)
   expect(result.contacts.some(c => c.role === role)).toBe(true)
+})
+
+After({ tags: '@contact-cases' }, async ({ request, world }) => {
+  const otherHubId = getCmsState(world).otherHubId
+  if (otherHubId) await deleteHubViaApi(request, otherHubId).catch(() => {})
+})
+
+Given('a contact exists in another hub', async ({ request, world }) => {
+  const otherHubId = await createHubViaApi(request, `bdd-contact-cases-${Date.now()}`)
+  getCmsState(world).otherHubId = otherHubId
+  getCmsState(world).otherHubContact = await createContactViaApi(request, { hubId: otherHubId })
+})
+
+When('the admin lists the cases of the contact', async ({ request, world }) => {
+  const hubId = getScenarioState(world).hubId
+  const contactId = getCmsState(world).lastContact!.id as string
+  const res = await apiGet<{ cases: NonNullable<CmsState['contactCases']> }>(request, `/hubs/${hubId}/directory/${contactId}/cases`)
+  setLastResponse(world, res)
+  if (res.status === 200) getCmsState(world).contactCases = res.data.cases
+})
+
+When("the admin lists the cases of the other hub's contact through this hub", async ({ request, world }) => {
+  const hubId = getScenarioState(world).hubId
+  const contactId = getCmsState(world).otherHubContact!.id as string
+  setLastResponse(world, await apiGet(request, `/hubs/${hubId}/directory/${contactId}/cases`))
+})
+
+Then('the response should not disclose any cases', async ({ world }) => {
+  const data = getSharedState(world).lastResponse!.data as Record<string, unknown>
+  expect(data.cases).toBeUndefined()
+})
+
+Then("the contact's case list should have {int} linked record(s)", async ({ world }, count: number) => {
+  expect(getCmsState(world).contactCases).toBeDefined()
+  expect(getCmsState(world).contactCases!.length).toBe(count)
+})
+
+Then("the contact's case list should include the linked record with role {string}", async ({ world }, role: string) => {
+  const recordId = getCmsState(world).lastRecord!.id as string
+  const link = getCmsState(world).contactCases!.find(l => l.recordId === recordId)
+  expect(link, 'linked record should be listed').toBeDefined()
+  expect(link!.role).toBe(role)
+  expect(link!.entityTypeLabel).not.toBe('')
+  expect(link!.status).not.toBe('')
+  expect(Number.isNaN(Date.parse(link!.createdAt))).toBe(false)
 })
 
 Given('a volunteer exists for assignment', async ({ request, world }) => {

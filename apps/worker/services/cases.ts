@@ -503,6 +503,35 @@ export class CasesService {
     return { records: rows, total: rows.length }
   }
 
+  /**
+   * Every record linked to a contact, with the link's role — hub-scoped so a
+   * contact can never surface records that belong to another hub. Unlike
+   * listByContact this includes closed records: the contact profile's Cases
+   * tab is a history, not a to-do list.
+   */
+  async listLinksForContact(contactId: string, hubId: string): Promise<Array<{
+    recordId: string
+    caseNumber: string | null
+    entityTypeId: string | null
+    statusHash: string
+    role: string | null
+    createdAt: Date
+  }>> {
+    return this.db
+      .select({
+        recordId: caseRecords.id,
+        caseNumber: caseRecords.caseNumber,
+        entityTypeId: caseRecords.entityTypeId,
+        statusHash: caseRecords.statusHash,
+        role: caseContacts.role,
+        createdAt: caseContacts.addedAt,
+      })
+      .from(caseContacts)
+      .innerJoin(caseRecords, eq(caseRecords.id, caseContacts.caseId))
+      .where(and(eq(caseContacts.contactId, contactId), eq(caseRecords.hubId, hubId)))
+      .orderBy(desc(caseContacts.addedAt))
+  }
+
   // =========================================================================
   // Assignment
   // =========================================================================

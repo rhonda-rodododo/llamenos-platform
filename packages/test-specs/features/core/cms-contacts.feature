@@ -47,3 +47,31 @@ Feature: CMS Contacts
     Then the contact list request should succeed
     When the volunteer tries to create a contact
     Then the response status should be 403
+
+  @contacts @contact-cases
+  Scenario: List the cases linked to a contact
+    Given case management is enabled
+    And an entity type "contact_cases_type" exists
+    And a record of type "contact_cases_type" exists
+    And a contact exists
+    When the admin links the contact to the record with role "defendant"
+    And the admin lists the cases of the contact
+    Then the response status should be 200
+    And the contact's case list should have 1 linked record
+    And the contact's case list should include the linked record with role "defendant"
+
+  @contacts @contact-cases
+  Scenario: A contact with no linked cases has an empty case list
+    Given case management is enabled
+    And a contact exists
+    When the admin lists the cases of the contact
+    Then the response status should be 200
+    And the contact's case list should have 0 linked records
+
+  @contacts @contact-cases
+  Scenario: Cases of a contact from another hub are refused
+    Given case management is enabled
+    And a contact exists in another hub
+    When the admin lists the cases of the other hub's contact through this hub
+    Then the response status should be 404
+    And the response should not disclose any cases

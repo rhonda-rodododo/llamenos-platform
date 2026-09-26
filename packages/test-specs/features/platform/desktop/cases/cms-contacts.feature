@@ -165,8 +165,6 @@ Feature: Contact Directory
 
   # --- Cases tab ---
 
-  # @fixme: GET /directory/:id/cases does not exist, so linked cases never render — #797
-  @fixme
   Scenario: Cases tab shows linked case records
     Given a contact exists with linked cases
     When I navigate to the "Contact Directory" page
