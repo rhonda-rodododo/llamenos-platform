@@ -301,12 +301,12 @@ telephony.post('/user-answer',
     type: 'call:update',
     callId: parentCallSid,
     status: 'in-progress',
-  }, hubId ?? undefined)
+  }, hubId ?? '')
 
   publishEvent(c.env, KIND_PRESENCE_UPDATE, {
     type: 'presence:summary',
     callId: parentCallSid,
-  }, hubId ?? undefined)
+  }, hubId ?? '')
 
   const [, activeCallsForAnswer] = await Promise.all([
     services.identity.getUser(pubkey).catch(() => ({} as { name?: string })),
@@ -376,7 +376,7 @@ telephony.post('/call-status',
           type: 'call:update',
           callId: parentCallSid,
           status: 'completed',
-        }, hubId)
+        }, hubId ?? '')
 
         const duration = preCall
           ? Math.floor((Date.now() - new Date(preCall.startedAt).getTime()) / 1000)
@@ -515,7 +515,7 @@ telephony.post('/voicemail-recording', validateWebhook, async (c) => {
     publishEvent(c.env, KIND_CALL_VOICEMAIL, {
       type: 'voicemail:new',
       callId: callSid,
-    }, hubId)
+    }, hubId ?? '')
 
     await audit(services.audit, 'voicemailReceived', 'system', { callSid }, { request: c.req.raw, hmacSecret: c.env.HMAC_SECRET }, hubId ?? null)
 
