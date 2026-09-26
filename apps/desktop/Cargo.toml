@@ -61,7 +61,7 @@ tauri-plugin-dialog = "2"
 # keeps this on the same crypto backend `reqwest`/`tokio-tungstenite` already
 # resolve to above (see Cargo.lock) instead of pulling in `aws-lc-rs` (rustls's
 # own default), which would add a cmake/nasm build dependency for nothing.
-rustls = { version = "0.23", default-features = false, features = ["ring", "tls12", "std"] }
+rustls = { version = "0.23.45", default-features = false, features = ["ring", "tls12", "std"] }
 rustls-webpki = "0.103"
 
 [dev-dependencies]
