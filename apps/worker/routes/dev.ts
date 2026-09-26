@@ -8,6 +8,7 @@ import { KIND_CALL_RING, KIND_CALL_UPDATE, KIND_CALL_VOICEMAIL, KIND_MESSAGE_NEW
 import { getTestPushLog, clearTestPushLog } from '../lib/push-dispatch'
 import { getApnsBundleId, getApnsVoipTopic } from '../lib/apns-topic'
 import { seedDemoDataset } from '../services/demo-seeder'
+import { ServiceError } from '../services/settings'
 import { DEMO_HUB } from '../lib/demo-dataset'
 import { demoIdentities } from '../lib/demo-identities'
 
@@ -865,7 +866,14 @@ dev.post('/test-simulate/answer-call', async (c) => {
   const services = c.get('services')
   const call = await services.calls.getActiveCallByCallId(body.callId)
   if (!call) return c.json({ error: 'Call not found' }, 404)
-  await services.calls.answerCall(call.hubId ?? '', body.callId, body.pubkey)
+  try {
+    await services.calls.answerCall(call.hubId ?? '', body.callId, body.pubkey)
+  } catch (err) {
+    if (err instanceof ServiceError && (err.status === 404 || err.status === 409)) {
+      return c.json({ error: err.message }, err.status)
+    }
+    throw err
+  }
 
   // Publish call update event (mirrors real telephony flow)
   // Await to ensure event is in relay before returning — prevents race conditions in E2E tests
