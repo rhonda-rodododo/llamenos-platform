@@ -1518,24 +1518,15 @@ export class SettingsService {
       )
     }
 
-    // Check slug uniqueness
-    const [existing] = await this.db
-      .select()
-      .from(rolesTable)
-      .where(eq(rolesTable.slug, slug))
-    if (existing) {
-      throw new ServiceError(
-        409,
-        `Role slug "${slug}" already exists`,
-      )
-    }
-
     const now = new Date()
     const id = data.id ?? `role-${crypto.randomUUID()}`
 
     const roleDescription = description ?? ''
 
-    await this.db.insert(rolesTable).values({
+    // Slug uniqueness is enforced atomically by the unique index: a
+    // check-then-insert let two concurrent creates of the same slug both pass
+    // the check, and the loser surfaced the unique violation as a 500.
+    const inserted = await this.db.insert(rolesTable).values({
       id,
       name: data.name ?? null,
       slug,
@@ -1548,6 +1539,14 @@ export class SettingsService {
       createdAt: now,
       updatedAt: now,
     })
+      .onConflictDoNothing({ target: rolesTable.slug })
+      .returning({ id: rolesTable.id })
+    if (inserted.length === 0) {
+      throw new ServiceError(
+        409,
+        `Role slug "${slug}" already exists`,
+      )
+    }
 
     if (envelopes && envelopes.length > 0) {
       for (const env of envelopes) {
