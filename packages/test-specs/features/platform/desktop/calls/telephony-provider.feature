@@ -17,8 +17,16 @@ Feature: Telephony Provider Configuration
 
   Scenario: Provider dropdown shows all providers
     When I expand the "Telephony Provider" section
-    Then the provider dropdown should have 8 options
-    And the provider options should be Twilio, SignalWire, Vonage, Plivo, Asterisk, Telnyx, Bandwidth, and FreeSWITCH
+    Then the provider dropdown should offer exactly these providers:
+      | provider   | inAppAudio  |
+      | twilio     | supported   |
+      | signalwire | supported   |
+      | vonage     | unsupported |
+      | plivo      | unsupported |
+      | asterisk   | unsupported |
+      | telnyx     | unsupported |
+      | bandwidth  | unsupported |
+      | freeswitch | unsupported |
 
   Scenario: Changing provider updates credential form fields
     When I expand the "Telephony Provider" section

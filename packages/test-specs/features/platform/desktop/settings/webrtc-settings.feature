@@ -60,14 +60,15 @@ Feature: WebRTC & Call Preference Settings
     And I switch the provider to "signalwire"
     Then I should see "WebRTC Configuration"
 
-  Scenario: WebRTC toggle shown for Vonage without extra fields
+  # Vonage has no in-app audio in this codebase: its adapter only dials
+  # volunteers' phones and the client has no Vonage audio SDK (issue #728).
+  Scenario: WebRTC config not offered for Vonage, which rings phones only
     When I navigate to the "Hub Settings" page
     And I expand the "Telephony Provider" section
     And I switch the provider to "vonage"
-    Then I should see "WebRTC Configuration"
-    When I enable the WebRTC toggle
-    Then I should not see "API Key SID"
-    And I should not see "TwiML App SID"
+    Then the in-app audio notice should mark "vonage" as "unsupported"
+    And the WebRTC toggle should not be offered
+    And I should not see "WebRTC Configuration"
 
   Scenario: WebRTC config persists with provider save
     When I navigate to the "Hub Settings" page

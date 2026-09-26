@@ -4,32 +4,24 @@
  * not covered by desktop-admin-steps.ts
  */
 import { expect } from '@playwright/test'
+import type { DataTable } from 'playwright-bdd'
 import { When, Then } from '../fixtures'
 import { TestIds } from '../../test-ids'
 import { Timeouts } from '../../helpers'
 
-Then('the provider dropdown should have {int} options', async ({ page }, count: number) => {
-  const select = page.locator('select').first()
-  await expect(select).toBeVisible()
-  const options = select.locator('option')
-  // Allow for provider count changes — assert at least the expected count
-  const actualCount = await options.count()
-  expect(actualCount).toBeGreaterThanOrEqual(count)
-})
-
+// Asserts on the provider identity each option carries (its `value` and
+// `data-in-app-audio`), not its display text — the label is i18n-decorated
+// (e.g. "Vonage — phones only") and would break on any copy change.
 Then(
-  'the provider options should be Twilio, SignalWire, Vonage, Plivo, Asterisk, Telnyx, Bandwidth, and FreeSWITCH',
-  async ({ page }) => {
-    const select = page.locator('select').first()
-    const options = select.locator('option')
-    await expect(options.nth(0)).toHaveText('Twilio')
-    await expect(options.nth(1)).toHaveText('SignalWire')
-    await expect(options.nth(2)).toHaveText('Vonage')
-    await expect(options.nth(3)).toHaveText('Plivo')
-    await expect(options.nth(4)).toHaveText(/Asterisk/)
-    await expect(options.nth(5)).toHaveText('Telnyx')
-    await expect(options.nth(6)).toHaveText('Bandwidth')
-    await expect(options.nth(7)).toHaveText(/FreeSWITCH/)
+  'the provider dropdown should offer exactly these providers:',
+  async ({ page }, table: DataTable) => {
+    const expected = table.hashes()
+    const options = page.getByTestId(TestIds.PROVIDER_SELECT).locator('option')
+    await expect(options).toHaveCount(expected.length)
+    for (const [i, row] of expected.entries()) {
+      await expect(options.nth(i)).toHaveAttribute('value', row.provider)
+      await expect(options.nth(i)).toHaveAttribute('data-in-app-audio', row.inAppAudio)
+    }
   },
 )
 
