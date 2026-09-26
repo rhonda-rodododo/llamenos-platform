@@ -88,7 +88,6 @@ interface CmsState {
   lastReportId?: string
   // Contact cases tab (#797)
   contactCases?: Array<{ recordId: string; caseNumber?: string; entityTypeLabel: string; role: string; status: string; createdAt: string }>
-  otherHubId?: string
   otherHubContact?: Record<string, unknown>
   // Volunteer for permission tests
   volunteerDeviceKey?: string
