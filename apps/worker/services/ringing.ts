@@ -9,7 +9,7 @@ import { withRetry, isRetryableError } from '../lib/retry'
 import { getCircuitBreaker } from '../lib/circuit-breaker'
 import { incCounter } from '../routes/metrics'
 import { hashPhone } from '../lib/crypto'
-import { resolveHubPermissions } from '@shared/permissions'
+import { hasHubPermission, permissionGranted, resolvePermissions } from '@shared/permissions'
 
 const logger = createLogger('ringing')
 
@@ -51,19 +51,21 @@ export async function startParallelRinging(
 
     // Get user details (including call preference)
     const { users: allUsers } = await services.identity.getUsers()
+    const { roles: roleDefs } = await services.settings.getRoles()
 
-    // Hub access: only ring people who could actually answer this hub's call.
-    // Same rule `hubContext` applies to the answer route — any effective permission in
-    // the hub (global role or hub-scoped role). Without this a stale shift entry or a
-    // fallback group naming a user from another hub would push "a caller is waiting"
-    // to someone with no business in this hub. Global-scope calls (hubId '') have no hub.
-    const { roles: allRoles } = hubId !== '' ? await services.settings.getRoles() : { roles: [] }
-    const hasHubAccess = (v: (typeof allUsers)[number]) =>
-      hubId === '' || resolveHubPermissions(v.roles ?? [], v.hubRoles ?? [], allRoles, hubId).length > 0
-
-    // Availability rules: a volunteer must be active, on break-free, and a member of the hub.
+    // Availability rules: a volunteer must be active, not on break, and able
+    // to answer calls IN THIS HUB. Shift rosters and fallback groups are plain
+    // pubkey lists that are not pruned when someone leaves the hub; without the
+    // hub check a volunteer removed from the hub would keep being rung with its
+    // callers (#1037). Hub authority is hub-scoped: only a super-admin's global
+    // roles reach into a hub. Global-scope calls (hubId '') have no hub, so the
+    // authority there is the user's global roles.
+    const canAnswer = (v: (typeof allUsers)[number]) =>
+      hubId === ''
+        ? permissionGranted(resolvePermissions(v.roles ?? [], roleDefs), 'calls:answer')
+        : hasHubPermission(v.roles ?? [], v.hubRoles ?? [], roleDefs, hubId, 'calls:answer')
     const pickAvailable = (pubkeys: string[]) =>
-      allUsers.filter(v => pubkeys.includes(v.pubkey) && v.active && !v.onBreak && hasHubAccess(v))
+      allUsers.filter(v => pubkeys.includes(v.pubkey) && v.active && !v.onBreak && canAnswer(v))
 
     // All available on-shift users (for Nostr relay notification)
     let available = pickAvailable(onShiftPubkeys)

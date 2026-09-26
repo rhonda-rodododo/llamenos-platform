@@ -241,6 +241,7 @@ describe('IdentityService.createInvite', () => {
       phone: '+15550001111',
       roleIds: ['role-volunteer'],
       createdBy: 'admin-pk',
+      hubId: 'hub-a',
     })
     expect(result.invite.name).toBe('Bob Volunteer') // from mock row
     expect(db.insert).toHaveBeenCalled()
@@ -337,37 +338,88 @@ describe('IdentityService.redeemInvite', () => {
     ).rejects.toMatchObject({ status: 400 })
   })
 
-  it('creates user and marks invite used on success', async () => {
-    const { db, service } = setup()
-    const invite = makeInviteRow()
-    const newUser = makeUserRow({ pubkey: 'pk-new', displayName: invite.name })
-
-    // RACE-01: Atomic claim succeeds — returns the invite row
+  /** A transaction mock: atomic claim returns `invite`; the existing-user lookup returns `existing`. */
+  function redeemTx(invite: Record<string, unknown>, existing: Record<string, unknown>[], written: Record<string, unknown>) {
+    const insertValues = vi.fn().mockReturnValue({
+      onConflictDoNothing: vi.fn().mockReturnValue({ returning: vi.fn().mockResolvedValue([written]) }),
+    })
+    const userSet = vi.fn().mockReturnValue({
+      where: vi.fn().mockReturnValue({ returning: vi.fn().mockResolvedValue([written]) }),
+    })
     const tx = {
-      update: vi.fn().mockReturnValue({
-        set: vi.fn().mockReturnValue({
+      update: vi.fn()
+        // 1st update: atomic invite claim
+        .mockReturnValueOnce({
+          set: vi.fn().mockReturnValue({
+            where: vi.fn().mockReturnValue({ returning: vi.fn().mockResolvedValue([invite]) }),
+          }),
+        })
+        // 2nd update: merge into an existing account
+        .mockReturnValueOnce({ set: userSet }),
+      select: vi.fn().mockReturnValue({
+        from: vi.fn().mockReturnValue({
           where: vi.fn().mockReturnValue({
-            returning: vi.fn().mockResolvedValue([invite]),
+            for: vi.fn().mockReturnValue({ limit: vi.fn().mockResolvedValue(existing) }),
           }),
         }),
       }),
-      insert: vi.fn().mockReturnValue({
-        values: vi.fn().mockReturnValue({
-          onConflictDoNothing: vi.fn().mockReturnValue({
-            returning: vi.fn().mockResolvedValue([newUser]),
-          }),
-        }),
-      }),
+      insert: vi.fn().mockReturnValue({ values: insertValues }),
     }
+    return { tx, insertValues, userSet }
+  }
+
+  // #1037: a hub invite admits the invitee to THAT hub only — never a global role.
+  it('grants a hub invite\'s roles as a role assignment in that hub, with no global role', async () => {
+    const { db, service } = setup()
+    const invite = makeInviteRow({ hubId: 'hub-a' })
+    const { tx, insertValues } = redeemTx(invite, [], makeUserRow({ pubkey: 'pk-new' }))
     ;(db as any).transaction = vi.fn().mockImplementation((fn: (tx: unknown) => Promise<unknown>) => fn(tx))
 
     const result = await service.redeemInvite({ code: 'invite-code-abc', pubkey: 'pk-new' })
     expect(result.volunteer.pubkey).toBe('pk-new')
-    expect(tx.update).toHaveBeenCalled() // atomic claim
-    expect(tx.insert).toHaveBeenCalled() // user created
+    expect(tx.update).toHaveBeenCalledTimes(1) // atomic claim only
+    expect(insertValues).toHaveBeenCalledWith(expect.objectContaining({
+      roles: [],
+      hubRoles: [{ hubId: 'hub-a', roleIds: ['role-volunteer'] }],
+    }))
   })
 
-  it('throws 409 (not an unhandled duplicate-key error) when the pubkey already has a user', async () => {
+  it('grants a hubless invite\'s roles globally (super-admin invites only)', async () => {
+    const { db, service } = setup()
+    const invite = makeInviteRow({ hubId: null, roleIds: ['role-super-admin'] })
+    const { tx, insertValues } = redeemTx(invite, [], makeUserRow({ pubkey: 'pk-new' }))
+    ;(db as any).transaction = vi.fn().mockImplementation((fn: (tx: unknown) => Promise<unknown>) => fn(tx))
+
+    await service.redeemInvite({ code: 'invite-code-abc', pubkey: 'pk-new' })
+    expect(insertValues).toHaveBeenCalledWith(expect.objectContaining({
+      roles: ['role-super-admin'],
+      hubRoles: [],
+    }))
+  })
+
+  it('merges a hub invite into an existing account without touching its other hubs', async () => {
+    const { db, service } = setup()
+    const invite = makeInviteRow({ hubId: 'hub-b' })
+    const existing = makeUserRow({
+      pubkey: 'pk-existing',
+      roles: [],
+      hubRoles: [{ hubId: 'hub-a', roleIds: ['role-hub-admin'] }],
+    })
+    const { tx, userSet } = redeemTx(invite, [existing], existing)
+    ;(db as any).transaction = vi.fn().mockImplementation((fn: (tx: unknown) => Promise<unknown>) => fn(tx))
+
+    await service.redeemInvite({ code: 'invite-code-abc', pubkey: 'pk-existing' })
+    expect(tx.insert).not.toHaveBeenCalled()
+    expect(userSet).toHaveBeenCalledWith(expect.objectContaining({
+      hubRoles: [
+        { hubId: 'hub-a', roleIds: ['role-hub-admin'] },
+        { hubId: 'hub-b', roleIds: ['role-volunteer'] },
+      ],
+    }))
+    expect(userSet.mock.calls[0][0]).not.toHaveProperty('roles')
+  })
+
+  it('throws 409 (not an unhandled duplicate-key error) when the account is created concurrently', async () => {
     const { db, service } = setup()
     const invite = makeInviteRow()
 
@@ -376,6 +428,15 @@ describe('IdentityService.redeemInvite', () => {
         set: vi.fn().mockReturnValue({
           where: vi.fn().mockReturnValue({
             returning: vi.fn().mockResolvedValue([invite]),
+          }),
+        }),
+      }),
+      // The lookup saw no account, but one is created before our insert lands
+      // (a FOR UPDATE on a missing row locks nothing).
+      select: vi.fn().mockReturnValue({
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            for: vi.fn().mockReturnValue({ limit: vi.fn().mockResolvedValue([]) }),
           }),
         }),
       }),
@@ -403,9 +464,17 @@ describe('IdentityService.redeemInvite', () => {
 describe('IdentityService.revokeInvite', () => {
   it('deletes the invite code', async () => {
     const { db, service } = setup()
+    db.$setDeleteResult([{ code: 'invite-code-abc' }])
 
     await service.revokeInvite('invite-code-abc')
     expect(db.delete).toHaveBeenCalled()
+  })
+
+  it('throws 404 when no invite matches (e.g. another hub\'s invite)', async () => {
+    const { db, service } = setup()
+    db.$setDeleteResult([])
+
+    await expect(service.revokeInvite('invite-code-abc', 'hub-b')).rejects.toMatchObject({ status: 404 })
   })
 })
 

@@ -1,4 +1,4 @@
-import { request, ApiError, NetworkError, REQUEST_TIMEOUT_MS } from './client'
+import { request, hp, ApiError, NetworkError, REQUEST_TIMEOUT_MS } from './client'
 import { getApiUrl } from '../api-config'
 import { netFetch } from '../net'
 import type { InviteCode, User } from '@protocol/schemas'
@@ -6,20 +6,22 @@ import type { InviteCode, User } from '@protocol/schemas'
 export type { InviteCode }
 
 // --- Invites ---
+// Invites are issued per hub (#1037): an invite admits the invitee to the active
+// hub only. Validation and redemption stay unscoped — the invitee has no hub yet.
 
 export async function listInvites() {
-  return request<{ invites: InviteCode[] }>('/invites')
+  return request<{ invites: InviteCode[] }>(hp('/invites'))
 }
 
 export async function createInvite(data: { name: string; phone: string; roleIds: string[] }) {
-  return request<{ invite: InviteCode }>('/invites', {
+  return request<{ invite: InviteCode }>(hp('/invites'), {
     method: 'POST',
     body: JSON.stringify(data),
   })
 }
 
 export async function revokeInvite(code: string) {
-  return request<{ ok: true }>(`/invites/${code}`, { method: 'DELETE' })
+  return request<{ ok: true }>(hp(`/invites/${code}`), { method: 'DELETE' })
 }
 
 export async function validateInvite(code: string) {

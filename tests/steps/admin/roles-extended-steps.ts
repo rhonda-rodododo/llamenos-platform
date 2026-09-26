@@ -221,14 +221,17 @@ Then('the role dropdown should show all default roles', async ({ page, request }
   await expectFormOffersSystemRoles(page, request)
 })
 
-Given('a volunteer with {string} role', async ({ request, rolesWorld }, roleName: string) => {
+Given('a volunteer with {string} role', async ({ request, rolesWorld, workerHub }, roleName: string) => {
   const roles = await listRolesViaApi(request)
   const role = roles.find(r => r.name === roleName)
   expect(role).toBeTruthy()
 
+  // The Volunteers page lists the active hub's members only (#1044), so the
+  // volunteer must be created in the worker hub, not as a global-role account.
   const vol = await createVolunteerViaApi(request, {
     name: `RoleTest ${Date.now()}`,
     roleIds: [role!.id],
+    hubId: workerHub,
   })
   // Kept in the rolesWorld fixture, not on `window`: the old window stash did not
   // survive the page navigation in the next step, so the dropdown step silently no-op'd.
@@ -256,13 +259,16 @@ Then('the volunteer should display the {string} badge', async ({ page, rolesWorl
   await expect(row.getByTestId(TestIds.VOLUNTEER_ROW_ROLE_BADGE)).toContainText(roleName, { timeout: Timeouts.ELEMENT })
 })
 
-Given('I changed a volunteer\'s role to {string}', async ({ request, rolesWorld }, roleName: string) => {
+Given('I changed a volunteer\'s role to {string}', async ({ request, rolesWorld, workerHub }, roleName: string) => {
   // Setup: a volunteer holding the role (assigned through the API).
   const role = (await listRolesViaApi(request)).find(r => r.name === roleName)
   expect(role, `role "${roleName}" must exist`).toBeTruthy()
+  // The Volunteers page lists the active hub's members only (#1044), so the
+  // volunteer must be created in the worker hub, not as a global-role account.
   const vol = await createVolunteerViaApi(request, {
     name: `Badge ${Date.now()}`,
     roleIds: [role!.id],
+    hubId: workerHub,
   })
   rolesWorld.volunteerNsec = vol.nsec
 })

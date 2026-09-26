@@ -58,7 +58,7 @@ vi.mock('@worker/lib/entity-router', () => ({
   createEntityRouter: () => new Hono(),
 }))
 
-import invitesRoutes from '@worker/routes/invites'
+import invitesRoutes, { hubInvitesRoutes } from '@worker/routes/invites'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -96,6 +96,14 @@ function createApp(permissions: string[] = ['invites:read', 'invites:create', 'i
   })
 
   app.route('/invites', invitesRoutes)
+  // Hub-scoped mount — stands in for hubContext setting the path hub
+  const hubScoped = new Hono<AppEnv>()
+  hubScoped.use('*', async (c, next) => {
+    c.set('hubId', c.req.param('hubId') as never)
+    await next()
+  })
+  hubScoped.route('/invites', hubInvitesRoutes)
+  app.route('/hubs/:hubId', hubScoped)
 
   return { app, services }
 }
@@ -191,19 +199,20 @@ describe('invites routes', () => {
     })
   })
 
-  describe('POST /invites (create)', () => {
-    it('creates an invite without roleIds', async () => {
-      const { app, services } = createApp()
+  describe('POST /hubs/:hubId/invites (create)', () => {
+    it('creates an invite bound to the hub in the path (#1037)', async () => {
+      // The creator holds every permission of the volunteer role they grant
+      const { app, services } = createApp(['invites:*', 'calls:answer', 'notes:create'])
 
-      const res = await app.request('/invites', {
+      const res = await app.request('/hubs/hub-a/invites', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: 'New Invite' }),
+        body: JSON.stringify({ name: 'New Invite', phone: '', roleIds: ['role-volunteer'] }),
       }, defaultEnv)
 
       expect(res.status).toBe(201)
       expect(services.identity.createInvite).toHaveBeenCalledWith(
-        expect.objectContaining({ name: 'New Invite', createdBy: 'creator-pk' }),
+        expect.objectContaining({ name: 'New Invite', createdBy: 'creator-pk', hubId: 'hub-a' }),
       )
     })
 
@@ -211,7 +220,7 @@ describe('invites routes', () => {
       // Hub admin does NOT have '*' permission, so they can't grant super-admin
       const { app } = createApp(['invites:create', 'invites:read', 'users:*', 'settings:*'])
 
-      const res = await app.request('/invites', {
+      const res = await app.request('/hubs/hub-a/invites', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -225,25 +234,10 @@ describe('invites routes', () => {
       expect(body.error).toContain('Cannot grant role')
     })
 
-    it('super admin can grant any role', async () => {
-      const { app } = createApp(['*'])
-
-      const res = await app.request('/invites', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: 'Admin Invite',
-          roleIds: ['role-super-admin'],
-        }),
-      }, defaultEnv)
-
-      expect(res.status).toBe(201)
-    })
-
     it('rejects unknown role IDs', async () => {
       const { app } = createApp(['invites:create', 'calls:answer'])
 
-      const res = await app.request('/invites', {
+      const res = await app.request('/hubs/hub-a/invites', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -258,13 +252,62 @@ describe('invites routes', () => {
     })
   })
 
+  describe('POST /invites (create, unscoped)', () => {
+    it('refuses a hubless invite that grants hub roles — invites are issued per hub', async () => {
+      const { app, services } = createApp(['*'])
+
+      const res = await app.request('/invites', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: 'Global Volunteer', phone: '', roleIds: ['role-volunteer'] }),
+      }, defaultEnv)
+
+      expect(res.status).toBe(400)
+      expect(services.identity.createInvite).not.toHaveBeenCalled()
+    })
+
+    it('super admin can issue a hubless super-admin invite', async () => {
+      const { app, services } = createApp(['*'])
+
+      const res = await app.request('/invites', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: 'Admin Invite',
+          roleIds: ['role-super-admin'],
+        }),
+      }, defaultEnv)
+
+      expect(res.status).toBe(201)
+      expect(services.identity.createInvite).toHaveBeenCalledWith(expect.objectContaining({ hubId: null }))
+    })
+  })
+
+  describe('GET /hubs/:hubId/invites', () => {
+    it('lists only the invites of the hub in the path (#1044)', async () => {
+      const { app, services } = createApp()
+
+      const res = await app.request('/hubs/hub-a/invites', {}, defaultEnv)
+      expect(res.status).toBe(200)
+      expect(services.identity.getInvites).toHaveBeenCalledWith('hub-a')
+    })
+  })
+
   describe('DELETE /invites/:code', () => {
     it('revokes an invite', async () => {
       const { app, services } = createApp()
 
       const res = await app.request('/invites/INV-123', { method: 'DELETE' }, defaultEnv)
       expect(res.status).toBe(200)
-      expect(services.identity.revokeInvite).toHaveBeenCalledWith('INV-123')
+      expect(services.identity.revokeInvite).toHaveBeenCalledWith('INV-123', undefined)
+    })
+
+    it('revokes only within the hub in the path', async () => {
+      const { app, services } = createApp()
+
+      const res = await app.request('/hubs/hub-a/invites/INV-123', { method: 'DELETE' }, defaultEnv)
+      expect(res.status).toBe(200)
+      expect(services.identity.revokeInvite).toHaveBeenCalledWith('INV-123', 'hub-a')
     })
 
     it('audits revocation', async () => {

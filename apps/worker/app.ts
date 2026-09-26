@@ -10,7 +10,7 @@ import devRoutes from './routes/dev'
 import authRoutes from './routes/auth'
 import webauthnRoutes from './routes/webauthn'
 import usersRoutes from './routes/users'
-import invitesRoutes from './routes/invites'
+import invitesRoutes, { hubInvitesRoutes } from './routes/invites'
 import shiftsRoutes from './routes/shifts'
 import bansRoutes from './routes/bans'
 import notesRoutes from './routes/notes'
@@ -272,6 +272,7 @@ authenticated.route('/recovery-group', recoveryGroupRoutes.authenticated)
 const hubScoped = new Hono<AppEnv>()
 hubScoped.use('*', hubContext)
 hubScoped.route('/users', usersRoutes)
+hubScoped.route('/invites', hubInvitesRoutes)
 hubScoped.route('/volunteers', usersRoutes)
 hubScoped.route('/shifts', shiftsRoutes)
 hubScoped.route('/bans', bansRoutes)

@@ -207,12 +207,14 @@ Then('the digits should be stored server-side only', async ({ world: _world }) =
 
 // ── Invite Redemption Steps ─────────────────────────────────────
 
-Given('an invite code exists', async ({ request, world }) => {
-  const { data } = await apiPost<{ code?: string; invite?: { code: string } }>(request, '/invites', {
+Given('an invite code exists', async ({ request, world, workerHub }) => {
+  // Invites are issued per hub (#1037)
+  const { data, status } = await apiPost<{ code?: string; invite?: { code: string } }>(request, `/hubs/${workerHub}/invites`, {
     name: uniqueName('Sec Invite'),
     phone: uniquePhone(),
     roleIds: ['role-volunteer'],
   })
+  expect(status).toBe(201)
   getNetworkSecState(world).inviteCode = (data as Record<string, unknown>)?.code as string
     ?? ((data as Record<string, unknown>)?.invite as Record<string, unknown>)?.code as string
 })

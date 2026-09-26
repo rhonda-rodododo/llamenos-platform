@@ -10,9 +10,8 @@ import { redeemInviteBodySchema, createInviteBodySchema, inviteResponseSchema, i
 import { okResponseSchema } from '@protocol/schemas/common'
 import { publicErrors, authErrors } from '../openapi/helpers'
 import { audit } from '../services/audit'
-import { permissionGranted } from '@shared/permissions'
-import type { Role } from '@shared/permissions'
-import { createEntityRouter } from '../lib/entity-router'
+import { permissionGranted, resolvePermissions, type Role } from '@shared/permissions'
+import { checkRoleGrant } from '../lib/hub-scope'
 
 const invites = new Hono<AppEnv>()
 
@@ -84,98 +83,123 @@ invites.post('/redeem',
   },
 )
 
-// --- Authenticated routes (require invites permissions) ---
-invites.use('/', authMiddleware, requirePermission('invites:read'))
-invites.use('/:code', authMiddleware, requirePermission('invites:read'))
+// --- Invite management (list / create / revoke) ---
+//
+// Invites are issued PER HUB (#1037): `/api/hubs/:hubId/invites` admits the
+// invitee to that hub only, and redemption grants the invite's roles as a role
+// assignment in that hub — never a global role. The same router is mounted
+// unscoped at `/api/invites`, where it spans every hub (every invitee's name
+// and phone), so there it is super-admin only and may issue only global
+// super-admin invites.
 
-// GET / via factory
-const inviteListRouter = createEntityRouter({
-  tag: 'Invites',
-  domain: 'invites',
-  service: 'identity',
-  listResponseSchema: inviteListResponseSchema,
-  itemResponseSchema: inviteResponseSchema,
-  disableGet: true,
-  disableDelete: true,
-  methods: {
-    list: 'getInvites',
-  },
-})
-invites.route('/', inviteListRouter)
+/** True when every role grants the global wildcard — the only authority a hubless invite may carry. */
+function onlySuperAdminRoles(roleIds: readonly string[], allRoles: Role[]): boolean {
+  return roleIds.length > 0 && roleIds.every(id => permissionGranted(resolvePermissions([id], allRoles), '*'))
+}
 
-invites.post('/',
-  describeRoute({
-    tags: ['Invites'],
-    summary: 'Create a new invite',
-    responses: {
-      201: {
-        description: 'Invite created',
-        content: {
-          'application/json': {
-            schema: resolver(inviteResponseSchema),
+function inviteManagementRoutes(): Hono<AppEnv> {
+  const management = new Hono<AppEnv>()
+
+  management.get('/',
+    describeRoute({
+      tags: ['Invites'],
+      summary: 'List unredeemed invites (for the hub in the path)',
+      responses: {
+        200: {
+          description: 'Invites',
+          content: {
+            'application/json': {
+              schema: resolver(inviteListResponseSchema),
+            },
           },
         },
+        ...authErrors,
       },
-      ...authErrors,
+    }),
+    requirePermission('invites:read'),
+    async (c) => {
+      const services = c.get('services')
+      return c.json(await services.identity.getInvites(c.get('hubId')))
     },
-  }),
-  requirePermission('invites:create'),
-  validator('json', createInviteBodySchema),
-  async (c) => {
-    const services = c.get('services')
-    const pubkey = c.get('pubkey')
-    const body = c.req.valid('json')
+  )
 
-    // Validate that the creator can grant all requested roles (prevent privilege escalation)
-    if (body.roleIds && body.roleIds.length > 0) {
-      const creatorPermissions = c.get('permissions') as string[]
-      if (!permissionGranted(creatorPermissions, '*')) {
-        const allRoles = c.get('allRoles') as Role[]
-        for (const roleId of body.roleIds) {
-          const role = allRoles.find(r => r.id === roleId)
-          if (!role) {
-            return c.json({ error: `Unknown role: ${roleId}` }, 400)
-          }
-          for (const perm of role.permissions) {
-            if (!permissionGranted(creatorPermissions, perm)) {
-              return c.json({ error: `Cannot grant role '${role.name}' — you lack permission '${perm}'` }, 403)
-            }
-          }
-        }
+  management.post('/',
+    describeRoute({
+      tags: ['Invites'],
+      summary: 'Create a new invite (admits the invitee to the hub in the path)',
+      responses: {
+        201: {
+          description: 'Invite created',
+          content: {
+            'application/json': {
+              schema: resolver(inviteResponseSchema),
+            },
+          },
+        },
+        ...authErrors,
+      },
+    }),
+    requirePermission('invites:create'),
+    validator('json', createInviteBodySchema),
+    async (c) => {
+      const services = c.get('services')
+      const pubkey = c.get('pubkey')
+      const body = c.req.valid('json')
+      const hubId = c.get('hubId') ?? null
+
+      if (!hubId && !onlySuperAdminRoles(body.roleIds, c.get('allRoles'))) {
+        return c.json({
+          error: 'Invites that grant hub roles are issued per hub: POST /api/hubs/:hubId/invites',
+        }, 400)
       }
-    }
 
-    const result = await services.identity.createInvite({ ...body, createdBy: pubkey })
-    await audit(services.audit, 'inviteCreated', pubkey, { name: body.name }, undefined, null)
-    return c.json(result, 201)
-  },
-)
+      // The creator must already hold every permission they grant (prevents privilege escalation)
+      const denied = checkRoleGrant(c, body.roleIds)
+      if (denied) return c.json({ error: denied.error }, denied.status)
 
-invites.delete('/:code',
-  describeRoute({
-    tags: ['Invites'],
-    summary: 'Revoke an invite',
-    responses: {
-      200: {
-        description: 'Invite revoked',
-        content: {
-          'application/json': {
-            schema: resolver(okResponseSchema),
+      const result = await services.identity.createInvite({ ...body, createdBy: pubkey, hubId })
+      await audit(services.audit, 'inviteCreated', pubkey, { name: body.name }, undefined, hubId)
+      return c.json(result, 201)
+    },
+  )
+
+  management.delete('/:code',
+    describeRoute({
+      tags: ['Invites'],
+      summary: 'Revoke an invite (issued for the hub in the path)',
+      responses: {
+        200: {
+          description: 'Invite revoked',
+          content: {
+            'application/json': {
+              schema: resolver(okResponseSchema),
+            },
           },
         },
+        ...authErrors,
       },
-      ...authErrors,
+    }),
+    requirePermission('invites:revoke'),
+    async (c) => {
+      const services = c.get('services')
+      const pubkey = c.get('pubkey')
+      const code = c.req.param('code')
+      const hubId = c.get('hubId')
+      await services.identity.revokeInvite(code, hubId)
+      await audit(services.audit, 'inviteRevoked', pubkey, { code }, undefined, hubId ?? null)
+      return c.json({ ok: true })
     },
-  }),
-  requirePermission('invites:revoke'),
-  async (c) => {
-    const services = c.get('services')
-    const pubkey = c.get('pubkey')
-    const code = c.req.param('code')
-    await services.identity.revokeInvite(code)
-    await audit(services.audit, 'inviteRevoked', pubkey, { code }, undefined, null)
-    return c.json({ ok: true })
-  },
-)
+  )
+
+  return management
+}
+
+// Unscoped management spans every hub: authenticate, then super-admin only.
+invites.use('/', authMiddleware, requirePermission('*'))
+invites.use('/:code', authMiddleware, requirePermission('*'))
+invites.route('/', inviteManagementRoutes())
+
+/** Hub-scoped invite management — mounted at /api/hubs/:hubId/invites behind hubContext. */
+export const hubInvitesRoutes = inviteManagementRoutes()
 
 export default invites

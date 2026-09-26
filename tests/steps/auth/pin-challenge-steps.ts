@@ -6,9 +6,24 @@
 import { expect } from '@playwright/test'
 import { When, Then } from '../fixtures'
 import { TestIds, Timeouts, enterPin, TEST_PIN } from '../../helpers'
+import { createUserViaApi, uniqueName, uniquePhone } from '../../api-helpers'
+import { Navigation, VolunteerPage } from '../../pages'
 
-When('I click the phone visibility toggle', async ({ page }) => {
-  const toggleBtn = page.getByTestId(TestIds.TOGGLE_PHONE_VISIBILITY).first()
+When('I click the phone visibility toggle', async ({ page, backendRequest, workerHub, adminWorld }) => {
+  // The Volunteers page lists the active hub's members only (#1044). This
+  // scenario used to rely on whatever users other scenarios had left on the
+  // server; it now brings its own hub member with a phone number to unmask.
+  const phone = uniquePhone()
+  const vol = await createUserViaApi(backendRequest, { name: uniqueName('PIN Unmask'), phone, hubId: workerHub })
+  adminWorld.lastUserPubkey = vol.pubkey
+  adminWorld.lastPhone = phone
+  // Re-enter the page client-side so it refetches the list (a full reload
+  // would re-lock the device key and land on the PIN sign-in screen).
+  await Navigation.goToDashboard(page)
+  await page.waitForURL((url) => url.pathname === '/', { timeout: Timeouts.NAVIGATION })
+  await Navigation.goToVolunteers(page)
+  const row = VolunteerPage.getRowById(page, vol.pubkey)
+  const toggleBtn = row.getByTestId(TestIds.TOGGLE_PHONE_VISIBILITY)
   await expect(toggleBtn).toBeVisible({ timeout: Timeouts.ELEMENT })
   await toggleBtn.scrollIntoViewIfNeeded()
   await toggleBtn.click()
@@ -33,10 +48,10 @@ Then('the PIN challenge dialog should remain open', async ({ page }) => {
   await expect(pinDialog).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
-Then('I should see the unmasked phone number', async ({ page }) => {
-  // After dialog closes, the phone should be visible in the volunteer row
-  const phoneText = page.getByTestId(TestIds.VOLUNTEER_ROW).first().locator('text=/\\+/')
-  await expect(phoneText).toBeVisible({ timeout: 5000 })
+Then('I should see the unmasked phone number', async ({ page, adminWorld }) => {
+  // After the dialog closes, that volunteer's row shows the full number
+  const row = VolunteerPage.getRowById(page, adminWorld.lastUserPubkey)
+  await expect(row).toContainText(adminWorld.lastPhone, { timeout: 5000 })
 })
 
 When('I enter a wrong PIN three times', async ({ page }) => {

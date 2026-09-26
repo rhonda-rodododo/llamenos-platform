@@ -34,6 +34,7 @@ import { ServiceError } from './settings'
 import { demoIdentities } from '../lib/demo-identities'
 import { createLogger } from '../lib/logger'
 import { withRetry, isRetryableDbError } from '../lib/retry'
+import { resolveHubRoleIds, type Role } from '@shared/permissions'
 import { getCircuitBreaker } from '../lib/circuit-breaker'
 
 const log = createLogger('services.identity')
@@ -102,6 +103,35 @@ function rowToUser(row: typeof users.$inferSelect): User {
 /** Strip encryptedSecretKey from volunteer for external responses */
 function sanitizeUser(vol: User): Omit<User, 'encryptedSecretKey'> & { encryptedSecretKey?: undefined } {
   return { ...vol, encryptedSecretKey: undefined }
+}
+
+/**
+ * A user as seen from inside one hub (#1044). A hub's admins must not learn
+ * which OTHER hubs a person belongs to, nor their roles there:
+ * - `hubRoles` is trimmed to this hub's assignment;
+ * - `roles` is the set that carries authority in this hub — the hub
+ *   assignment, plus the global roles of a super-admin (the only global roles
+ *   that reach into a hub). Other global roles are not disclosed.
+ */
+function sanitizeUserForHub(vol: User, hubId: string, allRoles: Role[]): ReturnType<typeof sanitizeUser> {
+  const assignment = (vol.hubRoles ?? []).filter(hr => hr.hubId === hubId)
+  return {
+    ...sanitizeUser(vol),
+    roles: resolveHubRoleIds(vol.roles, assignment, allRoles, hubId),
+    hubRoles: assignment,
+  }
+}
+
+/**
+ * SQL predicate: the user holds a role assignment in `hubId`.
+ *
+ * Compares `hubId` as a text parameter. Binding a JSON string and casting it
+ * (`@> ${JSON.stringify(...)}::jsonb`) reaches Postgres double-encoded — a
+ * jsonb *string*, not an array — so the containment never matched and every
+ * hub's member list came back empty.
+ */
+function isHubMember(hubId: string) {
+  return sql`EXISTS (SELECT 1 FROM jsonb_array_elements(${users.hubRoles}) AS assignment WHERE assignment->>'hubId' = ${hubId})`
 }
 
 /** Map a DB invite row to InviteCode interface */
@@ -317,12 +347,24 @@ export class IdentityService {
   // =========================================================================
 
   /**
-   * List all users (encryptedSecretKey stripped).
+   * List every user on the server (encryptedSecretKey stripped).
+   * Cross-hub: callers must be super-admin — hub-scoped callers use {@link getHubUsers}.
    */
   async getUsers(): Promise<{ users: ReturnType<typeof sanitizeUser>[] }> {
     const rows = await this.db.select().from(users)
     return {
       users: rows.map(r => sanitizeUser(rowToUser(r))),
+    }
+  }
+
+  /**
+   * List the members of one hub, as seen from inside that hub (#1044).
+   * Users without a role assignment in `hubId` are not returned.
+   */
+  async getHubUsers(hubId: string, allRoles: Role[]): Promise<{ users: ReturnType<typeof sanitizeUser>[] }> {
+    const rows = await this.db.select().from(users).where(isHubMember(hubId))
+    return {
+      users: rows.map(r => sanitizeUserForHub(rowToUser(r), hubId, allRoles)),
     }
   }
 
@@ -337,6 +379,21 @@ export class IdentityService {
       .limit(1)
     if (rows.length === 0) throw new ServiceError(404, 'Not found')
     return sanitizeUser(rowToUser(rows[0]))
+  }
+
+  /**
+   * Get one member of a hub, as seen from inside that hub. A user who exists
+   * but is not a member of `hubId` is indistinguishable from one who does not
+   * exist (404) — the hub must not learn about other hubs' people (#1044).
+   */
+  async getHubUser(pubkey: string, hubId: string, allRoles: Role[]): Promise<ReturnType<typeof sanitizeUser>> {
+    const rows = await this.db
+      .select()
+      .from(users)
+      .where(and(eq(users.pubkey, pubkey), isHubMember(hubId)))
+      .limit(1)
+    if (rows.length === 0) throw new ServiceError(404, 'Not found')
+    return sanitizeUserForHub(rowToUser(rows[0]), hubId, allRoles)
   }
 
   /**
@@ -364,13 +421,22 @@ export class IdentityService {
     specializations?: string[]
     maxCaseAssignments?: number
     supervisorPubkey?: string
+    /**
+     * Create the user as a member of this hub: the requested roles become the
+     * user's role assignment in `hubId` and NO global role is granted (#1037).
+     * Omitted only by super-admin callers creating an account outside any hub.
+     */
+    hubId?: string
   }): Promise<{ volunteer: ReturnType<typeof sanitizeUser> }> {
-    const roles = this.enforceAdminRoles(data.pubkey, data.roleIds ?? data.roles ?? ['role-volunteer'])
+    const requested = data.roleIds ?? data.roles ?? ['role-volunteer']
+    const roles = this.enforceAdminRoles(data.pubkey, data.hubId ? [] : requested)
+    const hubRoles = data.hubId ? [{ hubId: data.hubId, roleIds: requested }] : []
     const [row] = await this.db.insert(users).values({
       pubkey: data.pubkey,
       displayName: data.name,
       phone: data.phone,
       roles,
+      hubRoles,
       active: true,
       encryptedSecretKey: data.encryptedSecretKey,
       transcriptionEnabled: true,
@@ -520,24 +586,32 @@ export class IdentityService {
   // =========================================================================
 
   /**
-   * List all unredeemed invites.
+   * List unredeemed invites. With `hubId`, only that hub's invites (#1044) —
+   * a hub's admins must not see the names and phone numbers another hub is
+   * inviting. Without it, every invite on the server (super-admin only).
    */
-  async getInvites(): Promise<{ invites: InviteCode[] }> {
+  async getInvites(hubId?: string): Promise<{ invites: InviteCode[] }> {
+    const unused = sql`${inviteCodes.usedAt} IS NULL`
     const rows = await this.db
       .select()
       .from(inviteCodes)
-      .where(sql`${inviteCodes.usedAt} IS NULL`)
+      .where(hubId ? and(unused, eq(inviteCodes.hubId, hubId)) : unused)
     return { invites: rows.map(rowToInvite) }
   }
 
   /**
    * Create a new invite code.
+   *
+   * `hubId` is the hub the invite admits the invitee to: redemption grants
+   * `roleIds` in that hub only (#1037). An invite without a hub can carry only
+   * global authority — the routes allow that for `role-super-admin` alone.
    */
   async createInvite(data: {
     name: string
     phone: string
     roleIds: string[]
     createdBy: string
+    hubId: string | null
   }): Promise<{ invite: InviteCode }> {
     const code = crypto.randomUUID()
     const now = new Date()
@@ -547,8 +621,9 @@ export class IdentityService {
       code,
       name: data.name,
       phone: data.phone,
-      roleIds: data.roleIds || ['role-volunteer'],
+      roleIds: data.roleIds,
       createdBy: data.createdBy,
+      hubId: data.hubId,
       createdAt: now,
       expiresAt,
     }).returning()
@@ -579,7 +654,17 @@ export class IdentityService {
   }
 
   /**
-   * Redeem an invite code — marks it used and creates a volunteer.
+   * Redeem an invite code — marks it used and admits the redeemer.
+   *
+   * A hub invite grants its roles as a role assignment in THAT hub, never as a
+   * global role (#1037): global roles other than super-admin carry no hub
+   * authority, and a global grant would survive removal from the hub. A
+   * hubless invite (super-admin only, enforced at creation) grants its roles
+   * globally.
+   *
+   * If the redeemer already has an account (a member of another hub accepting
+   * an invite to this one), the hub assignment is merged into it; their
+   * profile and other hubs are left untouched.
    */
   async redeemInvite(data: { code: string; pubkey: string }): Promise<{
     volunteer: ReturnType<typeof sanitizeUser>
@@ -602,19 +687,43 @@ export class IdentityService {
 
       if (!invite) throw new ServiceError(400, 'Invalid, expired, or already-used invite code')
 
-      // Create volunteer. An existing pubkey must not surface as an unhandled
-      // unique-key violation (500): ON CONFLICT DO NOTHING + explicit 409. Throwing
-      // rolls back the claim above, so the invite stays redeemable.
-      // TODO(#1037): once invites carry a hub, merge the grant into the existing
-      // user's hubRoles instead of rejecting.
+      const grantedRoles = invite.roleIds.length > 0 ? invite.roleIds : ['role-volunteer']
+
+      const [existing] = await tx
+        .select()
+        .from(users)
+        .where(eq(users.pubkey, data.pubkey))
+        .for('update')
+        .limit(1)
+
+      if (existing) {
+        const user = rowToUser(existing)
+        const update: Partial<typeof users.$inferInsert> = { updatedAt: new Date() }
+        if (invite.hubId) {
+          update.hubRoles = [
+            ...(user.hubRoles ?? []).filter(hr => hr.hubId !== invite.hubId),
+            { hubId: invite.hubId, roleIds: grantedRoles },
+          ]
+        } else {
+          update.roles = this.enforceAdminRoles(
+            data.pubkey,
+            Array.from(new Set([...user.roles, ...grantedRoles])),
+          )
+        }
+        const [row] = await tx.update(users).set(update).where(eq(users.pubkey, data.pubkey)).returning()
+        return { volunteer: sanitizeUser(rowToUser(row)) }
+      }
+
+      // A concurrent redemption may create the user between the lookup above and
+      // this insert (a FOR UPDATE on a missing row locks nothing): ON CONFLICT DO
+      // NOTHING + explicit 409 keeps that from surfacing as a unique-key 500, and
+      // throwing rolls back the invite claim so the code stays redeemable.
       const [volRow] = await tx.insert(users).values({
         pubkey: data.pubkey,
         displayName: invite.name,
         phone: invite.phone,
-        roles: this.enforceAdminRoles(
-          data.pubkey,
-          invite.roleIds.length > 0 ? invite.roleIds : ['role-volunteer'],
-        ),
+        roles: this.enforceAdminRoles(data.pubkey, invite.hubId ? [] : grantedRoles),
+        hubRoles: invite.hubId ? [{ hubId: invite.hubId, roleIds: grantedRoles }] : [],
         active: true,
         encryptedSecretKey: '',
         transcriptionEnabled: true,
@@ -632,10 +741,15 @@ export class IdentityService {
   }
 
   /**
-   * Revoke (delete) an invite code.
+   * Revoke (delete) an invite code. With `hubId`, only an invite issued for
+   * that hub can be revoked; otherwise 404, exactly as if it did not exist.
    */
-  async revokeInvite(code: string): Promise<void> {
-    await this.db.delete(inviteCodes).where(eq(inviteCodes.code, code))
+  async revokeInvite(code: string, hubId?: string): Promise<void> {
+    const deleted = await this.db
+      .delete(inviteCodes)
+      .where(hubId ? and(eq(inviteCodes.code, code), eq(inviteCodes.hubId, hubId)) : eq(inviteCodes.code, code))
+      .returning({ code: inviteCodes.code })
+    if (deleted.length === 0) throw new ServiceError(404, 'Invite not found')
   }
 
   // =========================================================================
