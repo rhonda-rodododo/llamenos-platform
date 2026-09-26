@@ -404,6 +404,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - add E2E tests for device linking and fix /link-device public path
 
 
+## 0.19.17 (2026-09-26)
+
+### Features
+
+- make the self-hosted deploy runnable — Debian 13 fixes, first-deploy runbook (#973)
+- rename FDE ISO to debian13-fde-<unlock>.iso + warn on unsafe defaults (#974)
+- ntfy push relay on the FlokiNET host as an explicit no-secrets-at-rest tier (#976)
+- manage system hostname declaratively (#984)
+- POST /api/security-events ingestion for client-reported cert pin mismatches (#989)
+- deterministic route->schema binding report, lint rail, and codemod (#879)
+- fixed fictional dataset seeder + admin-authenticated demo reset (#1010)
+- say which telephony providers carry in-app audio (#1001)
+- MockTelephonyAdapter + admin simulate-incoming-call for demo instances (#1011)
+- call history status filter chips (All/Completed/Unanswered) (#996)
+
+### Fixes
+
+- derive board's required set from the live ruleset (#975)
+- reference provisioning profile by its internal Name (#978)
+- remove project name from operator-visible ISO labels (#983)
+- app image pull policy defaults to missing so a docker-loaded image is used (#986)
+- write dockremap subuid/subgid before dockerd enters userns-remap mode (#985)
+- keep latest Bun working on CPUID-masked hosts; gate release on a PostgreSQL smoke on a kvm64 guest (#988)
+- preflight RAM check uses MemAvailable, not MemFree (#980)
+- drop unused hpke-rs-libcrux [patch.crates-io] entry (#990)
+- release-PR job fails on real errors; llamenos-auto identity; push with lease (#992)
+- ntfy_domain guard follows the deployment domain (llamenos-hotline.org) (#993)
+- event link API accepts event-category records, hub-scoped (#998)
+- clear 6 RUSTSEC advisories (rustls 0.23.45, rkyv, quick-xml) (#1002)
+- triage convert step races detail load and swallows the miss (#1009)
+- add GET /directory/:id/cases so the contact Cases tab works (#994)
+
 ## 0.19.16 (2026-09-25)
 
 ### Features

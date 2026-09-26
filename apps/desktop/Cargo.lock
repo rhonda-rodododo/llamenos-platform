@@ -2713,7 +2713,7 @@ dependencies = [
 
 [[package]]
 name = "llamenos-desktop"
-version = "0.19.16"
+version = "0.19.17"
 dependencies = [
  "aes-gcm",
  "argon2",
