@@ -10,10 +10,13 @@
  */
 import { expect, type APIRequestContext, type Page } from '@playwright/test'
 import { Given, When, Then } from '../fixtures'
+import type { ConversationWorld } from '../fixtures'
 import { TestIds } from '../../test-ids'
-import { Timeouts, flagSeedFailed, readSeedFailedFlag } from '../../helpers'
+import { Timeouts } from '../../helpers'
 import { Navigation } from '../../pages/index'
-import { apiGet, apiPost, enableMessagingViaApi } from '../../api-helpers'
+import { ADMIN_SEED, apiGet, apiPost, enableMessagingViaApi } from '../../api-helpers'
+import { encryptMessageForDesktop } from '../../crypto-helpers'
+import { seedConversationViaApi, type SeededConversation } from '../../conversation-seeding'
 import { simulateIncomingMessage, simulateDeliveryStatus, uniqueCallerNumber } from '../../simulation-helpers'
 
 // --- Admin messaging settings ---
@@ -89,81 +92,41 @@ Then('the WhatsApp channel should be enabled', async ({ backendRequest }) => {
 
 // --- Active conversation steps ---
 
-interface SeededConversation {
-  conversationId: string
-  /** Last 4 digits of the unique sender number — the card renders `...XXXX`. */
-  last4: string
-}
-
 /**
- * Seed a conversation into the worker's isolated hub via the real API.
+ * Seed a conversation into the worker's isolated hub via the real API, select
+ * it in the UI, and record it on the scenario's `conversationWorld`.
  * With `claim: true` the conversation is claimed by the admin (status active)
  * so status-gated UI (composer, close button) actually renders.
- * On success the conversation is selected in the UI and its identity is
- * recorded on window.__test_last_conversation for later steps.
- * On failure, flagSeedFailed is set so downstream steps take the deterministic
- * skip branch.
+ * Every failure throws — a scenario whose precondition cannot be seeded must
+ * fail, not pass vacuously.
  */
-async function seedConversation(
+async function seedAndSelectConversation(
   page: Page,
   backendRequest: APIRequestContext,
   workerHub: string,
+  world: ConversationWorld,
   body: string,
   opts: { claim?: boolean } = {},
-): Promise<SeededConversation | null> {
-  await enableMessagingViaApi(backendRequest, ['sms']).catch(() => {})
-  const senderNumber = uniqueCallerNumber()
-  const result = await simulateIncomingMessage(backendRequest, {
-    senderNumber,
+): Promise<SeededConversation> {
+  const seeded = await seedConversationViaApi(backendRequest, workerHub, {
+    status: opts.claim ? 'active' : 'waiting',
     body,
-    channel: 'sms',
-    // Scope to the worker's hub: the UI lists conversations hub-scoped, so a
-    // conversation seeded without a hubId would never render in the test app.
-    hubId: workerHub,
-  }).catch(() => null)
-  if (!result?.conversationId) {
-    await flagSeedFailed(page)
-    return null
-  }
-
-  if (opts.claim) {
-    const claim = await apiPost(
-      backendRequest,
-      `/hubs/${workerHub}/conversations/${result.conversationId}/claim`,
-      {},
-    )
-    if (claim.status !== 200) {
-      await flagSeedFailed(page)
-      return null
-    }
-  }
-
+  })
+  world.seeded = seeded
   await Navigation.goToConversations(page)
-  const item = page.getByTestId(TestIds.CONVERSATION_ITEM).filter({ hasText: senderNumber.slice(-4) })
-  const hasItem = await item.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
-  if (!hasItem) {
-    await flagSeedFailed(page)
-    return null
-  }
+  const item = page.getByTestId(TestIds.CONVERSATION_ITEM).filter({ hasText: seeded.last4 })
+  await expect(item).toBeVisible({ timeout: Timeouts.ELEMENT })
   await item.click()
-  const seeded: SeededConversation = {
-    conversationId: result.conversationId,
-    last4: senderNumber.slice(-4),
-  }
-  await page.evaluate((s) => {
-    ;(window as unknown as Record<string, unknown>).__test_last_conversation = s
-  }, seeded)
   return seeded
 }
 
-Given('I have an active conversation', async ({ page, backendRequest, workerHub }) => {
+Given('I have an active conversation', async ({ page, backendRequest, workerHub, conversationWorld }) => {
   // Active = claimed: the message composer and close button only render for
   // active conversations, so claim through the real API during seeding.
-  await seedConversation(page, backendRequest, workerHub, `Active conversation ${Date.now()}`, { claim: true })
+  await seedAndSelectConversation(page, backendRequest, workerHub, conversationWorld, `Active conversation ${Date.now()}`, { claim: true })
 })
 
 When('I type a message and click send', async ({ page }) => {
-  if (await readSeedFailedFlag(page)) return
   const composer = page.getByTestId(TestIds.MESSAGE_COMPOSER)
   await expect(composer).toBeVisible({ timeout: Timeouts.ELEMENT })
   const textarea = composer.locator('textarea, input[type="text"]').first()
@@ -173,44 +136,44 @@ When('I type a message and click send', async ({ page }) => {
   await sendBtn.click()
 })
 
-Given('I sent a message in a conversation', async ({ page, backendRequest, workerHub }) => {
-  // Seed + claim, then send a real outbound message through the conversations
+Given('I sent a message in a conversation', async ({ page, backendRequest, workerHub, conversationWorld }) => {
+  // Seed + claim, then post an outbound message through the real conversations
   // API so the thread contains an outbound message carrying a delivery status.
-  // The delivery-status simulation endpoint requires the message to have an
-  // externalId, which the server only assigns when a provider is configured —
-  // passing one explicitly is the documented test fallback.
-  const seeded = await seedConversation(
+  // The message is sealed client-side — exactly as the desktop client's
+  // encryptMessage does, for the admin reader — because the desktop client under
+  // Playwright can only open envelopes sealed with the mock HPKE primitive
+  // (tests/mocks/hpke-mock.ts); content the server seals with real RFC 9180
+  // HPKE would render as "[Encrypted]" and could never satisfy the thread
+  // assertion. The delivery-status simulation endpoint requires the message to
+  // have an externalId, which the server only assigns when a provider is
+  // configured — passing one explicitly is the documented test fallback.
+  const seeded = await seedAndSelectConversation(
     page,
     backendRequest,
     workerHub,
+    conversationWorld,
     `Inbound for delivery test ${Date.now()}`,
     { claim: true },
   )
-  if (!seeded) return
 
   const outboundBody = `Outbound delivery probe ${Date.now()}`
   const base = `/hubs/${workerHub}/conversations/${seeded.conversationId}`
+  const { encryptedContent, readerEnvelopes } = encryptMessageForDesktop(outboundBody, [ADMIN_SEED])
   const send = await apiPost<{ id?: string }>(backendRequest, `${base}/messages`, {
-    body: outboundBody,
+    encryptedContent,
+    readerEnvelopes,
     externalId: `sim-${Date.now()}`,
   })
   if (send.status !== 201 || !send.data?.id) {
-    await flagSeedFailed(page)
-    return
+    throw new Error(`Seeding: sending outbound message failed (${send.status})`)
   }
   const messageId = send.data.id
-  const delivered = await simulateDeliveryStatus(backendRequest, {
+  await simulateDeliveryStatus(backendRequest, {
     conversationId: seeded.conversationId,
     messageId,
     status: 'delivered',
-  }).then(() => true).catch(() => false)
-  if (!delivered) {
-    await flagSeedFailed(page)
-    return
-  }
-  await page.evaluate((info) => {
-    ;(window as unknown as Record<string, unknown>).__test_last_outbound = info
-  }, { conversationId: seeded.conversationId, messageId, body: outboundBody })
+  })
+  conversationWorld.outbound = { conversationId: seeded.conversationId, messageId, body: outboundBody }
 
   // Re-select so the thread refetches and shows the outbound message.
   await Navigation.goToDashboard(page)
@@ -220,13 +183,8 @@ Given('I sent a message in a conversation', async ({ page, backendRequest, worke
   await item.click()
 })
 
-Then('I should see the delivery status indicator', async ({ page, backendRequest, workerHub }) => {
-  if (await readSeedFailedFlag(page)) return
-  const outbound = await page.evaluate(
-    () => (window as unknown as Record<string, unknown>).__test_last_outbound as
-      | { conversationId: string; messageId: string; body: string }
-      | undefined,
-  )
+Then('I should see the delivery status indicator', async ({ page, backendRequest, workerHub, conversationWorld }) => {
+  const outbound = conversationWorld.outbound
   if (!outbound) throw new Error('Given step must have sent an outbound message')
 
   // UI: the outbound message renders in the thread (delivery status itself is
@@ -251,20 +209,15 @@ Then('I should see the delivery status indicator', async ({ page, backendRequest
 })
 
 Then('the conversation status should be {string}', async ({ page }, status: string) => {
-  if (await readSeedFailedFlag(page)) {
-    await expect(page.getByTestId(TestIds.PAGE_TITLE)).toBeVisible({ timeout: Timeouts.ELEMENT })
-    return
-  }
   const statusText = page.locator(`text=/${status}/i`).first()
   await expect(statusText).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
-Given('I have an unassigned conversation', async ({ page, backendRequest, workerHub }) => {
-  await seedConversation(page, backendRequest, workerHub, `Unassigned conversation ${Date.now()}`)
+Given('I have an unassigned conversation', async ({ page, backendRequest, workerHub, conversationWorld }) => {
+  await seedAndSelectConversation(page, backendRequest, workerHub, conversationWorld, `Unassigned conversation ${Date.now()}`)
 })
 
 When('I assign it to a volunteer', async ({ page }) => {
-  if (await readSeedFailedFlag(page)) return
   // The Given step seeds a waiting (unassigned) conversation and selects it,
   // so the claim button must be rendered — a missing button is a real app bug.
   const assignBtn = page.getByTestId(TestIds.CONV_ASSIGN_BTN)
@@ -273,10 +226,6 @@ When('I assign it to a volunteer', async ({ page }) => {
 })
 
 Then('the volunteer name should appear on the conversation', async ({ page }) => {
-  if (await readSeedFailedFlag(page)) {
-    await expect(page.getByTestId(TestIds.PAGE_TITLE)).toBeVisible({ timeout: Timeouts.ELEMENT })
-    return
-  }
   // After claiming, the conversation is active and assigned to the current
   // user; the app confirms with a "Conversation claimed" toast and the card
   // stops showing the italic "Waiting" assignee placeholder.
@@ -297,30 +246,24 @@ Then('it should be assigned to the volunteer with lowest load', async () => {
 })
 
 Given('conversations exist across SMS and WhatsApp', async ({ page, backendRequest, workerHub }) => {
-  await enableMessagingViaApi(backendRequest, ['sms', 'whatsapp']).catch(() => {})
+  await enableMessagingViaApi(backendRequest, ['sms', 'whatsapp'])
   await simulateIncomingMessage(backendRequest, {
     senderNumber: uniqueCallerNumber(),
     body: 'SMS test',
     channel: 'sms',
     hubId: workerHub,
-  }).catch(() => {})
+  })
   await simulateIncomingMessage(backendRequest, {
     senderNumber: uniqueCallerNumber(),
     body: 'WhatsApp test',
     channel: 'whatsapp',
     hubId: workerHub,
-  }).catch(() => {})
+  })
   await Navigation.goToConversations(page)
-  const item = page.getByTestId(TestIds.CONVERSATION_ITEM).first()
-  const hasItem = await item.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
-  if (!hasItem) {
-    await expect(page.getByTestId(TestIds.PAGE_TITLE)).toBeVisible({ timeout: Timeouts.ELEMENT })
-    await flagSeedFailed(page)
-  }
+  await expect(page.getByTestId(TestIds.CONVERSATION_ITEM).first()).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 When('I filter by SMS channel', async ({ page }) => {
-  if (await readSeedFailedFlag(page)) return
   // Desktop uses search to filter, not dedicated channel filter chips
   const searchInput = page.getByTestId(TestIds.CONV_SEARCH)
   await expect(searchInput).toBeVisible({ timeout: Timeouts.ELEMENT })

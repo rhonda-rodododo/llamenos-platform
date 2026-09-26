@@ -1,6 +1,7 @@
 import { type APIRequestContext } from '@playwright/test'
 import { test as base, createBdd } from 'playwright-bdd'
 import { createHubViaApi, ensureAdminRole, type RoleDefinition } from '../api-helpers'
+import type { SeededConversation } from '../conversation-seeding'
 
 // ── Scenario-scoped World types ──────────────────────────────────────
 // Each scenario gets a fresh instance via fixture. Step definitions read/write
@@ -45,6 +46,17 @@ export type CasesWorld = {
   triageReportId: string
 }
 
+export type ConversationWorld = {
+  /**
+   * The conversation the scenario's Given step seeded and selected. Steps that
+   * must re-select it after the app clears the detail selection (closing sets
+   * selectedId to null) find it by its unique last-4 digits.
+   */
+  seeded?: SeededConversation
+  /** The outbound message posted by "I sent a message in a conversation". */
+  outbound?: { conversationId: string; messageId: string; body: string }
+}
+
 export type SasWorld = {
   ephemeralPubkey?: string    // X25519 pubkey hex (secret stays in Rust/mock state)
   primarySecret?: Uint8Array  // test-only: simulates the primary device's key
@@ -70,6 +82,7 @@ export const test = base.extend<
     adminWorld: AdminWorld
     rolesWorld: RolesWorld
     casesWorld: CasesWorld
+    conversationWorld: ConversationWorld
     sasWorld: SasWorld
   },
   {
@@ -155,6 +168,9 @@ export const test = base.extend<
       contactCarlosId: '', contactMariaId: '', contactWithDataId: '', contactWithDataName: '',
       triageReportTypeId: '', triageReportId: '',
     })
+  },
+  conversationWorld: async ({}, use) => {
+    await use({})
   },
   sasWorld: async ({}, use) => {
     await use({})

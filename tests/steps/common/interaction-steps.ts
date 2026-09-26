@@ -10,7 +10,7 @@
 import { expect } from '@playwright/test'
 import { When, Then } from '../fixtures'
 import { TestIds, navTestIdMap, sectionTestIdMap } from '../../test-ids'
-import { Timeouts, navigateViaSpa, readSeedFailedFlag } from '../../helpers'
+import { Timeouts, navigateViaSpa } from '../../helpers'
 import { Navigation } from '../../pages/index'
 
 /**
@@ -62,10 +62,7 @@ const buttonTextToTestIdMap: Record<string, string> = {
  * the actual button accessible name.
  */
 async function clickByTextOrTestId(page: import('@playwright/test').Page, text: string): Promise<void> {
-  // Guard: if "Send" is clicked after a conversation seeding failure (messaging
-  // backend unavailable), skip gracefully instead of timing out on the send button.
   if (text === 'Send') {
-    if (await readSeedFailedFlag(page)) return
     // Check conversation send button first. isVisible()'s `timeout` option is a
     // documented no-op (it never waits) — use waitFor(), which actually polls,
     // so this branch doesn't race the button's render against page load.
