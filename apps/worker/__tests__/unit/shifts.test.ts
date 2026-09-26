@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest'
-import { ShiftsService } from '@worker/services/shifts'
+import { describe, it, expect, vi, afterEach } from 'vitest'
+import { ShiftsService, isShiftActive } from '@worker/services/shifts'
 import { ServiceError } from '@worker/services/settings'
 import { createMockDb } from './mock-db'
 
@@ -187,37 +187,67 @@ describe('ShiftsService', () => {
       expect(result).toEqual([])
     })
 
-    it('handles overnight shifts correctly', async () => {
-      const { db, service } = setup()
-      const now = new Date()
-      const currentDay = now.getUTCDay()
-      const currentHour = now.getUTCHours()
+    describe('overnight shifts (Fri 22:00-06:00)', () => {
+      afterEach(() => {
+        vi.useRealTimers()
+      })
 
-      let startTime: string
-      let endTime: string
-
-      if (currentHour >= 22 || currentHour < 6) {
-        startTime = '22:00'
-        endTime = '06:00'
-      } else {
-        startTime = '06:00'
-        endTime = '22:00'
+      // 2026-01-02 is a Friday, 2026-01-03 a Saturday
+      const cases: Array<[string, string, boolean]> = [
+        ['Fri 23:00 (before midnight, listed day)', '2026-01-02T23:00:00Z', true],
+        ['Sat 02:00 (after midnight, day after listed day)', '2026-01-03T02:00:00Z', true],
+        ['Fri 02:00 (early Friday belongs to Thursday night)', '2026-01-02T02:00:00Z', false],
+        ['Sat 06:00 (end is exclusive)', '2026-01-03T06:00:00Z', false],
+        ['Sat 23:00 (Saturday night is not listed)', '2026-01-03T23:00:00Z', false],
+      ]
+      for (const [label, iso, expected] of cases) {
+        it(`${label} -> ${expected ? 'on' : 'off'} shift`, async () => {
+          vi.useFakeTimers()
+          vi.setSystemTime(new Date(iso))
+          const { db, service } = setup()
+          db.$setSelectResult([makeShift({ days: [5], startTime: '22:00', endTime: '06:00', userPubkeys: ['pk1'] })])
+          const result = await service.getCurrentVolunteers('hub-1')
+          expect(result.includes('pk1')).toBe(expected)
+        })
       }
+    })
+  })
 
-      db.$setSelectResult([makeShift({
-        days: [currentDay],
-        startTime,
-        endTime,
-        userPubkeys: ['pk1'],
-      })])
+  describe('isShiftActive', () => {
+    const overnight = { startTime: '22:00', endTime: '06:00', days: [5] }
 
-      const result = await service.getCurrentVolunteers('hub-1')
+    it('same-day shift requires listed day and time window', () => {
+      const day = { startTime: '08:00', endTime: '12:00', days: [1] }
+      expect(isShiftActive(day, 1, '09:00')).toBe(true)
+      expect(isShiftActive(day, 2, '09:00')).toBe(false)
+      expect(isShiftActive(day, 1, '12:00')).toBe(false)
+    })
 
-      if (currentHour >= 22 || currentHour < 6) {
-        expect(result).toContain('pk1')
-      } else {
-        expect(result).toContain('pk1')
-      }
+    it('overnight: active on start day from startTime', () => {
+      expect(isShiftActive(overnight, 5, '21:59')).toBe(false)
+      expect(isShiftActive(overnight, 5, '22:00')).toBe(true)
+      expect(isShiftActive(overnight, 5, '23:59')).toBe(true)
+    })
+
+    it('overnight: active the next day until endTime, not on start day morning', () => {
+      expect(isShiftActive(overnight, 6, '00:00')).toBe(true)
+      expect(isShiftActive(overnight, 6, '05:59')).toBe(true)
+      expect(isShiftActive(overnight, 6, '06:00')).toBe(false)
+      expect(isShiftActive(overnight, 5, '02:00')).toBe(false)
+    })
+
+    it('overnight: Saturday -> Sunday wrap (day 6 -> day 0)', () => {
+      const satNight = { startTime: '22:00', endTime: '06:00', days: [6] }
+      expect(isShiftActive(satNight, 6, '23:00')).toBe(true)
+      expect(isShiftActive(satNight, 0, '02:00')).toBe(true)
+      expect(isShiftActive(satNight, 0, '06:00')).toBe(false)
+      expect(isShiftActive(satNight, 6, '02:00')).toBe(false)
+    })
+
+    it('overnight: the reported repro (yesterday covers now, today has not started)', () => {
+      const s = { startTime: '08:55', endTime: '07:55', days: [5] }
+      expect(isShiftActive(s, 6, '06:55')).toBe(true)
+      expect(isShiftActive({ ...s, days: [6] }, 6, '06:55')).toBe(false)
     })
   })
 
