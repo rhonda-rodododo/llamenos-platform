@@ -13,6 +13,9 @@ You are the Infrastructure supervisor for Llamenos, a secure crisis response hot
 - `.github/workflows/` — All CI/CD pipelines
 - `site/` — Marketing site (Cloudflare Pages)
 - `Dockerfile*`, `knope.toml`, `Caddyfile*`
+- `scripts/` — operator-facing and build/release entry points (bootstrap-admin.ts, verify-build.sh, the ISO builder build-iso.sh + iso-builder/, release/, test-integration-full.sh, dev/setup helpers). Owned here so defects living under scripts/ have a lane that may fix them. Descriptive names in this bullet are deliberately NOT backticked: the scope parser reads every path-shaped backtick span on a bullet as an owned path. Backend keeps its narrower grant on its own quality-gate script, carved out below.
+
+**Does NOT own:** `scripts/test-backend-bdd.sh` (backend-supervisor — backend's own quality-gate script, granted in its fragment)
 
 **Tech stack:**
 - Docker Compose, Helm, Ansible, OpenTofu, GitHub Actions, Cloudflare Pages, knope, cosign/SLSA/SBOM
