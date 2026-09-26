@@ -64,13 +64,13 @@ function makeAuditService() {
   const db = {
     transaction: vi.fn().mockImplementation(async (fn: (tx: unknown) => Promise<unknown>) => {
       const tx = {
+        // per-chain advisory lock taken before the tip is read
+        execute: vi.fn().mockResolvedValue([]),
         select: vi.fn().mockReturnValue({
           from: vi.fn().mockReturnValue({
             where: vi.fn().mockReturnValue({
               orderBy: vi.fn().mockReturnValue({
-                limit: vi.fn().mockReturnValue({
-                  for: vi.fn().mockResolvedValue([]),
-                }),
+                limit: vi.fn().mockResolvedValue([]),
               }),
             }),
           }),

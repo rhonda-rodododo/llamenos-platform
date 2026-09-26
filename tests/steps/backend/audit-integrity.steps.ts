@@ -147,6 +147,29 @@ Given('an admin performs {int} sequential operations', async ({ request, world }
   }
 })
 
+Given('an admin performs {int} concurrent operations', async ({ request, world }, count: number) => {
+  const hubId = getScenarioState(world).hubId
+  const existing = await listAuditLogViaApi(request, { hubId })
+  getAuditTestState(world).entriesBefore = existing.total
+
+  // Fire every audited write at once so the server sees overlapping appends to one chain.
+  const results = await Promise.all(
+    Array.from({ length: count }, (_, i) =>
+      createShiftViaApi(request, { name: `Concurrent Shift ${Date.now()}-${i}`, hubId }),
+    ),
+  )
+  expect(results).toHaveLength(count)
+})
+
+Then('no two audit entries should share the same previousEntryHash', async ({ request, world }) => {
+  const hubId = getScenarioState(world).hubId
+  const { entries } = await listAuditLogViaApi(request, { limit: 100, hubId })
+  const predecessors = (entries as unknown as AuditEntry[])
+    .map(e => e.previousEntryHash)
+    .filter((h): h is string => h !== null)
+  expect(new Set(predecessors).size).toBe(predecessors.length)
+})
+
 When(
   'the audit log is fetched ordered by creation time',
   async ({ request, world }) => {
