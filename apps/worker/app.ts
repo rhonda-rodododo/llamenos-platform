@@ -58,6 +58,7 @@ import retentionRoutes from './routes/retention'
 import platformBansRoutes from './routes/platform-bans'
 import platformSettingsRoutes from './routes/platform-settings'
 import ringGroupsRoutes from './routes/ring-groups'
+import demoTelephonyRoutes from './routes/demo-telephony'
 import recoveryGroupRoutes from './routes/recovery-group'
 import teamsRoutes from './routes/teams'
 import tagsRoutes from './routes/tags'
@@ -297,6 +298,7 @@ hubScoped.route('/onboard', hubOnboardRoutes)
 hubScoped.route('/ring-groups', ringGroupsRoutes)
 hubScoped.route('/teams', teamsRoutes)
 hubScoped.route('/tags', tagsRoutes)
+hubScoped.route('/demo/telephony', demoTelephonyRoutes)
 
 authenticated.route('/hubs/:hubId', hubScoped)
 

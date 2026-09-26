@@ -94,6 +94,7 @@ import type {
 import { IVR_LANGUAGES, LANGUAGE_CODES } from '@shared/languages'
 import type { IvrVoiceCatalog } from '../telephony/ivr-menu'
 import { getIvrVoiceCatalogForProvider } from '../telephony/ivr-voice-catalogs'
+import { MOCK_PROVIDER_TYPE } from '../telephony/mock'
 import type { Role } from '@shared/permissions'
 import { DEFAULT_ROLES } from '@shared/permissions'
 import {
@@ -2287,6 +2288,57 @@ export class SettingsService {
         },
       })
     return { ok: true }
+  }
+
+  /**
+   * Select the demo-only mock telephony provider (type `mock`) for a hub.
+   *
+   * Callers MUST have already checked `assertMockTelephonyAllowed` — this only
+   * persists the selection. Refuses to overwrite a real provider's credentials.
+   */
+  async enableHubMockTelephony(hubId: string, phoneNumber: string): Promise<{ ok: true }> {
+    const [existing] = await this.db
+      .select()
+      .from(providerConfigs)
+      .where(eq(providerConfigs.hubId, hubId))
+      .limit(1)
+    if (existing && existing.providerType !== MOCK_PROVIDER_TYPE) {
+      throw new ServiceError(
+        409,
+        `Hub already has a ${existing.providerType} telephony provider — remove it before enabling the mock`,
+      )
+    }
+    const id = existing?.id ?? crypto.randomUUID()
+    const values = {
+      providerType: MOCK_PROVIDER_TYPE,
+      credentials: JSON.stringify({ type: MOCK_PROVIDER_TYPE, phoneNumber }),
+      status: 'connected',
+      phoneNumbers: [phoneNumber],
+      updatedAt: new Date(),
+    }
+    await this.db
+      .insert(providerConfigs)
+      .values({ id, hubId, capabilities: [], createdAt: new Date(), ...values })
+      .onConflictDoUpdate({ target: providerConfigs.id, set: values })
+    return { ok: true }
+  }
+
+  /** Remove the mock provider from a hub. Never touches a real provider's config. */
+  async disableHubMockTelephony(hubId: string): Promise<{ ok: true }> {
+    await this.db
+      .delete(providerConfigs)
+      .where(and(eq(providerConfigs.hubId, hubId), eq(providerConfigs.providerType, MOCK_PROVIDER_TYPE)))
+    return { ok: true }
+  }
+
+  /** Whether the hub currently selects the mock provider. */
+  async isHubMockTelephonyEnabled(hubId: string): Promise<boolean> {
+    const [row] = await this.db
+      .select({ providerType: providerConfigs.providerType })
+      .from(providerConfigs)
+      .where(eq(providerConfigs.hubId, hubId))
+      .limit(1)
+    return row?.providerType === MOCK_PROVIDER_TYPE
   }
 
   async getHubByPhone(

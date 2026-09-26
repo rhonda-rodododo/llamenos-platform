@@ -11,6 +11,7 @@ import { AsteriskAdapter } from '../telephony/asterisk'
 import { TelnyxAdapter } from '../telephony/telnyx'
 import { BandwidthAdapter } from '../telephony/bandwidth'
 import { FreeSwitchAdapter } from '../telephony/freeswitch'
+import { MockTelephonyAdapter, MockTelephonyRefusedError, isMockProviderConfig } from '../telephony/mock'
 import { createSMSAdapter } from '../messaging/sms/factory'
 import { createWhatsAppAdapter } from '../messaging/whatsapp/factory'
 import { createSignalAdapter } from '../messaging/signal/factory'
@@ -31,8 +32,14 @@ export async function getTelephonyFromService(
   const webhookBaseUrl = env.WEBHOOK_BASE_URL ?? ''
   try {
     const config = await settingsService.getTelephonyProvider()
-    if (config) return createAdapterFromConfig(config, webhookBaseUrl)
+    if (config) return createAdapterFromConfig(config, webhookBaseUrl, env)
   } catch (e) {
+    if (e instanceof MockTelephonyRefusedError) {
+      // A mock config in an environment that forbids it must never silently
+      // degrade to a real provider — no adapter at all is the safe answer.
+      logger.error('Mock telephony provider refused', { reason: e.reason })
+      return null
+    }
     logger.warn('getTelephonyProvider failed, falling back to env vars', { error: e })
   }
 
@@ -58,8 +65,12 @@ export async function getHubTelephonyFromService(
   const webhookBaseUrl = env.WEBHOOK_BASE_URL ?? ''
   try {
     const config = await settingsService.getHubTelephonyProvider(hubId)
-    if (config) return createAdapterFromConfig(config, webhookBaseUrl)
+    if (config) return createAdapterFromConfig(config, webhookBaseUrl, env)
   } catch (e) {
+    if (e instanceof MockTelephonyRefusedError) {
+      logger.error('Mock telephony provider refused', { hubId, reason: e.reason })
+      return null
+    }
     logger.warn('getHubTelephonyProvider failed for hub, falling back to global', { error: e })
   }
   return getTelephonyFromService(env, settingsService)
@@ -113,9 +124,16 @@ export async function getMessagingAdapterFromService(
 
 /**
  * Create adapter from saved config.
- * Supports Twilio, SignalWire, Vonage, Plivo, Asterisk, Telnyx, Bandwidth, and FreeSWITCH.
+ * Supports Twilio, SignalWire, Vonage, Plivo, Asterisk, Telnyx, Bandwidth, and FreeSWITCH,
+ * plus the demo-only MockTelephonyAdapter (type `mock`, which throws
+ * MockTelephonyRefusedError unless DEMO_MODE is confirmed and ENVIRONMENT permits it).
  */
-function createAdapterFromConfig(config: TelephonyProviderConfig, webhookBaseUrl = ''): TelephonyAdapter {
+function createAdapterFromConfig(config: TelephonyProviderConfig, webhookBaseUrl: string, env: Env): TelephonyAdapter {
+  // `mock` is a worker-side demo type, deliberately not part of the wire-level
+  // TelephonyProviderType enum — compare on the raw string.
+  if (isMockProviderConfig(config)) {
+    return new MockTelephonyAdapter(env, config.phoneNumber)
+  }
   switch (config.type) {
     case 'twilio':
       return new TwilioAdapter(config.accountSid!, config.authToken!, config.phoneNumber, webhookBaseUrl)
