@@ -23,6 +23,8 @@ interface InviteTestState {
   inviteCode?: string
   rateLimitResponses: number[]
   volunteerDeviceKey?: string
+  /** Seed of the user who redeemed an invite earlier in the scenario. */
+  redeemerSeedHex?: string
   /** Unique per-scenario fake IP so validation calls don't share the 'unknown' rate limit bucket. */
   scenarioIp: string
 }
@@ -74,6 +76,7 @@ Given('the invite has been redeemed by a user', async ({ request, world }) => {
     data: { code: s.inviteCode, ...auth },
   })
   expect(res.status()).toBe(200)
+  s.redeemerSeedHex = kp.seedHex
 })
 
 Given('a registered volunteer user', async ({ request, world }) => {
@@ -123,6 +126,19 @@ When('a new user redeems the invite', async ({ request, world }) => {
     data: { code: s.inviteCode, ...auth },
   })
   const data = res.ok() ? await res.json().catch(() => null) : null
+  setLastResponse(world, { status: res.status(), data })
+})
+
+When('the same user redeems the invite', async ({ request, world }) => {
+  const s = getS(world)
+  expect(s.inviteCode).toBeDefined()
+  expect(s.redeemerSeedHex).toBeDefined()
+  const auth = createRedeemAuth(s.redeemerSeedHex!)
+  const res = await request.post(`${BASE_URL}/api/invites/redeem`, {
+    headers: { 'Content-Type': 'application/json' },
+    data: { code: s.inviteCode, ...auth },
+  })
+  const data = await res.json().catch(() => null)
   setLastResponse(world, { status: res.status(), data })
 })
 

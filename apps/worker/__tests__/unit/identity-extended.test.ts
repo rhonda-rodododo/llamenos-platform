@@ -353,7 +353,9 @@ describe('IdentityService.redeemInvite', () => {
       }),
       insert: vi.fn().mockReturnValue({
         values: vi.fn().mockReturnValue({
-          returning: vi.fn().mockResolvedValue([newUser]),
+          onConflictDoNothing: vi.fn().mockReturnValue({
+            returning: vi.fn().mockResolvedValue([newUser]),
+          }),
         }),
       }),
     }
@@ -363,6 +365,34 @@ describe('IdentityService.redeemInvite', () => {
     expect(result.volunteer.pubkey).toBe('pk-new')
     expect(tx.update).toHaveBeenCalled() // atomic claim
     expect(tx.insert).toHaveBeenCalled() // user created
+  })
+
+  it('throws 409 (not an unhandled duplicate-key error) when the pubkey already has a user', async () => {
+    const { db, service } = setup()
+    const invite = makeInviteRow()
+
+    const tx = {
+      update: vi.fn().mockReturnValue({
+        set: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            returning: vi.fn().mockResolvedValue([invite]),
+          }),
+        }),
+      }),
+      insert: vi.fn().mockReturnValue({
+        values: vi.fn().mockReturnValue({
+          // ON CONFLICT DO NOTHING returns no row when the pubkey already exists
+          onConflictDoNothing: vi.fn().mockReturnValue({
+            returning: vi.fn().mockResolvedValue([]),
+          }),
+        }),
+      }),
+    }
+    ;(db as any).transaction = vi.fn().mockImplementation((fn: (tx: unknown) => Promise<unknown>) => fn(tx))
+
+    await expect(
+      service.redeemInvite({ code: 'invite-code-abc', pubkey: 'pk-existing' }),
+    ).rejects.toMatchObject({ status: 409 })
   })
 })
 

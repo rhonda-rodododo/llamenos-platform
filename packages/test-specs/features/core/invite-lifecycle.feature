@@ -42,6 +42,17 @@ Feature: Invite Lifecycle
     Then the invite is not valid with error "already_used"
 
   @backend
+  Scenario: An existing member redeeming a second invite is rejected with 409, not 500
+    Given I am logged in as an admin
+    And an invite exists for "First Invite" with phone "+15551234580"
+    And the invite has been redeemed by a user
+    And an invite exists for "Second Invite" with phone "+15551234581"
+    When the same user redeems the invite
+    Then the response status is 409
+    When the invite code is validated
+    Then the invite is valid
+
+  @backend
   Scenario: Admin can list invites
     Given I am logged in as an admin
     And an invite exists for "List Test" with phone "+15551234571"
