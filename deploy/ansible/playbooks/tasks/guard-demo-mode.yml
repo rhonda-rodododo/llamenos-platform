@@ -1,7 +1,8 @@
 ---
 # Shared guard: demo/dev-only settings must never reach a production instance.
 #
-# Included from both entry points that can render an app environment file:
+# Imported (import_tasks, so `tags: always` reaches every task under `--tags`) from
+# both entry points that can render an app environment file:
 #   - playbooks/preflight.yml  (production/staging path via setup.yml -> deploy.yml)
 #   - playbooks/deploy-demo.yml (demo/staging path via the monolithic llamenos role)
 #

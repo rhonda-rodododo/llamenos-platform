@@ -1,5 +1,6 @@
 ---
-# Ends the current play for a host whose disk is not encrypted.
+# Ends the current play for a host whose disk is not encrypted. Callers MUST use
+# import_tasks + `tags: always`: a dynamic include_tasks would be skipped under `--tags`.
 #
 # Backups, restores, updates/rollbacks of the app and the observability stack
 # all write data at rest (database dumps, config archives holding the .env,

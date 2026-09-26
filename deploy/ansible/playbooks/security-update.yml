@@ -20,9 +20,13 @@
 
   tasks:
     # ─── Pre-Update Scan ─────────────────────────────────────────
+    # `apply` is what tags the role's own tasks; `tags:` alone tags only the
+    # include, so `--tags security-update` would run the include and skip the role.
     - name: Run pre-update security scan
       ansible.builtin.include_role:
         name: security-scan
+        apply:
+          tags: [security-update, scan]
       vars:
         security_scan_fail_on_os_updates: false
       tags: [security-update, scan]
@@ -31,6 +35,8 @@
     - name: Run pre-update backup
       ansible.builtin.include_role:
         name: backup
+        apply:
+          tags: [security-update, backup]
       tags: [security-update, backup]
 
     # ─── Record Pre-Update State ─────────────────────────────────
@@ -139,6 +145,8 @@
     - name: Run post-update security scan
       ansible.builtin.include_role:
         name: security-scan
+        apply:
+          tags: [security-update, scan]
       vars:
         security_scan_fail_on_os_updates: false
       tags: [security-update, scan]

@@ -18,7 +18,7 @@
 
   tasks:
     - name: Skip hosts without disk encryption (this play keeps data at rest)
-      ansible.builtin.include_tasks: tasks/skip-unencrypted-host.yml
+      ansible.builtin.import_tasks: tasks/skip-unencrypted-host.yml
       tags: always
 
     # ── Pre-flight Checks ──────────────────────────────────────────
@@ -43,8 +43,12 @@
 
     # ── Snapshot Current State ─────────────────────────────────────
     - name: Track current versions before rollback
+      # `apply` is what tags the role's own tasks; `tags:` alone tags only the
+      # include, so `--tags rollback` would run this and skip the role body.
       ansible.builtin.include_role:
         name: llamenos-version-tracker
+        apply:
+          tags: [rollback, version]
       tags: [rollback, version]
 
     - name: Display current versions (about to roll back from)
@@ -55,6 +59,8 @@
     - name: Run pre-rollback backup
       ansible.builtin.include_role:
         name: backup
+        apply:
+          tags: [rollback, backup]
       when: not (rollback_skip_backup | bool)
       tags: [rollback, backup]
 

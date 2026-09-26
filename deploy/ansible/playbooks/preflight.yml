@@ -111,8 +111,13 @@
           Disk space OK: {{ ((ansible_facts.mounts | selectattr('mount', 'equalto', '/') | list | first).size_available / 1073741824) | round(1) }} GiB free on /
       tags: always
 
+    # import_tasks, not include_tasks: `tags: always` on a dynamic include tags only
+    # the include itself, so under `--tags app` (every `just deploy-*` recipe) the
+    # inner assert would be silently filtered out. An import is resolved at parse
+    # time and hands the tag to every task in the file. scripts/check-disk-tier-guards.py
+    # (group `tags`) fails the build if this regresses.
     - name: Assert minimum available RAM
-      ansible.builtin.include_tasks: tasks/assert-memory.yml
+      ansible.builtin.import_tasks: tasks/assert-memory.yml
       tags: always
 
 - name: Preflight variable validation
@@ -329,13 +334,17 @@
 
     # Demo/dev-only settings (demo_mode, dev_routes_enabled, dev_reset_secret) must
     # never reach a production instance. See issue #716.
+    # import_tasks so the tag reaches every guard task under `--tags` (see the RAM
+    # assert above for why include_tasks is not enough).
     - name: Include shared demo/dev-mode production safety guard
-      ansible.builtin.include_tasks: tasks/guard-demo-mode.yml
+      ansible.builtin.import_tasks: tasks/guard-demo-mode.yml
       tags: always
 
     # Hosts without full-disk encryption may run only the push relay.
+    # import_tasks: this is the control that keeps PostgreSQL and every secret off
+    # an unencrypted host; a dynamic include would skip it under `--tags`.
     - name: Include shared disk-tier guard (no secrets at rest on unencrypted hosts)
-      ansible.builtin.include_tasks: tasks/guard-disk-tier.yml
+      ansible.builtin.import_tasks: tasks/guard-disk-tier.yml
       tags: always
 
     - name: Assert bridge_secret is set when SIP bridge or Asterisk is enabled

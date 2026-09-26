@@ -15,7 +15,8 @@
 # below may not, and "placed" includes the empty-group fallback every service
 # role uses: an empty group means "every llamenos_servers host".
 #
-# Included from playbooks/preflight.yml. Backups, restores, updates and the
+# Imported (import_tasks — a dynamic include_tasks would be skipped under `--tags`)
+# from playbooks/preflight.yml. Backups, restores, updates and the
 # observability stack skip unencrypted hosts instead
 # (playbooks/tasks/skip-unencrypted-host.yml).
 

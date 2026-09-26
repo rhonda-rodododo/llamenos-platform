@@ -38,13 +38,17 @@
 
   tasks:
     - name: Skip hosts without disk encryption (this play keeps data at rest)
-      ansible.builtin.include_tasks: tasks/skip-unencrypted-host.yml
+      ansible.builtin.import_tasks: tasks/skip-unencrypted-host.yml
       tags: always
 
     # ── Phase 1: Snapshot & Backup (runs outside rescue) ───────────
     - name: Track current versions (pre-update snapshot)
+      # `apply` is what tags the role's own tasks; `tags:` alone tags only the
+      # include, so `--tags update` would run this and skip the role body.
       ansible.builtin.include_role:
         name: llamenos-version-tracker
+        apply:
+          tags: [update, version]
       tags: [update, version]
 
     - name: Display pre-update versions
@@ -75,6 +79,8 @@
     - name: Run pre-update backup
       ansible.builtin.include_role:
         name: backup
+        apply:
+          tags: [update, backup]
       when: not (update_skip_backup | bool)
       tags: [update, backup]
 
