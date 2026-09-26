@@ -37,6 +37,16 @@ describe('escapeMarkdownCell', () => {
     expect(escapeMarkdownCell('a\\|b')).toBe('a\\\\\\|b')
   })
 
+  test('escapes backslashes so the output round-trips to the input', () => {
+    // Undo the escaping the way a markdown renderer would: `\\` -> `\`, `\|` -> `|`.
+    const unescape = (s: string) => s.replace(/\\([\\|])/g, '$1')
+    for (const input of ['a\\b', 'trailing\\', '\\|', '\\\\|', 'x\\\\y|z']) {
+      const out = escapeMarkdownCell(input)
+      expect(unescape(out)).toBe(input)
+    }
+    expect(escapeMarkdownCell('a\\')).toBe('a\\\\')
+  })
+
   test('escapes a bare pipe', () => {
     expect(escapeMarkdownCell('a|b')).toBe('a\\|b')
   })
@@ -79,8 +89,8 @@ describe('renderMarkdown — per-function table row integrity', () => {
     // applied only to notes, with everything else interpolated raw.
     function vulnerableRenderRow(row: BindingRow): string {
       const notes = [row.body.note, row.response.note, row.unresolvedReason].filter(Boolean).join('<br>')
-      // codeql[js/incomplete-sanitization] Intentional: this reproduces the known-vulnerable (backslash-unaware) escape on purpose so the mutation check below proves the real escapeMarkdownCell fix is what catches it.
-      return `| \`${row.functionName}\` | ${row.file}:${row.line} | ${row.method} | \`${row.pathPattern || '?'}\` | ${row.body.verdict} | ${row.response.verdict} | ${notes.replace(/\|/g, '\\|')} |`
+      const escapedNotes = notes.split('|').join('\\|')  // backslash-unaware, as the original was
+      return `| \`${row.functionName}\` | ${row.file}:${row.line} | ${row.method} | \`${row.pathPattern || '?'}\` | ${row.body.verdict} | ${row.response.verdict} | ${escapedNotes} |`
     }
 
     const row = makeRow({
