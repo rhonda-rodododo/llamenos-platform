@@ -320,6 +320,25 @@ describe('Telephony routes', () => {
       )
     })
 
+    it('reads spam settings and scopes the rate-limit window to the called hub (#1051)', async () => {
+      services.settings.checkRateLimit = vi.fn().mockResolvedValue({ limited: false })
+      services.settings.getSpamSettings = vi.fn().mockResolvedValue({
+        voiceCaptchaEnabled: false,
+        rateLimitEnabled: true,
+        maxCallsPerMinute: 5,
+        blockDurationMinutes: 30,
+      })
+      const app = await createTestApp(adapter, services)
+      await app.request('/api/telephony/language-selected?hub=hub-1', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: 'CallSid=CA-lang&From=%2B15551111111&Digits=2',
+      })
+      expect(services.settings.getSpamSettings).toHaveBeenCalledWith('hub-1')
+      const [{ key }] = (services.settings.checkRateLimit as ReturnType<typeof vi.fn>).mock.calls[0]
+      expect(key).toMatch(/^phone:hub-1:/)
+    })
+
     it('returns CAPTCHA gather when voice CAPTCHA enabled', async () => {
       services.settings.getSpamSettings = vi.fn().mockResolvedValue({
         voiceCaptchaEnabled: true,

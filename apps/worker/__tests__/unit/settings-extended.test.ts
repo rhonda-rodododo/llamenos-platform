@@ -259,6 +259,32 @@ describe('SettingsService.updateCallSettings', () => {
   })
 })
 
+describe('SettingsService per-hub call settings (#1051)', () => {
+  it('reads the hub override layered over the platform values', async () => {
+    const { db, service } = setup()
+    db.$setSelectResults([
+      [makeSettingsRow()],
+      [{ hubId: 'hub-a', settings: { callSettings: { queueTimeoutSeconds: 45 } } }],
+    ])
+    const result = await service.getCallSettings('hub-a')
+    expect(result.queueTimeoutSeconds).toBe(45)
+    expect(result.voicemailMaxSeconds).toBe(120)
+  })
+
+  it('hub update clamps, persists to hub_settings and never touches system_settings', async () => {
+    const { db, service } = setup()
+    db.$setSelectResults([
+      [{ hubId: 'hub-a', settings: {} }],
+      [{ hubId: 'hub-a', settings: {} }],
+      [makeSettingsRow()],
+      [{ hubId: 'hub-a', settings: { callSettings: { queueTimeoutSeconds: 30 } } }],
+    ])
+    await service.updateCallSettings({ queueTimeoutSeconds: 5 }, 'hub-a')
+    expect(db.insert).toHaveBeenCalled()
+    expect(db.update).not.toHaveBeenCalled()
+  })
+})
+
 // ---------------------------------------------------------------------------
 // getIvrLanguages / updateIvrLanguages
 // ---------------------------------------------------------------------------

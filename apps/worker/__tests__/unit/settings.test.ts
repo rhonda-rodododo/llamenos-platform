@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect } from 'vitest'
 import { SettingsService, ServiceError } from '@worker/services/settings'
 import { createMockDb } from './mock-db'
 
@@ -192,7 +192,7 @@ describe('SettingsService.clearRateLimits', () => {
   })
 
   it('resolves without error', async () => {
-    const { db, service } = setup()
+    const { service } = setup()
     await expect(service.clearRateLimits()).resolves.toBeUndefined()
   })
 })
@@ -265,6 +265,39 @@ describe('SettingsService.updateSpamSettings', () => {
     await service.updateSpamSettings({ voiceCaptchaEnabled: true })
 
     expect(db.update).toHaveBeenCalled()
+  })
+})
+
+describe('SettingsService per-hub spam settings (#1051)', () => {
+  it('reads the hub override layered over the platform values', async () => {
+    const { db, service } = setup()
+    db.$setSelectResults([
+      [makeSettingsRow()], // system_settings
+      [{ hubId: 'hub-a', settings: { spamSettings: { rateLimitEnabled: false } } }], // hub_settings
+    ])
+    const result = await service.getSpamSettings('hub-a')
+    expect(result.rateLimitEnabled).toBe(false)
+    expect(result.maxCallsPerMinute).toBe(3) // inherited from platform
+  })
+
+  it('a hub without an override inherits the platform values', async () => {
+    const { db, service } = setup()
+    db.$setSelectResults([[makeSettingsRow()], []])
+    const result = await service.getSpamSettings('hub-b')
+    expect(result.rateLimitEnabled).toBe(true)
+  })
+
+  it('hub update persists to hub_settings and never to system_settings', async () => {
+    const { db, service } = setup()
+    db.$setSelectResults([
+      [{ hubId: 'hub-a', settings: {} }], // getHubSettings (existing overrides)
+      [{ hubId: 'hub-a', settings: {} }], // updateHubSettings -> getHubSettings
+      [makeSettingsRow()], // re-read effective: system_settings
+      [{ hubId: 'hub-a', settings: { spamSettings: { rateLimitEnabled: false } } }],
+    ])
+    await service.updateSpamSettings({ rateLimitEnabled: false }, 'hub-a')
+    expect(db.insert).toHaveBeenCalled()
+    expect(db.update).not.toHaveBeenCalled()
   })
 })
 
