@@ -50,6 +50,24 @@ export default tseslint.config(
       '@typescript-eslint/no-explicit-any': 'error',
     },
   },
+  // Domain-separation rail (#1033): crypto contexts come from the generated registry
+  // (@shared/crypto-labels), never a raw 'llamenos:*' literal — a literal drifts silently when
+  // packages/protocol/crypto-labels.json changes. version.ts (DOM event name) and
+  // transcription (localStorage key) are not crypto contexts.
+  {
+    files: ['src/client/lib/**/*.ts'],
+    ignores: [
+      'src/client/lib/**/*.test.ts',
+      'src/client/lib/version.ts',
+      'src/client/lib/transcription/**',
+    ],
+    rules: {
+      'no-restricted-syntax': ['error', {
+        selector: "Literal[value=/^llamenos:/]",
+        message: "Use the generated constant from '@shared/crypto-labels' instead of a raw 'llamenos:' literal.",
+      }],
+    },
+  },
   // api-schema-binding rail (see scripts/api-schema-binding/): a hand-written request/response
   // shape here is a build error, so the client/server drift documented in
   // scripts/api-schema-binding/report.md cannot keep spreading by copy-paste from a neighbour.
