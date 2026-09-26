@@ -1322,6 +1322,8 @@ export class CasesService {
     caseId: string,
     authorPubkey: string,
     input: CreateInteractionBody,
+    /** Explicit creation time — only for seeding historical demo data. */
+    opts?: { createdAt?: Date },
   ): Promise<InteractionRow> {
     const record = await this.db
       .select({ id: caseRecords.id })
@@ -1343,6 +1345,7 @@ export class CasesService {
         interactionTypeHash: input.interactionTypeHash,
         previousStatusHash: input.previousStatusHash ?? null,
         newStatusHash: input.newStatusHash ?? null,
+        ...(opts?.createdAt ? { createdAt: opts.createdAt } : {}),
       })
       .returning()
 

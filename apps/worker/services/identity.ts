@@ -31,7 +31,7 @@ import type {
   DeviceRecord,
 } from '../types'
 import { ServiceError } from './settings'
-import { DEMO_ACCOUNTS } from '@shared/demo-accounts'
+import { demoIdentities } from '../lib/demo-identities'
 import { createLogger } from '../lib/logger'
 import { withRetry, isRetryableDbError } from '../lib/retry'
 import { getCircuitBreaker } from '../lib/circuit-breaker'
@@ -293,7 +293,7 @@ export class IdentityService {
     }
 
     if (demoMode) {
-      for (const account of DEMO_ACCOUNTS) {
+      for (const account of demoIdentities()) {
         await this.db.insert(users).values({
           pubkey: account.pubkey,
           displayName: account.name,

@@ -1910,6 +1910,14 @@ export class SettingsService {
       throw new ServiceError(404, 'Hub not found')
     }
 
+    return this.purgeHub(id)
+  }
+
+  /**
+   * Delete a hub and every hub-scoped row, without requiring the hub row to
+   * exist — so orphaned data (hub row already gone) can still be cleared.
+   */
+  async purgeHub(id: string): Promise<{ ok: true }> {
     await this.db.transaction(async (tx) => {
       // 1. Delete users who belong exclusively to this hub (cascade deletes sessions, webauthn, etc.)
       // Exclude super-admins — they are system-level accounts that must survive hub deletion.

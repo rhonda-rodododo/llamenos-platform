@@ -273,6 +273,45 @@ export class CallsService {
   // Call History
   // =========================================================================
 
+  /**
+   * Insert an already-finished call straight into history.
+   * Only for seeding demo data — live calls go through addCall → endCall.
+   */
+  async recordHistoricalCall(
+    hubId: string,
+    data: {
+      callId: string
+      callerLast4: string
+      startedAt: Date
+      durationSeconds: number
+      answeredBy: string | null
+      status: 'completed' | 'unanswered'
+      hasVoicemail?: boolean
+      encryptedContent: string
+      adminEnvelopes: unknown[]
+    },
+  ): Promise<CallRecordRow> {
+    const endedAt = new Date(data.startedAt.getTime() + data.durationSeconds * 1000)
+    const [row] = await this.db
+      .insert(callRecords)
+      .values({
+        callId: data.callId,
+        hubId,
+        callerLast4: data.callerLast4,
+        startedAt: data.startedAt,
+        endedAt,
+        duration: data.durationSeconds,
+        answeredBy: data.answeredBy,
+        status: data.status,
+        hasVoicemail: data.hasVoicemail ?? false,
+        encryptedContent: data.encryptedContent,
+        adminEnvelopes: data.adminEnvelopes,
+        createdAt: endedAt,
+      })
+      .returning()
+    return row
+  }
+
   /** Get a single encrypted call record by ID */
   async getCallRecord(callId: string): Promise<CallRecordRow | null> {
     const [row] = await this.db
